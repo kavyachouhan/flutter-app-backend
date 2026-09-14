@@ -1,0 +1,50 @@
+# Local development dependencies only — the API itself runs on the host via
+# `npm run dev` so edits reload instantly.
+#
+#   docker compose up -d && npm run migrate && npm run seed && npm run dev
+#
+# The Postgres image is pinned to the major version Supabase runs, so local
+# behaviour matches production. Ports are bound to 127.0.0.1 so a laptop on a
+# cafe wifi is not serving an unauthenticated database to the network.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: khata-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: khata
+      POSTGRES_PASSWORD: khata
+      POSTGRES_DB: khata
+      # Match Supabase's collation so ORDER BY on names sorts identically.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      # 5433 on the host, not 5432: a locally-installed PostgreSQL service
+      # commonly already owns 5432, and this container must not fight it for
+      # the port or shadow it in connection strings.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - khata-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U khata -d khata']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: khata-redis
+    restart: unless-stopped
+    # Bounded memory with LRU eviction: the cache must never be able to OOM
+    # the box, and everything in it is reconstructible from Postgres.
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly no
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  khata-pgdata:

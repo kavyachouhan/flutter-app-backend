@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+tests
+**/*.test.ts
+.vscode
+.idea
+README.md
+master-feature-list.md

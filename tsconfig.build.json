@@ -1,0 +1,13 @@
+{
+  /* Production build: source only, no tests, no source maps shipped by
+     default. `npm run build` uses this; `npm run typecheck` uses the base
+     config so tests are type-checked too. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "src/**/__tests__/**"]
+}

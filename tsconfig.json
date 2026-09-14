@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    /* Node 20+ on the server, ESM everywhere. NodeNext makes TypeScript apply
+       Node's own resolution rules, which is what forces the explicit `.js`
+       extensions on relative imports below. */
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+
+    "rootDir": ".",
+    "outDir": "dist",
+
+    /* Strictness. This is a money and tax codebase: every one of these has
+       caught a real class of bug in products like this one. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* We never ship un-type-checked JS, and `verbatimModuleSyntax` keeps the
+       emitted import graph identical to the source so ESM stays predictable. */
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": false,
+    "pretty": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
