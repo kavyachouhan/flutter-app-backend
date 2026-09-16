@@ -12,54 +12,21 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-
-    # Use services to run PostgreSQL and Redis for testing
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: khata
-          POSTGRES_PASSWORD: khata
-          POSTGRES_DB: khata_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U khata"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s --health-timeout 3s --health-retries 10
-
-    env:
-      APP_ENV: development
-      NODE_ENV: test
-      DATABASE_URL: postgresql://khata:khata@localhost:5432/khata_test
-      REDIS_URL: redis://localhost:6379
-      JWT_SECRET: ci-only-secret-value-at-least-thirty-two-chars-long
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: package.json
           cache: npm
 
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
 
-      - name: Type-check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Format check
-        run: npm run format:check
-
-      - name: Migrate test database
-        run: npm run migrate
-
-      - name: Test
-        run: npm test
+      # Unit tests only. They configure themselves from tests/fixtures/env.ts
+      # and never touch a database; integration tests against a dedicated
+      # Supabase test project will get their own job, fed from repository
+      # secrets, so no shared or production database is reachable from CI.
+      - run: npm test

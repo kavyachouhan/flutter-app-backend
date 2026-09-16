@@ -58,7 +58,7 @@ export default tseslint.config(
   // The config module and scripts are the only places allowed to touch
   // process.env / the console: they run before the logger exists.
   {
-    files: ['src/config/env.ts', 'src/db/migrate.ts', 'src/db/seed/**/*.ts', 'eslint.config.js'],
+    files: ['src/config/env.ts', 'src/db/migrate.ts', 'src/db/bootstrap.ts', 'eslint.config.js'],
     rules: {
       'no-restricted-properties': 'off',
       'no-console': 'off',

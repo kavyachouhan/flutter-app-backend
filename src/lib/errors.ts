@@ -1,80 +1,66 @@
 /**
- * The application error hierarchy.
- *
- * Every failure that reaches a client goes through one of these. The `code` is
- * a stable, machine-readable enum that the Flutter and React clients switch
- * on — clients must never string-match a human message, because messages get
- * reworded and translated and the match silently stops working.
- *
- * Rules:
- *   - `message` is safe to show a user or an integrator. Never put a SQL
- *     fragment, a stack trace or a secret in it.
- *   - `details` carries structured, also-safe context (which field failed,
- *     which limit was hit).
- *   - Anything NOT an AppError is treated as a bug: the error handler logs it
- *     in full and returns a generic 500, so internals never leak.
+ * Every failure that reaches a client is an AppError. `code` is the contract
+ * clients branch on; messages get reworded and translated, codes do not.
+ * Codes are additive only — a rename breaks every installed app that has not
+ * updated yet.
  */
 
-/**
- * Stable error codes. Additive only — renaming one is a breaking API change
- * for every deployed mobile app that has not been updated.
- */
 export const ErrorCode = {
-  // 400
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   MALFORMED_REQUEST: 'MALFORMED_REQUEST',
 
-  // 401
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   TOKEN_INVALID: 'TOKEN_INVALID',
   OTP_INVALID: 'OTP_INVALID',
   OTP_EXPIRED: 'OTP_EXPIRED',
 
-  // 403
   FORBIDDEN: 'FORBIDDEN',
   INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE',
   OUTLET_NOT_PERMITTED: 'OUTLET_NOT_PERMITTED',
+  ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
 
-  // 404
   NOT_FOUND: 'NOT_FOUND',
 
-  // 409
   CONFLICT: 'CONFLICT',
   DUPLICATE: 'DUPLICATE',
-  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
   DOCUMENT_IMMUTABLE: 'DOCUMENT_IMMUTABLE',
   TOTALS_MISMATCH: 'TOTALS_MISMATCH',
-  STALE_WRITE: 'STALE_WRITE',
+  LAST_OWNER: 'LAST_OWNER',
 
-  // 402 / entitlements
   ENTITLEMENT_REQUIRED: 'ENTITLEMENT_REQUIRED',
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
 
-  // 422
   UNPROCESSABLE: 'UNPROCESSABLE',
-  INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
-  CREDIT_LIMIT_EXCEEDED: 'CREDIT_LIMIT_EXCEEDED',
+  NUMBER_NOT_LEASED: 'NUMBER_NOT_LEASED',
   NUMBER_BLOCK_EXHAUSTED: 'NUMBER_BLOCK_EXHAUSTED',
+  CREDIT_SALE_REQUIRES_CUSTOMER: 'CREDIT_SALE_REQUIRES_CUSTOMER',
+  INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
+  OVERPAYMENT: 'OVERPAYMENT',
 
-  // 429
   RATE_LIMITED: 'RATE_LIMITED',
 
-  // 500 / 503
   INTERNAL: 'INTERNAL',
   DEPENDENCY_UNAVAILABLE: 'DEPENDENCY_UNAVAILABLE',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 
-/** Structured, client-safe context attached to an error. */
+/** Warnings returned alongside a successful write; the operation is not rejected. */
+export const WarningCode = {
+  CREDIT_LIMIT_EXCEEDED: 'CREDIT_LIMIT_EXCEEDED',
+  NEGATIVE_STOCK: 'NEGATIVE_STOCK',
+} as const;
+
+export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];
+
 export type ErrorDetails = Record<string, unknown>;
 
 export interface AppErrorOptions {
-  /** The underlying error, logged but never serialised to the client. */
+  /** Logged, never serialised. */
   cause?: unknown;
+  /** Client-safe structured context. */
   details?: ErrorDetails;
-  /** Seconds the client should wait before retrying. Emitted as Retry-After. */
   retryAfterSeconds?: number;
 }
 
@@ -83,15 +69,7 @@ export class AppError extends Error {
   readonly code: ErrorCodeValue;
   readonly details: ErrorDetails | undefined;
   readonly retryAfterSeconds: number | undefined;
-
-  /**
-   * True for errors that are a normal part of operation (a validation failure,
-   * a 404). These log at `warn`. Anything non-operational logs at `error` and
-   * is treated as a bug worth paging on.
-   *
-   * Annotated `boolean` rather than left to inference: an inferred `true`
-   * literal type makes the `false` override in InternalError a type error.
-   */
+  /** False marks a bug: logged at error level and answered with a generic 500. */
   readonly isOperational: boolean = true;
 
   constructor(
@@ -106,20 +84,8 @@ export class AppError extends Error {
     this.code = code;
     this.details = options.details;
     this.retryAfterSeconds = options.retryAfterSeconds;
-    Error.captureStackTrace(this, new.target);
-  }
-
-  /** The client-facing shape. `requestId` is added by the error handler. */
-  toPayload(): { code: ErrorCodeValue; message: string; details?: ErrorDetails } {
-    return this.details === undefined
-      ? { code: this.code, message: this.message }
-      : { code: this.code, message: this.message, details: this.details };
   }
 }
-
-// ---------------------------------------------------------------------------
-// Concrete errors
-// ---------------------------------------------------------------------------
 
 export class ValidationError extends AppError {
   constructor(message = 'The request failed validation.', options: AppErrorOptions = {}) {
@@ -148,9 +114,8 @@ export class ForbiddenError extends AppError {
 }
 
 /**
- * Note the deliberate choice throughout the codebase: a resource belonging to
- * another tenant returns NotFound, not Forbidden. Forbidden would confirm the
- * record exists, which is an information leak across a tenant boundary.
+ * Also used for resources owned by another tenant: a 403 would confirm the
+ * record exists across the tenant boundary.
  */
 export class NotFoundError extends AppError {
   constructor(resource = 'Resource', options: AppErrorOptions = {}) {
@@ -170,7 +135,7 @@ export class ConflictError extends AppError {
 
 export class UnprocessableError extends AppError {
   constructor(
-    message = 'The request is well-formed but cannot be processed.',
+    message: string,
     code: ErrorCodeValue = ErrorCode.UNPROCESSABLE,
     options: AppErrorOptions = {},
   ) {
@@ -178,7 +143,6 @@ export class UnprocessableError extends AppError {
   }
 }
 
-/** Raised when a plan limit blocks the action — seats, outlets, item count. */
 export class EntitlementError extends AppError {
   constructor(
     message = 'Your current plan does not include this.',
@@ -190,9 +154,8 @@ export class EntitlementError extends AppError {
 }
 
 export class RateLimitError extends AppError {
-  constructor(retryAfterSeconds: number, options: AppErrorOptions = {}) {
+  constructor(retryAfterSeconds: number) {
     super(429, ErrorCode.RATE_LIMITED, 'Too many requests. Please slow down.', {
-      ...options,
       retryAfterSeconds,
     });
   }
@@ -217,15 +180,10 @@ export class InternalError extends AppError {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }
 
-/** Safe one-line description of any thrown value, for logging. */
 export function describeError(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
   if (typeof error === 'string') return error;

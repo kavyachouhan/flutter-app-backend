@@ -1,192 +1,110 @@
 # Khata Backend
 
-GST billing API for the Khata Flutter clients (Android, iOS, Windows, macOS) and the future React web app. One backend serves every platform.
+GST billing API for the Khata Flutter clients (Android, iOS, Windows, macOS) and the future React web app.
 
-Node 20+ · TypeScript (strict) · Express 5 · PostgreSQL (Supabase) · Redis
+Node 20.11+ · TypeScript (strict) · Express 5 · Supabase Postgres · Redis
 
----
-
-## Quick start
+## Setup
 
 ```bash
-cp .env.example .env.development
 npm install
-docker compose up -d        # Postgres on :5433, Redis on :6379
-npm run migrate
-npm run seed
-npm run dev                 # http://localhost:3000
+cp .env.example .env.development   # fill in every value; there are no in-code defaults
+npm run infra:up                   # local Redis (docker compose)
+npm run migrate                    # as the owner role, via DATABASE_MIGRATION_URL
+npm run db:bootstrap               # creates the API's login role, revokes Data API grants
+npm run dev
 ```
 
-Then `GET /healthz` to confirm it is up, and `/docs` for the API surface.
+`GET /healthz` confirms the process is up; `GET /readyz` checks Postgres and Redis.
 
-> **Port 5433 is deliberate.** A PostgreSQL installed directly on the host usually owns 5432; the container avoids it so the two cannot collide.
+### Supabase connections
 
-### Scripts
+| Variable                 | Connects as              | Pooler mode       | Used by                   |
+| ------------------------ | ------------------------ | ----------------- | ------------------------- |
+| `DATABASE_URL`           | `DATABASE_APP_ROLE_NAME` | transaction       | the running API           |
+| `DATABASE_MIGRATION_URL` | `postgres`               | session or direct | `migrate`, `db:bootstrap` |
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Watch mode with pretty logs |
-| `npm run build` / `start` | Compile to `dist/`, run compiled output |
-| `npm run migrate` / `migrate:status` | Apply pending migrations / show schema state |
-| `npm run seed` | Development tenant, outlets, counters, sample catalogue |
-| `npm test` | Unit tests, plus integration tests when Postgres is reachable |
-| `npm run check` | `typecheck` + `lint` + `test` — what CI runs |
+The API must never connect as `postgres`, `supabase_admin` or `service_role`: those roles bypass row-level security, which silently disables every tenant boundary. `env.ts` refuses to boot production if it does, and `db:bootstrap` refuses to finish if the app role can bypass RLS.
 
----
+Migrations need a session-mode connection because they hold a session-level advisory lock.
 
-## The two environments
+### Configuration
 
-`APP_ENV` (`development` | `production`) drives behaviour. It is deliberately **separate** from `NODE_ENV`, which stays `production` in any built image so Express and the dependency tree take their optimised paths.
+Every tunable is an environment variable validated by `src/config/env.ts`; a missing value stops boot. This includes things that look like constants but are set by law or policy — the notified GST rates, the document-number length limit, plan limits — so a change is a config update, not a deploy.
 
-| | development | production |
-|---|---|---|
-| Secrets | `.env.development` (git-ignored) | injected by the platform; no `.env` on disk |
-| Database | docker-compose Postgres | Supabase, as the `app_user` role |
-| SMS | `console` — logs the OTP | real provider |
-| OTP | `AUTH_DEV_FIXED_OTP` accepted for any number | random, hashed, single-use |
-| `POST /v1/auth/dev-login` | enabled — token pair, no OTP | **route is never registered** |
-| Logs | pretty, debug | JSON, info |
+The remaining literals in code are contracts rather than settings: paise and thousandths-of-a-unit scales shared with every client, HTTP status codes, and formats defined by GST law or ISO/ITU standards.
 
-### Why the bypass is safe
+## Environments
 
-A leaked dev bypass is total account takeover, so three independent guards stand between it and production:
+`APP_ENV` is `development` or `production`, independent of `NODE_ENV`.
 
-1. **The process refuses to boot.** `src/config/env.ts` collects *every* unsafe production setting — the bypass, a fixed OTP, the console SMS provider, a placeholder JWT secret, a wildcard CORS origin, non-TLS database, connecting as Supabase's `postgres` role — and throws with the full list. It fails closed, loudly, at startup.
-2. **The route does not exist.** The dev router is mounted behind `if (env.APP_ENV === 'development')` in `app.ts`, so in production the handler is never wired to a path — not merely guarded inside the handler.
-3. **CI asserts both.** `src/config/env.test.ts` proves each violation is rejected and that development configurations are left alone. A regression fails the build.
+Development may enable `AUTH_DEV_BYPASS` (mounting `POST /v1/auth/dev-login`) and `AUTH_DEV_FIXED_OTP`. Three independent guards keep these out of production:
 
-Everything else is identical across environments, so development exercises the real code path.
+1. `env.ts` refuses to boot with either enabled, and reports every unsafe setting at once.
+2. `v1-router.ts` never mounts the dev router outside development.
+3. `src/config/env.test.ts` asserts both in CI.
 
----
+## API
 
-## Architecture
+All routes are under `/v1`. Success responses are `{ data }`, or `{ data, nextCursor }` for lists; errors are `{ error: { code, message, details?, requestId } }`, and clients should branch on `code`.
 
-```
-Flutter (offline-first, local SQLite)  ──┐
-React web (future)                     ──┼──►  Express API  ──►  Postgres (RLS)
-Integrations (future)                  ──┘         │
-                                                   └──►  Redis (rate limit, cache, OTP, idempotency)
-```
+### Authentication flow
 
-Clients only ever talk to Express. Supabase is used as hosted Postgres — our own SQL, our own migrations, our own JWTs. No `supabase-js`, no Supabase Auth.
+1. `POST /auth/otp/request` → `POST /auth/otp/verify` returns an **identity token** and the user's tenants.
+2. With the identity token: `POST /onboarding/tenants` (new business) or `POST /auth/sessions` (existing tenant) returns an **access token** and a **refresh token** bound to the device.
+3. `POST /auth/refresh` rotates the refresh token. Presenting an already-rotated token outside `REFRESH_TOKEN_REUSE_GRACE_SECONDS` revokes the device's session.
 
-### Module layout
+Access tokens are stateless, so role changes apply at the next refresh; deactivating a member or device revokes refresh tokens immediately.
 
-```
-src/
-├─ config/env.ts       the only place process.env is read; validates and freezes at boot
-├─ lib/                errors, logger, context (ALS), money, ids, pagination
-├─ db/                 pool, tx (tenant scoping), migrate, migrations/*.sql
-├─ cache/              Redis client and degradation policy
-├─ middleware/         request context, validation, error handling
-├─ domain/             pure, dependency-free, unit-tested
-│  ├─ tax/             the GST engine — mirrored in Dart
-│  └─ numbering/       financial years, series formats, number blocks
-├─ modules/<feature>/  routes → controller → service → repository
-└─ observability/      Prometheus metrics
-```
+### Modules
 
-Every module follows `routes → controller → service → repository`. Controllers hold no logic, services own transactions, repositories own SQL.
+| Area      | Routes                                                                                                    |
+| --------- | --------------------------------------------------------------------------------------------------------- |
+| Auth      | `/auth/otp/*`, `/auth/sessions`, `/auth/refresh`, `/auth/logout`, `/auth/me`                              |
+| Tenancy   | `/onboarding/tenants`, `/tenant`, `/tenant/subscription`, `/members`, `/devices`, `/outlets`, `/counters` |
+| Catalogue | `/categories`, `/items`, `/items/by-barcode/:barcode`                                                     |
+| Customers | `/customers`, `/customers/:id/ledger`                                                                     |
+| Numbering | `/numbering/series`, `/numbering/series/:id/leases`, `/numbering/series/:id/gaps`, `/numbering/leases`    |
+| Billing   | `/invoices`, `/invoices/:id/void`, `/invoices/:id/printed`, `/payments`, `/payments/:id/void`             |
+| Stock     | `/stock/balances`, `/stock/ledger`, `/stock/adjustments`                                                  |
 
----
+Roles and their permissions are defined in `src/modules/auth/permissions.ts`.
 
-## The four rules that shape everything
+## Design rules
 
-These come from the design constraints in [master-feature-list.md](master-feature-list.md) §1. Each one is a rewrite if retrofitted, so all four hold from the first migration.
+**Money is integer paise; quantities are thousandths.** No floating point in the money path.
 
-### 1. Money is integer paise, never a float
+**Tenant isolation is enforced by Postgres.** Every tenant table has forced RLS; `src/db/tx.ts` sets the tenant with `SET LOCAL` per transaction, because a session setting would leak across tenants on a transaction-mode pooler. A resource in another tenant returns 404, never 403.
 
-Every amount — column, API field, intermediate value — is a whole number of paise. `0.1 + 0.2 !== 0.3` is not a curiosity in a billing product: over a few hundred bills a day it is a cash drawer that does not reconcile and a GST return that does not match.
+**Documents are immutable; ledgers are append-only.** Issued invoices and payments may only change status/print fields (trigger-enforced); corrections are voids and reversing entries. Stock and customer balances are trigger-maintained projections of their ledgers.
 
-`src/lib/money.ts` parses decimal strings directly rather than via `parseFloat`, and distributes amounts with the largest-remainder method so an apportioned discount sums to *exactly* the discount.
+**Clients generate ids.** Creating with an id that already exists returns the existing record, so an offline device can retry uploads safely.
 
-### 2. Tenant isolation is enforced by the database
+**The tax engine is shared.** `src/domain/tax` is pure and must match the Dart port. The server recomputes every uploaded invoice and rejects it with `TOTALS_MISMATCH` if the device disagrees.
 
-Every table carries `tenant_id`, has RLS **enabled and forced**, and has a policy comparing against `app.current_tenant_id()`. `src/db/tx.ts` is the only sanctioned way to query, and it issues `SET LOCAL app.tenant_id` as the first statement of every transaction.
+**Offline sales are accepted, then flagged.** An invoice upload is rejected only for structural problems (unleased number, mismatched totals, unpaid credit without a customer). Conditions a device could not see offline — credit limit, negative stock — come back as `warnings`.
 
-`SET LOCAL`, not `SET`: the Supabase pooler runs pgbouncer in transaction mode, so a session-scoped setting would leak one tenant's context onto the next tenant's query.
+### Document numbering
 
-> **Never connect as Supabase's `postgres` role.** It has `BYPASSRLS`, which silently disables every isolation policy while the application still appears to work. `env.ts` refuses to start if the production connection string uses it.
+Devices lease contiguous number blocks per series and issue from them offline. An exclusion constraint makes overlapping blocks impossible, so two devices can never issue the same number. Unused numbers in expired blocks are reported by `/numbering/series/:id/gaps` for GSTR-1 Table 13 and never reissued.
 
-A resource belonging to another tenant returns **404, not 403** — a 403 would confirm the record exists.
+Series formats are validated against `DOCUMENT_NUMBER_MAX_LENGTH` using the highest number they will ever print, not a sample, so a format cannot overflow mid-year. Outlet and counter codes cannot change while a series prints them.
 
-### 3. Documents are immutable; ledgers are append-only
+## Scripts
 
-Issued invoices are frozen by a database trigger; corrections are credit/debit notes. `stock_ledger_entries` has no UPDATE or DELETE path at all — reversals are negative entries. A ledger you can edit is not a ledger, and theft detection, stock audits and khata disputes all depend on that.
+| Command                                          | Purpose                                        |
+| ------------------------------------------------ | ---------------------------------------------- |
+| `npm run dev`                                    | Watch mode, loads `.env.development`           |
+| `npm run build` / `npm start`                    | Compile to `dist/` / run it                    |
+| `npm run migrate` / `migrate:status`             | Apply / list migrations (development env file) |
+| `npm run db:bootstrap`                           | Create the app role and revoke Data API grants |
+| `npm run migrate:deploy` / `db:bootstrap:deploy` | Same, from `dist/` with injected env           |
+| `npm run check`                                  | Typecheck, lint, unit tests                    |
 
-### 4. Offline-first means the device is the source of truth until it syncs
-
-Documents carry client-generated UUIDv7s, so a retried upload over a flaky connection stores exactly one row. The tax engine runs identically on the device, so offline totals match the server. Sync cursors use a per-tenant counter allocated under a row lock — a plain `BIGSERIAL` would let sequence order diverge from commit order, and a client paging past the gap would lose that row permanently.
-
----
-
-## Document numbering — the wedge
-
-> "Your invoice numbers will never duplicate."
-
-Four properties must hold at once, and the combination is what makes it hard:
-
-- **Unique** — two cashiers billing simultaneously on one counter cannot collide.
-- **Gapless** — GST expects a continuous series; gaps must be declarable in GSTR-1 Table 13, not hidden.
-- **Offline** — a device with no network must still issue a legally numbered invoice.
-- **FY-scoped** — the series resets on 1 April.
-
-"Offline" rules out the obvious designs: a database sequence needs the network, and a client-side counter cannot know what other devices used. The answer is **leasing** — while online, a device reserves a contiguous block of numbers (default 50) and consumes them locally. Blocks never overlap, so offline issuance cannot collide. Unused numbers in an expired block are reported as gaps rather than recycled.
-
-### The 16-character ceiling
-
-GST rule 46(b) caps a document number at 16 characters. That is tighter than it sounds:
-
-| Format | Room for | Max documents |
-|---|---|---|
-| `INV/2026-27/…` | 4 digits | 9,999 |
-| `INV/26-27/…` | 6 digits | 999,999 |
-| `INV/C1/26-27/…` | 3 digits | 999 |
-| `INV/C1/…` | 9 digits | 999,999,999 |
-
-So numbers use the short financial-year form, and a **per-counter series drops the year segment** — it is already implied by the invoice date. `validateSeriesFormat()` checks the *ceiling*, not a sample: a format that renders fine on invoice 1 and breaks on invoice 10,000 fails in February with the year's filings already depending on it.
-
----
-
-## The tax engine
-
-`src/domain/tax/` is a pure function — no clock, no database, no randomness. It has to be: the Dart port in the Flutter app must produce byte-identical results, or a device bills offline and the server rejects a sale whose cash is already in the drawer.
-
-Order of operations (changing it changes every total in the system):
-
-1. Line gross = `unitPrice × quantity`
-2. Line discount
-3. Bill discount, apportioned by post-line-discount value with largest-remainder
-4. Back out tax if prices are MRP-inclusive
-5. Tax per line
-6. CGST/SGST split (intra-state) or IGST (inter-state)
-7. Additional charges
-8. Round-off to the nearest rupee, reported separately
-
-**Rounding is half away from zero, applied once per line**, and totals are summed from rounded lines. Rounding the total independently is the classic invoice bug: the printed lines then do not add up to the printed total, and a customer who checks will find it. `Math.round` is not equivalent — it rounds `-2.5` to `-2`, so credit notes would round in the opposite direction from the invoices they reverse.
-
-Covers GST and non-GST (unregistered) and composition modes, inclusive and exclusive pricing, cess, and produces the tax-rate breakup and HSN summary GSTR-1 needs.
-
----
-
-## Printing
-
-**ESC/POS bytes are generated on the device, never on the server.** Printers are BLE-attached to the phone and must work with no network, so the existing `ReceiptBuilder` in the Flutter app keeps that job.
-
-The backend serves a `PrintDocument` — a resolved, tax-computed, template-applied structure of typed blocks (header, logo, line items, totals, QR, footer) — plus template and branding configuration. Column widths match the Flutter app's `PaperWidth`: 32 columns at 58 mm, 48 at 80 mm.
-
----
+Migrations are forward-only and checksummed; editing an applied migration is refused.
 
 ## Status
 
-| Milestone | State |
-|---|---|
-| M0 — skeleton, config, logging, errors, health, Docker, CI | **done** |
-| M1 — pool, tenant-scoped transactions, migration runner, foundation + tenancy schema | **done** |
-| M2 — auth (OTP, JWT, refresh rotation), RBAC, outlets/counters, entitlements | in progress |
-| M3 — rate limiting, idempotency, caching, OpenAPI | pending |
-| M4 — tax engine, numbering | **done** (pure domain; repositories pending) |
-| M5 — catalogue, customers, invoices, stock ledger, khata | pending |
-| M6 — sync push/pull, print payload, integration suite, seed | pending |
+Done: production skeleton, Supabase data layer and RLS, auth (OTP, JWT, refresh rotation, dev bypass), RBAC, tenants, outlets, counters, members, devices, plan metering, catalogue, customers and khata ledger, document numbering, invoices, payments, stock ledger.
 
-Out of scope for this phase and slotting in later without touching the spine: purchases/PO, credit-debit notes, GSTR workings and 2B reconciliation, reports, WhatsApp, online storefront, multi-outlet transfer, vertical modules.
+Not yet: OpenAPI docs, idempotency keys and response caching (M3), sync push/pull and print payloads (M6), integration tests against a Supabase test project.

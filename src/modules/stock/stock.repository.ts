@@ -1,0 +1,160 @@
+import type { Tx } from '../../db/tx.js';
+import type { Cursor } from '../../lib/pagination.js';
+
+export type StockEntryType = 'opening' | 'sale' | 'sale_void' | 'adjustment';
+
+export interface NewStockEntry {
+  /** null lets the database generate one (for entries derived from another document). */
+  id: string | null;
+  outletId: string;
+  itemId: string;
+  entryType: StockEntryType;
+  quantityDelta: number;
+  reasonCode: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  occurredAt: string;
+  note: string | null;
+  createdBy: string;
+}
+
+export interface StockEntryRow {
+  id: string;
+  outletId: string;
+  itemId: string;
+  entryType: StockEntryType;
+  quantityDelta: number;
+  reasonCode: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  occurredAt: Date;
+  note: string | null;
+  createdBy: string | null;
+}
+
+export interface BalanceRow {
+  itemId: string;
+  itemName: string;
+  unit: string;
+  quantity: number;
+  reorderLevel: number | null;
+  updatedAt: Date;
+}
+
+const ENTRY_COLUMNS = `
+  id, outlet_id AS "outletId", item_id AS "itemId", entry_type AS "entryType", quantity_delta AS "quantityDelta",
+  reason_code AS "reasonCode", reference_type AS "referenceType", reference_id AS "referenceId",
+  occurred_at AS "occurredAt", note, created_by AS "createdBy"`;
+
+export const stockRepository = {
+  async insertEntries(tx: Tx, entries: readonly NewStockEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    await tx.query(
+      `INSERT INTO stock_ledger_entries (id, tenant_id, outlet_id, item_id, entry_type, quantity_delta, reason_code,
+         reference_type, reference_id, occurred_at, note, created_by)
+       SELECT COALESCE(e.id, gen_random_uuid()), app.current_tenant_id(), e."outletId", e."itemId", e."entryType",
+              e."quantityDelta", e."reasonCode", e."referenceType", e."referenceId", e."occurredAt", e.note, e."createdBy"
+       FROM jsonb_to_recordset($1::jsonb) AS e(
+         id uuid, "outletId" uuid, "itemId" uuid, "entryType" text, "quantityDelta" bigint, "reasonCode" text,
+         "referenceType" text, "referenceId" uuid, "occurredAt" timestamptz, note text, "createdBy" uuid)`,
+      [JSON.stringify(entries)],
+    );
+  },
+
+  /** Writes the negating entry for every ledger row a document produced. */
+  async reverseEntries(
+    tx: Tx,
+    input: {
+      referenceType: string;
+      referenceId: string;
+      entryType: StockEntryType;
+      reversalType: StockEntryType;
+      userId: string;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO stock_ledger_entries (id, tenant_id, outlet_id, item_id, entry_type, quantity_delta,
+         reference_type, reference_id, occurred_at, created_by)
+       SELECT gen_random_uuid(), tenant_id, outlet_id, item_id, $4, -quantity_delta, reference_type, reference_id, now(), $5
+       FROM stock_ledger_entries
+       WHERE reference_type = $1 AND reference_id = $2 AND entry_type = $3`,
+      [input.referenceType, input.referenceId, input.entryType, input.reversalType, input.userId],
+    );
+  },
+
+  findNegativeBalances(tx: Tx, outletId: string, itemIds: readonly string[]) {
+    return tx.many<{ itemId: string; quantity: number }>(
+      `SELECT item_id AS "itemId", quantity FROM stock_balances
+       WHERE outlet_id = $1 AND item_id = ANY($2::uuid[]) AND quantity < 0`,
+      [outletId, [...new Set(itemIds)]],
+    );
+  },
+
+  findEntry(tx: Tx, id: string): Promise<StockEntryRow | undefined> {
+    return tx.one<StockEntryRow>(
+      `SELECT ${ENTRY_COLUMNS} FROM stock_ledger_entries WHERE id = $1`,
+      [id],
+    );
+  },
+
+  /** Locks the item so concurrent adjustments to it see each other's balance. */
+  lockItem(tx: Tx, itemId: string) {
+    return tx.one<{ id: string; trackStock: boolean }>(
+      'SELECT id, track_stock AS "trackStock" FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE',
+      [itemId],
+    );
+  },
+
+  async balanceFor(tx: Tx, outletId: string, itemId: string): Promise<number> {
+    const row = await tx.one<{ quantity: number }>(
+      'SELECT quantity FROM stock_balances WHERE outlet_id = $1 AND item_id = $2',
+      [outletId, itemId],
+    );
+    return row?.quantity ?? 0;
+  },
+
+  listBalances(
+    tx: Tx,
+    filter: { outletId: string; itemId: string | undefined; belowReorder: boolean },
+    limit: number,
+    cursor: Cursor | undefined,
+  ): Promise<BalanceRow[]> {
+    return tx.many<BalanceRow>(
+      `SELECT sb.item_id AS "itemId", i.name AS "itemName", i.unit, sb.quantity, i.reorder_level AS "reorderLevel",
+              sb.updated_at AS "updatedAt"
+       FROM stock_balances sb JOIN items i ON i.id = sb.item_id
+       WHERE sb.outlet_id = $1
+         AND i.deleted_at IS NULL
+         AND ($2::uuid IS NULL OR sb.item_id = $2)
+         AND (NOT $3::boolean OR (i.reorder_level IS NOT NULL AND sb.quantity <= i.reorder_level))
+         AND ($4::text IS NULL OR (i.name, i.id) > ($4::text, $5::uuid))
+       ORDER BY i.name, i.id
+       LIMIT $6`,
+      [
+        filter.outletId,
+        filter.itemId ?? null,
+        filter.belowReorder,
+        cursor ? String(cursor.k) : null,
+        cursor?.id ?? null,
+        limit + 1,
+      ],
+    );
+  },
+
+  listLedger(
+    tx: Tx,
+    outletId: string,
+    itemId: string,
+    limit: number,
+    cursor: Cursor | undefined,
+  ): Promise<StockEntryRow[]> {
+    return tx.many<StockEntryRow>(
+      `SELECT ${ENTRY_COLUMNS} FROM stock_ledger_entries
+       WHERE outlet_id = $1 AND item_id = $2
+         AND ($3::timestamptz IS NULL OR (occurred_at, id) < ($3::timestamptz, $4::uuid))
+       ORDER BY occurred_at DESC, id DESC
+       LIMIT $5`,
+      [outletId, itemId, cursor ? String(cursor.k) : null, cursor?.id ?? null, limit + 1],
+    );
+  },
+};
