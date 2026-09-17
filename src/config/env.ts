@@ -174,6 +174,13 @@ const envSchema = z.object({
   // customer without a deploy.
   PLAN_FREE_FEATURES: optional(csv),
 
+  // --- OpenAPI --------------------------------------------------------------
+  // Serves GET /v1/openapi.json and the Swagger UI at /v1/docs, unauthenticated.
+  OPENAPI_ENABLED: required(bool),
+  OPENAPI_TITLE: required(z.string().min(1)),
+  // Base URL clients should call, as printed in the document's `servers`.
+  OPENAPI_SERVER_URL: required(z.string().url()),
+
   // --- Observability --------------------------------------------------------
   LOG_LEVEL: required(z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])),
   LOG_PRETTY: required(bool),

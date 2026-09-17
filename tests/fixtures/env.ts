@@ -100,6 +100,10 @@ export const testEnv: Record<string, string> = {
   PLAN_FREE_MAX_ITEMS: '100',
   PLAN_FREE_FEATURES: 'offline_mode',
 
+  OPENAPI_ENABLED: 'true',
+  OPENAPI_TITLE: 'Khata API (test)',
+  OPENAPI_SERVER_URL: 'http://127.0.0.1:4010',
+
   LOG_LEVEL: 'silent',
   LOG_PRETTY: 'false',
   METRICS_ENABLED: 'false',

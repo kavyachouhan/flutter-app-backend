@@ -16,9 +16,13 @@ import { outletsRouter } from './modules/outlets/outlets.routes.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
 import { onboardingRouter, tenantRouter } from './modules/tenants/tenants.routes.js';
+import { createOpenApiRouter } from './openapi/routes.js';
 
 export function createV1Router(): Router {
   const router = Router();
+
+  // Before auth: the spec and its UI carry no tenant data.
+  if (env.OPENAPI_ENABLED) router.use(createOpenApiRouter());
 
   router.use('/auth', authRouter);
 
