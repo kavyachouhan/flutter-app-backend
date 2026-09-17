@@ -24,6 +24,7 @@ import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/stock/stock.openapi.js';
 import '../modules/operations/operations.openapi.js';
+import '../modules/reports/reports.openapi.js';
 import '../modules/audit/audit.openapi.js';
 import '../modules/sync/sync.openapi.js';
 
@@ -70,6 +71,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
       {
         name: 'Operations',
         description: 'Parked bills, expenses and the day’s cash-up.',
+      },
+      {
+        name: 'Reports',
+        description: 'One catalogue and one envelope for every report.',
       },
       { name: 'Audit', description: 'Who changed what, when.' },
       { name: 'Sync', description: 'Offline-first change feed and operation push.' },

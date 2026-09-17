@@ -40,6 +40,9 @@ export const PERMISSIONS = [
   'numbering:manage',
   'numbering:lease',
   'audit:read',
+  'reports:read',
+  // Margin and profit. Withheld from cashiers, who can still run the day book.
+  'reports:financial',
   // Pull the change stream / push offline operations. Each pushed operation
   // is additionally checked against its own permission (e.g. invoices:create).
   'sync:read',
@@ -73,6 +76,7 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'numbering:lease',
     'sync:read',
     'sync:write',
+    'reports:read',
   ]),
   accountant: new Set<Permission>([...READ_ONLY, 'audit:read']),
   viewer: new Set<Permission>(READ_ONLY.filter((p) => p !== 'audit:read')),

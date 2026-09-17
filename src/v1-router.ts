@@ -20,6 +20,7 @@ import {
 } from './modules/operations/operations.routes.js';
 import { outletsRouter } from './modules/outlets/outlets.routes.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
+import { reportsRouter } from './modules/reports/reports.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
 import { syncRouter } from './modules/sync/sync.routes.js';
 import { onboardingRouter, tenantRouter } from './modules/tenants/tenants.routes.js';
@@ -66,6 +67,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/expenses', expensesRouter);
   tenantScoped.use('/day-close', dayCloseRouter);
   tenantScoped.use('/stock', stockRouter);
+  tenantScoped.use('/reports', reportsRouter);
   tenantScoped.use('/audit', auditRouter);
   tenantScoped.use('/sync', syncRouter);
 

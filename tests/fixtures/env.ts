@@ -93,6 +93,10 @@ export const testEnv: Record<string, string> = {
   NUMBER_BLOCK_SIZE_MAX: '500',
   NUMBER_BLOCK_TTL_HOURS: '168',
 
+  PLAN_FREE_REPORT_IDS: 'day-book,sales-summary,current-stock,low-stock,customer-outstanding',
+  REPORT_MAX_RANGE_DAYS: '400',
+  REPORT_MAX_ROWS: '2000',
+
   HELD_BILL_MAX_PER_COUNTER: '20',
   DAY_CLOSE_VARIANCE_WARN_PAISE: '10000',
 

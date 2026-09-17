@@ -169,6 +169,14 @@ const envSchema = z.object({
   NUMBER_BLOCK_SIZE_MAX: required(positiveInt),
   NUMBER_BLOCK_TTL_HOURS: required(positiveInt),
 
+  // --- Reports --------------------------------------------------------------
+  // Report ids available without the `reports.all` feature. Gating is
+  // configuration so support can open one report for one customer.
+  PLAN_FREE_REPORT_IDS: optional(csv),
+  // A window wider than this is refused rather than served slowly.
+  REPORT_MAX_RANGE_DAYS: required(positiveInt),
+  REPORT_MAX_ROWS: required(positiveInt),
+
   // --- Counter operations ---------------------------------------------------
   // Parked bills per counter. A cap exists because each one holds a draft in
   // the database and an unbounded list is unusable at the till anyway.
