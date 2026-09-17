@@ -32,6 +32,10 @@ export const PERMISSIONS = [
   'numbering:manage',
   'numbering:lease',
   'audit:read',
+  // Pull the change stream / push offline operations. Each pushed operation
+  // is additionally checked against its own permission (e.g. invoices:create).
+  'sync:read',
+  'sync:write',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -52,6 +56,8 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'stock:read',
     'numbering:read',
     'numbering:lease',
+    'sync:read',
+    'sync:write',
   ]),
   accountant: new Set<Permission>([...READ_ONLY, 'audit:read']),
   viewer: new Set<Permission>(READ_ONLY.filter((p) => p !== 'audit:read')),

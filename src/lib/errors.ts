@@ -41,6 +41,15 @@ export const ErrorCode = {
   INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
   OVERPAYMENT: 'OVERPAYMENT',
 
+  /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
+  SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',
+  /** The device must discard its local database and pull from zero. */
+  SYNC_RESET_REQUIRED: 'SYNC_RESET_REQUIRED',
+  /** An update carried a baseServerSeq older than the row on the server. */
+  STALE_WRITE: 'STALE_WRITE',
+  SYNC_ENTITY_UNKNOWN: 'SYNC_ENTITY_UNKNOWN',
+  SYNC_CURSOR_INVALID: 'SYNC_CURSOR_INVALID',
+
   RATE_LIMITED: 'RATE_LIMITED',
 
   INTERNAL: 'INTERNAL',

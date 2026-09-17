@@ -31,6 +31,22 @@ export const otpDeliveries = new Counter({
   registers: [register],
 });
 
+// A rising `rejected` rate on one operation type is the first sign of a
+// client/server drift (e.g. tax engine mismatch) in the field.
+export const syncOperations = new Counter({
+  name: `${env.METRICS_PREFIX}sync_operations_total`,
+  help: 'Pushed sync operations by type and outcome',
+  labelNames: ['type', 'result'] as const,
+  registers: [register],
+});
+
+export const syncPullChanges = new Counter({
+  name: `${env.METRICS_PREFIX}sync_pull_changes_total`,
+  help: 'Rows emitted by the change feed, by entity',
+  labelNames: ['entity'] as const,
+  registers: [register],
+});
+
 // Routes are labelled by pattern, never by resolved path: each distinct label
 // value is a separate time series, and a scanner probing random URLs would
 // otherwise create thousands of them.

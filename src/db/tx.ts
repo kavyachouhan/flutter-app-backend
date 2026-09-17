@@ -108,12 +108,19 @@ export function translatePostgresError(error: unknown): unknown {
   }
 }
 
+export type IsolationLevel = 'read_committed' | 'repeatable_read';
+
 async function begin(
   client: PoolClient,
   tenantId: string | null,
   readOnly: boolean,
+  isolation: IsolationLevel = 'read_committed',
 ): Promise<void> {
-  await client.query(readOnly ? 'BEGIN READ ONLY' : 'BEGIN');
+  // A multi-statement pull under READ COMMITTED takes a new snapshot per
+  // statement, so a row committed between two statements can be skipped
+  // permanently by a cursor that has already moved past its server_seq.
+  const level = isolation === 'repeatable_read' ? ' ISOLATION LEVEL REPEATABLE READ' : '';
+  await client.query(`BEGIN${level}${readOnly ? ' READ ONLY' : ''}`);
   await client.query(
     `SELECT set_config('app.tenant_id', $1, true),
             set_config('app.user_id', $2, true),
@@ -134,6 +141,8 @@ export interface TransactionOptions {
   readOnly?: boolean;
   /** Set to 0 when the callback has side effects outside the database. */
   retries?: number;
+  /** REPEATABLE READ gives every statement in the callback one snapshot. */
+  isolation?: IsolationLevel;
 }
 
 export async function withTransaction<T>(
@@ -146,7 +155,7 @@ export async function withTransaction<T>(
   for (let attempt = 1; ; attempt++) {
     const client = await pool.connect();
     try {
-      await begin(client, tenantId, options.readOnly ?? false);
+      await begin(client, tenantId, options.readOnly ?? false, options.isolation);
       const result = await fn(wrap(client, tenantId));
       await client.query('COMMIT');
       return result;

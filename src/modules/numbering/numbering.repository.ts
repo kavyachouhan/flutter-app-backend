@@ -107,6 +107,24 @@ export const numberingRepository = {
     );
   },
 
+  /** The series that continues `outletId/counterId/documentType` in a given financial year, if any. */
+  findSeriesByScope(
+    tx: Tx,
+    scope: {
+      outletId: string;
+      counterId: string | null;
+      documentType: string;
+      fyStartYear: number;
+    },
+  ): Promise<SeriesRow | undefined> {
+    return tx.one<SeriesRow>(
+      `SELECT ${SERIES_COLUMNS} ${SERIES_FROM}
+       WHERE s.deleted_at IS NULL AND s.outlet_id = $1 AND s.counter_id IS NOT DISTINCT FROM $2
+         AND s.document_type = $3 AND s.fy_start_year = $4`,
+      [scope.outletId, scope.counterId, scope.documentType, scope.fyStartYear],
+    );
+  },
+
   async setNextSeq(tx: Tx, id: string, nextSeq: number): Promise<void> {
     await tx.query('UPDATE document_series SET next_seq = $2 WHERE id = $1', [id, nextSeq]);
   },

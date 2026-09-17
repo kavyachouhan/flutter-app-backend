@@ -15,6 +15,7 @@ import { numberingRouter } from './modules/numbering/numbering.routes.js';
 import { outletsRouter } from './modules/outlets/outlets.routes.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
+import { syncRouter } from './modules/sync/sync.routes.js';
 import { onboardingRouter, tenantRouter } from './modules/tenants/tenants.routes.js';
 import { createOpenApiRouter } from './openapi/routes.js';
 
@@ -56,6 +57,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/payments', paymentsRouter);
   tenantScoped.use('/stock', stockRouter);
   tenantScoped.use('/audit', auditRouter);
+  tenantScoped.use('/sync', syncRouter);
 
   router.use(tenantScoped);
   return router;

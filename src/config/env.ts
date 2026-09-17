@@ -140,6 +140,20 @@ const envSchema = z.object({
   RATE_LIMIT_OTP_VERIFY_WINDOW_SECONDS: required(positiveInt),
   RATE_LIMIT_REFRESH_POINTS: required(positiveInt),
   RATE_LIMIT_REFRESH_WINDOW_SECONDS: required(positiveInt),
+  // Per device, on /sync/* and number-block leases.
+  RATE_LIMIT_SYNC_POINTS: required(positiveInt),
+  RATE_LIMIT_SYNC_WINDOW_SECONDS: required(positiveInt),
+
+  // --- Sync -----------------------------------------------------------------
+  // Rows per pull page (the client keeps paging while hasMore is true).
+  SYNC_PULL_MAX_CHANGES: required(positiveInt),
+  // Operations per push batch; larger batches are rejected outright.
+  SYNC_PUSH_MAX_OPERATIONS: required(positiveInt),
+  // A pull tops up a device's block for a series when fewer numbers remain.
+  SYNC_LEASE_TOPUP_THRESHOLD: required(positiveInt),
+  // Days before a financial year ends at which next year's series are created
+  // and pre-leased, so an offline device survives the rollover.
+  SYNC_FY_ROLLOVER_LEAD_DAYS: required(positiveInt),
 
   // --- Pagination -----------------------------------------------------------
   PAGE_SIZE_DEFAULT: required(positiveInt),

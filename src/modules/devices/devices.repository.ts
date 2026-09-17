@@ -13,7 +13,10 @@ export interface DeviceRow {
   platform: string;
   appVersion: string | null;
   osVersion: string | null;
-  lastSyncSeq: number;
+  /** From device_sync_state; null until the device has pulled once. */
+  lastPullSeq: number | null;
+  lastPullAt: Date | null;
+  lastPushAt: Date | null;
   lastSeenAt: Date | null;
   isActive: boolean;
   createdAt: Date;
@@ -23,10 +26,13 @@ export interface DeviceRow {
 const DEVICE_COLUMNS = `
   d.id, d.user_id AS "userId", u.name AS "userName", d.outlet_id AS "outletId", d.counter_id AS "counterId",
   d.device_key AS "deviceKey", d.label, d.platform, d.app_version AS "appVersion", d.os_version AS "osVersion",
-  d.last_sync_seq AS "lastSyncSeq", d.last_seen_at AS "lastSeenAt", d.is_active AS "isActive",
+  s.last_pull_seq AS "lastPullSeq", s.last_pull_at AS "lastPullAt", s.last_push_at AS "lastPushAt",
+  d.last_seen_at AS "lastSeenAt", d.is_active AS "isActive",
   d.created_at AS "createdAt", d.updated_at AS "updatedAt"`;
 
-const FROM = 'FROM devices d LEFT JOIN users u ON u.id = d.user_id';
+const FROM = `FROM devices d
+  LEFT JOIN users u ON u.id = d.user_id
+  LEFT JOIN device_sync_state s ON s.device_id = d.id AND s.tenant_id = d.tenant_id`;
 
 const UPDATABLE = { label: 'label', outletId: 'outlet_id', counterId: 'counter_id' } as const;
 
