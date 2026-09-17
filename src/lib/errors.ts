@@ -40,6 +40,12 @@ export const ErrorCode = {
   CREDIT_SALE_REQUIRES_CUSTOMER: 'CREDIT_SALE_REQUIRES_CUSTOMER',
   INSUFFICIENT_STOCK: 'INSUFFICIENT_STOCK',
   OVERPAYMENT: 'OVERPAYMENT',
+  /** More units returned than remain unreturned on the invoice line. */
+  RETURN_EXCEEDS_INVOICE: 'RETURN_EXCEEDS_INVOICE',
+  /** The invoice is void and cannot be returned against. */
+  INVOICE_NOT_RETURNABLE: 'INVOICE_NOT_RETURNABLE',
+  /** A khata credit or partial refund needs a customer to carry the balance. */
+  REFUND_REQUIRES_CUSTOMER: 'REFUND_REQUIRES_CUSTOMER',
 
   /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',

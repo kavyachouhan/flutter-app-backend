@@ -7,6 +7,7 @@ import { auditRouter } from './modules/audit/audit.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { devAuthRouter } from './modules/auth/dev.routes.js';
 import { catalogueRouter } from './modules/catalogue/catalogue.routes.js';
+import { creditNotesRouter } from './modules/credit-notes/credit-notes.routes.js';
 import { customersRouter } from './modules/customers/customers.routes.js';
 import { devicesRouter } from './modules/devices/devices.routes.js';
 import { invoicesRouter } from './modules/invoices/invoices.routes.js';
@@ -55,6 +56,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/numbering', numberingRouter);
   tenantScoped.use('/invoices', invoicesRouter);
   tenantScoped.use('/payments', paymentsRouter);
+  tenantScoped.use('/credit-notes', creditNotesRouter);
   tenantScoped.use('/stock', stockRouter);
   tenantScoped.use('/audit', auditRouter);
   tenantScoped.use('/sync', syncRouter);

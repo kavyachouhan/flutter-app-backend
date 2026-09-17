@@ -137,7 +137,9 @@ export function voidReceipt(id: string, reason: string) {
     if (!payment) throw new NotFoundError('Payment');
     assertOutletAccess(payment.outletId);
     if (payment.kind !== 'receipt') {
-      throw new UnprocessableError('Payments taken at billing are voided by voiding the invoice.');
+      throw new UnprocessableError(
+        'Tenders and refunds are voided by voiding the invoice or credit note they belong to.',
+      );
     }
     if (payment.status === 'void') return loadPayment(tx, id);
 

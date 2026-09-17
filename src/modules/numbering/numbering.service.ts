@@ -180,11 +180,7 @@ export function listGaps(seriesId: string) {
     const series = await numberingRepository.findSeries(tx, seriesId);
     if (!series) throw new NotFoundError('Series');
     assertOutletAccess(series.outletId);
-    // Only invoices are issued so far; other document types have no table to check against yet.
-    if (series.documentType !== 'invoice') {
-      throw new UnprocessableError('Gap reporting is available for invoice series only.');
-    }
-    return numberingRepository.findInvoiceGaps(tx, seriesId);
+    return numberingRepository.findGaps(tx, seriesId);
   });
 }
 

@@ -1,7 +1,21 @@
 import type { Tx } from '../../db/tx.js';
 import type { Cursor } from '../../lib/pagination.js';
 
-export type StockEntryType = 'opening' | 'sale' | 'sale_void' | 'adjustment';
+export type StockEntryType =
+  | 'opening'
+  | 'sale'
+  | 'sale_void'
+  | 'adjustment'
+  | 'sale_return'
+  | 'sale_return_void'
+  | 'purchase'
+  | 'purchase_void'
+  | 'purchase_return'
+  | 'purchase_return_void'
+  | 'transfer_out'
+  | 'transfer_in'
+  | 'transfer_void'
+  | 'count';
 
 export interface NewStockEntry {
   /** null lets the database generate one (for entries derived from another document). */
@@ -61,7 +75,11 @@ export const stockRepository = {
     );
   },
 
-  /** Writes the negating entry for every ledger row a document produced. */
+  /**
+   * Writes the negating entry for every ledger row a document produced. The
+   * NOT EXISTS guard makes a second call a no-op, so a replayed void can never
+   * double-restore stock.
+   */
   async reverseEntries(
     tx: Tx,
     input: {
@@ -76,8 +94,10 @@ export const stockRepository = {
       `INSERT INTO stock_ledger_entries (id, tenant_id, outlet_id, item_id, entry_type, quantity_delta,
          reference_type, reference_id, occurred_at, created_by)
        SELECT gen_random_uuid(), tenant_id, outlet_id, item_id, $4, -quantity_delta, reference_type, reference_id, now(), $5
-       FROM stock_ledger_entries
-       WHERE reference_type = $1 AND reference_id = $2 AND entry_type = $3`,
+       FROM stock_ledger_entries s
+       WHERE s.reference_type = $1 AND s.reference_id = $2 AND s.entry_type = $3
+         AND NOT EXISTS (SELECT 1 FROM stock_ledger_entries r
+                         WHERE r.reference_type = $1 AND r.reference_id = $2 AND r.entry_type = $4)`,
       [input.referenceType, input.referenceId, input.entryType, input.reversalType, input.userId],
     );
   },

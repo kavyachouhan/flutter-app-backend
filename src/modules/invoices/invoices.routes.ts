@@ -3,6 +3,7 @@ import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import { idParams } from '../../lib/validators.js';
 import * as invoicesService from './invoices.service.js';
+import { listReturnable } from '../credit-notes/credit-notes.service.js';
 import { createInvoiceBody, listInvoicesQuery, voidInvoiceBody } from './invoices.schemas.js';
 
 export const invoicesRouter: Router = Router();
@@ -40,6 +41,16 @@ invoicesRouter.post(
   async (req, res) => {
     const { params, body } = validated<typeof voidSchemas>(req);
     res.json({ data: await invoicesService.voidInvoice(params.id, body.reason) });
+  },
+);
+
+invoicesRouter.get(
+  '/:id/returnable',
+  requirePermission('credit_notes:read'),
+  validate(byId),
+  async (req, res) => {
+    const { params } = validated<typeof byId>(req);
+    res.json({ data: await listReturnable(params.id) });
   },
 );
 

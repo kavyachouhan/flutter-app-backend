@@ -24,7 +24,15 @@ export interface CustomerRow {
 export type NewCustomer = Omit<CustomerRow, 'balance' | 'createdAt' | 'updatedAt'>;
 
 export type LedgerEntryType =
-  'opening_balance' | 'invoice' | 'invoice_void' | 'payment' | 'payment_void';
+  | 'opening_balance'
+  | 'invoice'
+  | 'invoice_void'
+  | 'payment'
+  | 'payment_void'
+  | 'credit_note'
+  | 'credit_note_void'
+  | 'refund'
+  | 'refund_void';
 
 export interface NewLedgerEntry {
   customerId: string;

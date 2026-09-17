@@ -217,6 +217,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       billDiscount: body.billDiscount ?? null,
       additionalCharges: body.additionalCharges ?? [],
       notes: body.notes ?? null,
+      customFields: body.customFields ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
     });

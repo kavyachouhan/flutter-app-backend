@@ -7,6 +7,7 @@ import {
   updateCategoryBody,
   updateItemBody,
 } from '../catalogue/catalogue.schemas.js';
+import { createCreditNoteBody } from '../credit-notes/credit-notes.schemas.js';
 import { createCustomerBody, updateCustomerBody } from '../customers/customers.schemas.js';
 import { createInvoiceBody, voidInvoiceBody } from '../invoices/invoices.schemas.js';
 import { createReceiptBody, voidPaymentBody } from '../payments/payments.schemas.js';
@@ -32,6 +33,9 @@ export const OPERATION_PAYLOADS = {
   'invoice.create': createInvoiceBody,
   'invoice.void': withId({ reason: nonEmpty }),
   'invoice.printed': withId({}),
+  'credit_note.create': createCreditNoteBody,
+  'credit_note.void': withId({ reason: nonEmpty }),
+  'credit_note.printed': withId({}),
   'payment.create': createReceiptBody,
   'payment.void': withId(voidPaymentBody.shape),
   'customer.create': createCustomerBody,

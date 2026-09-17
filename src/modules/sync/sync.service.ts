@@ -25,6 +25,7 @@ import { createLogger } from '../../lib/logger.js';
 import { syncOperations, syncPullChanges } from '../../observability/metrics.js';
 import { hasPermission, type Permission } from '../auth/permissions.js';
 import * as catalogueService from '../catalogue/catalogue.service.js';
+import * as creditNotesService from '../credit-notes/credit-notes.service.js';
 import * as customersService from '../customers/customers.service.js';
 import * as invoicesService from '../invoices/invoices.service.js';
 import type { BlockRow } from '../numbering/numbering.repository.js';
@@ -168,6 +169,9 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'invoice.create': 'invoices:create',
   'invoice.void': 'invoices:void',
   'invoice.printed': 'invoices:read',
+  'credit_note.create': 'credit_notes:create',
+  'credit_note.void': 'credit_notes:void',
+  'credit_note.printed': 'credit_notes:read',
   'payment.create': 'payments:create',
   'payment.void': 'payments:void',
   'customer.create': 'customers:write',
@@ -215,6 +219,21 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
     case 'invoice.printed': {
       const p = payload as Payload<'invoice.printed'>;
       await invoicesService.markPrinted(p.id);
+      return { id: p.id };
+    }
+    case 'credit_note.create': {
+      const p = payload as Payload<'credit_note.create'>;
+      const r = await creditNotesService.createCreditNote(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'credit_note.void': {
+      const p = payload as Payload<'credit_note.void'>;
+      await creditNotesService.voidCreditNote(p.id, p.reason);
+      return { id: p.id };
+    }
+    case 'credit_note.printed': {
+      const p = payload as Payload<'credit_note.printed'>;
+      await creditNotesService.markPrinted(p.id);
       return { id: p.id };
     }
     case 'payment.create': {
@@ -350,11 +369,16 @@ async function runOperation(
 
     const applied = await dispatch(op.type, payload);
     const replayed = replayedByProbe || applied.replayed === true;
-    const serverSeq = table
-      ? await withReadTransaction((tx) => syncRepository.serverSeqOf(tx, table, applied.id))
-      : op.type.startsWith('invoice.')
-        ? await withReadTransaction((tx) => syncRepository.serverSeqOf(tx, 'invoices', applied.id))
-        : undefined;
+    const seqTable =
+      table ??
+      (op.type.startsWith('invoice.')
+        ? 'invoices'
+        : op.type.startsWith('credit_note.')
+          ? 'credit_notes'
+          : undefined);
+    const serverSeq = seqTable
+      ? await withReadTransaction((tx) => syncRepository.serverSeqOf(tx, seqTable, applied.id))
+      : undefined;
 
     return {
       ...base,

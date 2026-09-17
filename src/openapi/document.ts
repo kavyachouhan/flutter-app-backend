@@ -21,6 +21,7 @@ import '../modules/customers/customers.openapi.js';
 import '../modules/numbering/numbering.openapi.js';
 import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
+import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/stock/stock.openapi.js';
 import '../modules/audit/audit.openapi.js';
 import '../modules/sync/sync.openapi.js';
@@ -63,6 +64,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Numbering', description: 'Document series and device-leased number blocks.' },
       { name: 'Invoices', description: 'Issuing, voiding and listing invoices.' },
       { name: 'Payments', description: 'Receipts against the khata and their allocations.' },
+      { name: 'Credit notes', description: 'Returns and corrections against issued invoices.' },
       { name: 'Stock', description: 'Balances, ledger and manual adjustments.' },
       { name: 'Audit', description: 'Who changed what, when.' },
       { name: 'Sync', description: 'Offline-first change feed and operation push.' },

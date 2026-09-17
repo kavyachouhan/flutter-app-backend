@@ -187,7 +187,7 @@ export const numberingRepository = {
    * counts up to what the device has consumed; an expired block counts in full.
    * Consecutive numbers share `seq - row_number()`, which forms the ranges.
    */
-  findInvoiceGaps(tx: Tx, seriesId: string): Promise<SequenceRange[]> {
+  findGaps(tx: Tx, seriesId: string): Promise<SequenceRange[]> {
     return tx.many<SequenceRange>(
       `WITH reserved AS (
          SELECT generate_series(
@@ -198,7 +198,8 @@ export const numberingRepository = {
        ),
        missing AS (
          SELECT r.seq FROM reserved r
-         WHERE NOT EXISTS (SELECT 1 FROM invoices i WHERE i.series_id = $1 AND i.sequence_no = r.seq)
+         WHERE NOT EXISTS (SELECT 1 FROM app.issued_document_numbers i
+                           WHERE i.series_id = $1 AND i.sequence_no = r.seq)
        )
        SELECT min(seq) AS "from", max(seq) AS "to"
        FROM (SELECT seq, seq - row_number() OVER (ORDER BY seq) AS grp FROM missing) grouped

@@ -5,7 +5,7 @@ export interface PaymentRow {
   id: string;
   outletId: string;
   customerId: string | null;
-  kind: 'invoice_tender' | 'receipt';
+  kind: 'invoice_tender' | 'receipt' | 'refund';
   mode: string;
   amount: number;
   tenderedAmount: number | null;
@@ -33,9 +33,9 @@ export interface AllocationInput {
 }
 
 const PAYMENT_COLUMNS = `
-  id, outlet_id AS "outletId", customer_id AS "customerId", kind, mode, amount, tendered_amount AS "tenderedAmount",
-  reference, received_at AS "receivedAt", received_by AS "receivedBy", status, void_reason AS "voidReason",
-  voided_at AS "voidedAt", created_at AS "createdAt"`;
+  id, outlet_id AS "outletId", customer_id AS "customerId", credit_note_id AS "creditNoteId", kind, mode, amount,
+  tendered_amount AS "tenderedAmount", reference, received_at AS "receivedAt", received_by AS "receivedBy", status,
+  void_reason AS "voidReason", voided_at AS "voidedAt", created_at AS "createdAt"`;
 
 export const paymentsRepository = {
   async exists(tx: Tx, id: string): Promise<boolean> {
@@ -105,6 +105,53 @@ export const paymentsRepository = {
       `INSERT INTO payments (id, tenant_id, outlet_id, customer_id, kind, mode, amount, reference, received_at, received_by, status)
        VALUES ($1, app.current_tenant_id(), $2, $3, 'receipt', $4, $5, $6, $7, $8, 'issued')`,
       [p.id, p.outletId, p.customerId, p.mode, p.amount, p.reference, p.receivedAt, p.receivedBy],
+    );
+  },
+
+  /** Money paid out against a credit note. */
+  async insertRefund(
+    tx: Tx,
+    p: {
+      id: string;
+      outletId: string;
+      customerId: string | null;
+      creditNoteId: string;
+      mode: string;
+      amount: number;
+      receivedAt: string;
+      receivedBy: string;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO payments (id, tenant_id, outlet_id, customer_id, credit_note_id, kind, mode, amount, received_at,
+         received_by, status)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, 'refund', $5, $6, $7, $8, 'issued')`,
+      [
+        p.id,
+        p.outletId,
+        p.customerId,
+        p.creditNoteId,
+        p.mode,
+        p.amount,
+        p.receivedAt,
+        p.receivedBy,
+      ],
+    );
+  },
+
+  findRefundForCreditNote(tx: Tx, creditNoteId: string): Promise<PaymentRow | undefined> {
+    return tx.one<PaymentRow>(
+      `SELECT ${PAYMENT_COLUMNS} FROM payments WHERE credit_note_id = $1 AND kind = 'refund' ORDER BY created_at LIMIT 1`,
+      [creditNoteId],
+    );
+  },
+
+  voidRefundForCreditNote(tx: Tx, creditNoteId: string, reason: string, userId: string) {
+    return tx.one<{ id: string; amount: number }>(
+      `UPDATE payments SET status = 'void', void_reason = $2, voided_at = now(), voided_by = $3
+       WHERE credit_note_id = $1 AND kind = 'refund' AND status = 'issued'
+       RETURNING id, amount`,
+      [creditNoteId, reason, userId],
     );
   },
 
