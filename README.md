@@ -50,11 +50,15 @@ All routes are under `/v1`. Success responses are `{ data }`, or `{ data, nextCu
 
 ### Authentication flow
 
-1. `POST /auth/otp/request` → `POST /auth/otp/verify` returns an **identity token** and the user's tenants.
+1. `POST /auth/otp/request` (answers `{ channel, maskedDestination, expiresInSeconds, resendAfterSeconds }`, so the app never assumes the code went by SMS) → `POST /auth/otp/verify` returns an **identity token** and the user's tenants.
 2. With the identity token: `POST /onboarding/tenants` (new business) or `POST /auth/sessions` (existing tenant) returns an **access token** and a **refresh token** bound to the device.
 3. `POST /auth/refresh` rotates the refresh token. Presenting an already-rotated token outside `REFRESH_TOKEN_REUSE_GRACE_SECONDS` revokes the device's session.
 
 Access tokens are stateless, so role changes apply at the next refresh; deactivating a member or device revokes refresh tokens immediately.
+
+### OTP delivery
+
+The vendor that sends the code is pluggable: `OTP_DELIVERY_PROVIDER` selects one of `console` (logs the code), `fake` (records it for tests), `twilio` or `msg91`; the first two are refused in production. Each provider lives in its own file under `src/modules/auth/delivery/providers/` with its own `TWILIO_*` / `MSG91_*` keys, and boot fails if the selected provider is missing any. Delivery failures are typed: a vendor outage answers 503, a rejected number answers 422 `OTP_DELIVERY_FAILED`. Swapping vendors is described in [docs/ADDING_A_DELIVERY_PROVIDER.md](docs/ADDING_A_DELIVERY_PROVIDER.md).
 
 ### Modules
 
@@ -81,7 +85,7 @@ Roles and their permissions are defined in `src/modules/auth/permissions.ts`.
 
 **Clients generate ids.** Creating with an id that already exists returns the existing record, so an offline device can retry uploads safely.
 
-**The tax engine is shared.** `src/domain/tax` is pure and must match the Dart port. The server recomputes every uploaded invoice and rejects it with `TOTALS_MISMATCH` if the device disagrees.
+**The tax engine is shared.** `src/domain/tax` is pure and must match the Dart port. The server recomputes every uploaded invoice and rejects it with `TOTALS_MISMATCH` if the device disagrees. Agreement is proven, not assumed: `contracts/tax-vectors.json` and `contracts/numbering-vectors.json` are generated from this code (`npm run contracts:generate`), a unit test fails if they go stale, and the Dart port asserts parity against a copy. See [contracts/README.md](contracts/README.md).
 
 **Offline sales are accepted, then flagged.** An invoice upload is rejected only for structural problems (unleased number, mismatched totals, unpaid credit without a customer). Conditions a device could not see offline — credit limit, negative stock — come back as `warnings`.
 
@@ -103,18 +107,19 @@ Series formats are validated against `DOCUMENT_NUMBER_MAX_LENGTH` using the high
 | `npm run check`                                  | Typecheck, lint, unit tests                    |
 | `npm test` / `npm run test:integration`          | Unit suite / integration suite (real database) |
 | `npm run ci:env`                                 | Compose an env file from fixtures + secrets    |
+| `npm run contracts:generate`                     | Rewrite `contracts/*.json` from the engine     |
 
 Migrations are forward-only and checksummed; editing an applied migration is refused.
 
 ## Status
 
-Done: production skeleton, Supabase data layer and RLS, auth (OTP, JWT, refresh rotation, dev bypass), RBAC, tenants, outlets, counters, members, devices, plan metering and feature gating, catalogue, customers and khata ledger, document numbering, invoices, payments, stock ledger, audit trail, integration tests against a Supabase test project.
+Done: production skeleton, Supabase data layer and RLS, auth (OTP with pluggable delivery, JWT, refresh rotation, dev bypass), RBAC, tenants, outlets, counters, members, devices, plan metering and feature gating, catalogue, customers and khata ledger, document numbering, invoices, payments, stock ledger, audit trail, integration tests against a Supabase test project, contract vectors for the Dart port.
 
 Not yet: OpenAPI docs, sync push/pull, credit notes, expenses and day close, reports, print payloads.
 
 ## Tests
 
-`npm test` runs the unit suite: pure functions only, configured from `tests/fixtures/env.ts`, no database, no network.
+`npm test` runs the unit suite: pure functions only, configured from `tests/fixtures/env.ts`, no database, no network. It includes `tests/contracts/contracts.test.ts`, which re-evaluates every committed contract vector and fails if the engine has drifted from the files the Dart port is tested against.
 
 `npm run test:integration` runs the suite in `tests/integration` against a real database, driving `createApp()` over HTTP as the unprivileged app role — so RLS, the immutability triggers and the numbering exclusion constraint are exercised rather than assumed. It needs `TEST_DATABASE_URL` and `TEST_DATABASE_MIGRATION_URL`; opting in is explicit because **the suite truncates every table between files**. Point it at a dedicated test database only. Apply migrations first with `npm run migrate`.
 

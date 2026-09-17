@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePhone, type PhoneRules } from './phone.js';
+import { maskPhone, normalizePhone, type PhoneRules } from './phone.js';
 import { ValidationError } from '../../lib/errors.js';
 
 const INDIA: PhoneRules = { countryCode: '91', nationalLength: 10 };
@@ -28,5 +28,16 @@ describe('normalizePhone', () => {
       '61412345678',
     );
     expect(() => normalizePhone('412345678', INDIA)).toThrow(ValidationError);
+  });
+});
+
+describe('maskPhone', () => {
+  it('shows only the last digits behind a plus sign', () => {
+    expect(maskPhone('919876543210')).toBe('+••••••••3210');
+    expect(maskPhone('14155552671', 2)).toBe('+•••••••••71');
+  });
+
+  it('never reveals more than it has', () => {
+    expect(maskPhone('123', 4)).toBe('+123');
   });
 });

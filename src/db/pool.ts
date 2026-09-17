@@ -9,6 +9,7 @@ import pg from 'pg';
 import { env } from '../config/env.js';
 import { createLogger } from '../lib/logger.js';
 import { describeError } from '../lib/errors.js';
+import { databaseSslConfig } from './ssl.js';
 
 const log = createLogger('db');
 
@@ -33,7 +34,7 @@ pg.types.setTypeParser(OID.DATE, (value: string) => value);
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
-  ssl: env.DATABASE_SSL ? { rejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED } : false,
+  ssl: databaseSslConfig(),
   max: env.DATABASE_POOL_MAX,
   idleTimeoutMillis: env.DATABASE_POOL_IDLE_TIMEOUT_MS,
   connectionTimeoutMillis: env.DATABASE_CONNECTION_TIMEOUT_MS,

@@ -21,6 +21,16 @@ export const businessEvents = new Counter({
   registers: [register],
 });
 
+// One series per provider and outcome: a rising `terminal_error` rate is a
+// misconfigured template or sender; a rising `retryable_error` rate is the
+// vendor. Both are the first thing to check when sign-ins drop.
+export const otpDeliveries = new Counter({
+  name: `${env.METRICS_PREFIX}otp_deliveries_total`,
+  help: 'OTP delivery attempts by provider and outcome',
+  labelNames: ['provider', 'result'] as const,
+  registers: [register],
+});
+
 // Routes are labelled by pattern, never by resolved path: each distinct label
 // value is a separate time series, and a scanner probing random URLs would
 // otherwise create thousands of them.

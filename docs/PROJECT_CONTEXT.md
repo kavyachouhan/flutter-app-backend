@@ -53,20 +53,20 @@ The pure GST tax engine (`src/domain/tax/engine.ts`) is mirrored by a Dart port 
 
 ### Route surface (all under `/v1`)
 
-| Area | Routes |
-| --- | --- |
-| Auth | `/auth/otp/request`, `/auth/otp/verify`, `/auth/sessions`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `/auth/dev-login` (development only) |
-| Tenancy | `/onboarding/tenants`, `/tenant`, `/tenant/subscription`, `/members`, `/devices`, `/outlets`, `/counters` |
-| Catalogue | `/categories`, `/items`, `/items/by-barcode/:barcode` |
-| Customers | `/customers`, `/customers/:id/ledger` |
-| Numbering | `/numbering/series`, `/numbering/series/:id/leases`, `/numbering/series/:id/gaps`, `/numbering/leases` |
-| Billing | `/invoices`, `/invoices/:id/void`, `/invoices/:id/printed`, `/payments`, `/payments/:id/void` |
-| Stock | `/stock/balances`, `/stock/ledger`, `/stock/adjustments` |
-| Audit | `/audit` *(added in M1)* |
+| Area      | Routes                                                                                                                                       |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth      | `/auth/otp/request`, `/auth/otp/verify`, `/auth/sessions`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `/auth/dev-login` (development only) |
+| Tenancy   | `/onboarding/tenants`, `/tenant`, `/tenant/subscription`, `/members`, `/devices`, `/outlets`, `/counters`                                    |
+| Catalogue | `/categories`, `/items`, `/items/by-barcode/:barcode`                                                                                        |
+| Customers | `/customers`, `/customers/:id/ledger`                                                                                                        |
+| Numbering | `/numbering/series`, `/numbering/series/:id/leases`, `/numbering/series/:id/gaps`, `/numbering/leases`                                       |
+| Billing   | `/invoices`, `/invoices/:id/void`, `/invoices/:id/printed`, `/payments`, `/payments/:id/void`                                                |
+| Stock     | `/stock/balances`, `/stock/ledger`, `/stock/adjustments`                                                                                     |
+| Audit     | `/audit` _(added in M1)_                                                                                                                     |
 
 ### Migrations applied
 
-`0001_foundation` · `0002_tenancy` · `0003_catalogue_customers` · `0004_billing_stock` · `0005_hardening` *(M1)*
+`0001_foundation` · `0002_tenancy` · `0003_catalogue_customers` · `0004_billing_stock` · `0005_hardening` _(M1)_
 
 ---
 
@@ -74,21 +74,21 @@ The pure GST tax engine (`src/domain/tax/engine.ts`) is mirrored by a Dart port 
 
 Approved plan; executed **milestone by milestone with a review between each**. The full plan also exists locally at `~/.claude/plans/role-you-are-validated-moth.md` (not in the repo — this document is the portable version).
 
-| # | Milestone | Status |
-| --- | --- | --- |
-| M1 | Schema debt, audit route, entitlement primitives | ✅ Done |
-| M2 | Integration test infrastructure | ✅ Done |
-| M3 | OpenAPI from the existing Zod schemas | ⏭ Next (pending decision, §11) |
-| M4 | Sync push/pull — highest risk | Pending |
-| M5 | Credit notes and returns | Pending |
-| M6 | Held bills, expenses, day close | Pending |
-| M7 | Reports kernel + 12 P0 reports | Pending |
-| M8 | Print payloads, templates, custom fields | Pending |
-| M9 | Outbox, idempotency middleware, WhatsApp, alerts | Pending |
-| M10 | Bulk import/export, barcode labels | Pending — **P0 complete** (~19.5 weeks total) |
-| M11–M14 | Purchases · pricing/discounts/banking/UPI · GST compliance · storefront | P1 (~11 weeks) |
-| M15–M18 | Multi-outlet · sales workflow chain · one vertical (pharmacy recommended) · i18n/stock count | P2 (~11 weeks) |
-| M19–M21 | Tally sync · e-invoice/e-way bill · loyalty/theft detection/GTIN | P3 (~8.5 weeks) |
+| #       | Milestone                                                                                    | Status                                        |
+| ------- | -------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| M1      | Schema debt, audit route, entitlement primitives                                             | ✅ Done                                       |
+| M2      | Integration test infrastructure                                                              | ✅ Done                                       |
+| M3      | OpenAPI from the existing Zod schemas                                                        | ⏭ Next (pending decision, §11)                |
+| M4      | Sync push/pull — highest risk                                                                | Pending                                       |
+| M5      | Credit notes and returns                                                                     | Pending                                       |
+| M6      | Held bills, expenses, day close                                                              | Pending                                       |
+| M7      | Reports kernel + 12 P0 reports                                                               | Pending                                       |
+| M8      | Print payloads, templates, custom fields                                                     | Pending                                       |
+| M9      | Outbox, idempotency middleware, WhatsApp, alerts                                             | Pending                                       |
+| M10     | Bulk import/export, barcode labels                                                           | Pending — **P0 complete** (~19.5 weeks total) |
+| M11–M14 | Purchases · pricing/discounts/banking/UPI · GST compliance · storefront                      | P1 (~11 weeks)                                |
+| M15–M18 | Multi-outlet · sales workflow chain · one vertical (pharmacy recommended) · i18n/stock count | P2 (~11 weeks)                                |
+| M19–M21 | Tally sync · e-invoice/e-way bill · loyalty/theft detection/GTIN                             | P3 (~8.5 weeks)                               |
 
 ---
 
@@ -101,7 +101,7 @@ Approved plan; executed **milestone by milestone with a review between each**. T
 5. **Sync design**: a single tenant-wide `server_seq` watermark covers every table. Push dispatches to existing services (no business logic in the sync module), **one transaction per operation**, HTTP 200 with per-operation `applied | replayed | rejected` and an explicit `retryable` flag. Mutable masters use optimistic concurrency (`baseServerSeq` → `STALE_WRITE`), not last-writer-wins.
 6. **Credit notes get their own tables**, not a discriminator column on `invoices` (the `payment_allocations` FK, the `grand_total >= 0` CHECK, and every existing aggregate argue against merging).
 7. **Reports**: one shared kernel and registry behind `GET /reports/:reportId`, with outlet scoping applied at a single point. **Never** a generic query endpoint.
-8. **Print**: layouts live in code; template selection, overrides, custom-field definitions and the print profile live in the database. Custom-field *values* are write-once JSONB on the document.
+8. **Print**: layouts live in code; template selection, overrides, custom-field definitions and the print profile live in the database. Custom-field _values_ are write-once JSONB on the document.
 
 ---
 
@@ -134,26 +134,26 @@ Approved plan; executed **milestone by milestone with a review between each**. T
 
 **Harness** — `tests/integration/setup/`
 
-| File | Role |
-| --- | --- |
-| `env.ts` | Reuses the unit fixture, swaps in real DB settings. Requires explicit `TEST_DATABASE_URL` / `TEST_DATABASE_MIGRATION_URL`; loads `.env.development` locally via `process.loadEnvFile`. Redis stays unreachable on purpose (rate limiting fails open; dev-login needs no OTP). |
-| `database.ts` | Owner connection; `assertSchemaReady` (all migrations applied, app role cannot bypass RLS); `truncateAll`. |
-| `global-setup.ts` | Asserts schema, truncates once per run. Does **not** apply migrations. |
-| `tenant.ts` | `createTenant()` onboards through the real API (dev-login → `POST /onboarding/tenants`) and returns authenticated request helpers. Generates unique phone numbers and GSTINs. |
-| `fixtures.ts` | `createItem`, `createCustomer`, `createSeries`, `leaseBlock`, `invoicePayload`, `expectedTotals` (computed independently of the server engine on purpose). |
-| `body.ts` | Typed `data()`, `rows()`, `error()` envelope accessors; `expectStatus()` (reports the error body on a status mismatch). |
-| `write-env-file.ts` | CI-only generator for `.env.development`; refuses to overwrite outside `CI=true`. |
+| File                | Role                                                                                                                                                                                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `env.ts`            | Reuses the unit fixture, swaps in real DB settings. Requires explicit `TEST_DATABASE_URL` / `TEST_DATABASE_MIGRATION_URL`; loads `.env.development` locally via `process.loadEnvFile`. Redis stays unreachable on purpose (rate limiting fails open; dev-login needs no OTP). |
+| `database.ts`       | Owner connection; `assertSchemaReady` (all migrations applied, app role cannot bypass RLS); `truncateAll`.                                                                                                                                                                    |
+| `global-setup.ts`   | Asserts schema, truncates once per run. Does **not** apply migrations.                                                                                                                                                                                                        |
+| `tenant.ts`         | `createTenant()` onboards through the real API (dev-login → `POST /onboarding/tenants`) and returns authenticated request helpers. Generates unique phone numbers and GSTINs.                                                                                                 |
+| `fixtures.ts`       | `createItem`, `createCustomer`, `createSeries`, `leaseBlock`, `invoicePayload`, `expectedTotals` (computed independently of the server engine on purpose).                                                                                                                    |
+| `body.ts`           | Typed `data()`, `rows()`, `error()` envelope accessors; `expectStatus()` (reports the error body on a status mismatch).                                                                                                                                                       |
+| `write-env-file.ts` | CI-only generator for `.env.development`; refuses to overwrite outside `CI=true`.                                                                                                                                                                                             |
 
 **Suites — 37 tests, 6 files, all passing**
 
-| File | Proves |
-| --- | --- |
-| `tenancy.test.ts` | Onboarding, cross-tenant 404, no list leakage, 401 on missing/bad tokens |
-| `sync-sequencing.test.ts` | `server_seq` unique, increasing under concurrent writers, never below a published watermark, per-tenant counters |
-| `numbering.test.ts` | Contiguous blocks, **no overlap under concurrent leases**, format ceiling, idempotent series creation |
-| `billing.test.ts` | GST totals, `TOTALS_MISMATCH`, `NUMBER_NOT_LEASED`, replay idempotency, stock + khata restored exactly on void, voided numbers kept, `CREDIT_SALE_REQUIRES_CUSTOMER`, receipts settle khata |
-| `immutability.test.ts` | Trigger blocks financial edits; revoked DELETE/UPDATE on invoices, lines, ledgers, audit log; print counter still moves |
-| `hardening.test.ts` | Barcode soft-delete stops resolving, keeps the row, frees the barcode for reuse; audit written on issue; audit paging |
+| File                      | Proves                                                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenancy.test.ts`         | Onboarding, cross-tenant 404, no list leakage, 401 on missing/bad tokens                                                                                                                    |
+| `sync-sequencing.test.ts` | `server_seq` unique, increasing under concurrent writers, never below a published watermark, per-tenant counters                                                                            |
+| `numbering.test.ts`       | Contiguous blocks, **no overlap under concurrent leases**, format ceiling, idempotent series creation                                                                                       |
+| `billing.test.ts`         | GST totals, `TOTALS_MISMATCH`, `NUMBER_NOT_LEASED`, replay idempotency, stock + khata restored exactly on void, voided numbers kept, `CREDIT_SALE_REQUIRES_CUSTOMER`, receipts settle khata |
+| `immutability.test.ts`    | Trigger blocks financial edits; revoked DELETE/UPDATE on invoices, lines, ledgers, audit log; print counter still moves                                                                     |
+| `hardening.test.ts`       | Barcode soft-delete stops resolving, keeps the row, frees the barcode for reuse; audit written on issue; audit paging                                                                       |
 
 **Other changes**: `vitest.integration.config.ts` (serial files, 30 s timeouts); `vitest.config.ts` now **excludes** `tests/integration/**`; npm scripts `test:integration` and `ci:env`; CI `integration` job (needs `verify`, skipped for forks); ESLint exempts `write-env-file.ts` from `no-console`; README gained a Tests section.
 
@@ -184,16 +184,16 @@ Approved plan; executed **milestone by milestone with a review between each**. T
 
 **§2 P0**
 
-| Area | Built | Missing |
-| --- | --- | --- |
-| 2.1 Billing | GST + non-GST, barcode lookup, fuzzy/alias search, line and bill discounts, round-off, charges, split tender, change due, void + audit | Held/parked bills; returns via credit note; offline mode is foundations only (no sync) |
-| 2.2 Invoice output | — | All six items |
-| 2.3 Catalogue | Items with HSN/tax/MRP/prices/UOM, categories, multiple barcodes, service items | Bulk Excel import/export; barcode labels |
-| 2.4 Inventory | Adjustments with reason codes; reorder level + `belowReorder` filter | Stock movement on purchase/return; low-stock alerts; fast/dead-stock views |
-| 2.5 Customers & khata | Master, ledger + statement, credit-limit warning, purchase history | WhatsApp reminders |
-| 2.6 Money | Receipts with partial and multi-invoice allocation | Expenses; day close |
-| 2.7 Reports | — | All 12 |
-| 2.8 Platform | RBAC; one API for all clients | Sync/backup; languages |
+| Area                  | Built                                                                                                                                  | Missing                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 2.1 Billing           | GST + non-GST, barcode lookup, fuzzy/alias search, line and bill discounts, round-off, charges, split tender, change due, void + audit | Held/parked bills; returns via credit note; offline mode is foundations only (no sync) |
+| 2.2 Invoice output    | —                                                                                                                                      | All six items                                                                          |
+| 2.3 Catalogue         | Items with HSN/tax/MRP/prices/UOM, categories, multiple barcodes, service items                                                        | Bulk Excel import/export; barcode labels                                               |
+| 2.4 Inventory         | Adjustments with reason codes; reorder level + `belowReorder` filter                                                                   | Stock movement on purchase/return; low-stock alerts; fast/dead-stock views             |
+| 2.5 Customers & khata | Master, ledger + statement, credit-limit warning, purchase history                                                                     | WhatsApp reminders                                                                     |
+| 2.6 Money             | Receipts with partial and multi-invoice allocation                                                                                     | Expenses; day close                                                                    |
+| 2.7 Reports           | —                                                                                                                                      | All 12                                                                                 |
+| 2.8 Platform          | RBAC; one API for all clients                                                                                                          | Sync/backup; languages                                                                 |
 
 **§6 Wedges — 1 of 4**: document numbering is built and proven (gap reporting still invoice-only). Onboarding import and GSTR-2B are unbuilt; support is not software.
 
@@ -203,7 +203,7 @@ Approved plan; executed **milestone by milestone with a review between each**. T
 
 ## 10. Known debts and open items
 
-1. **TLS verification disabled locally.** `src/db/pool.ts:36` and `src/db/migration-client.ts:11` hardcode `ssl: { rejectUnauthorized }` with no CA option. Production needs a new `DATABASE_SSL_CA` variable threaded into both.
+1. ~~TLS verification disabled locally.~~ **Resolved in pre-flight (17 Sep).** `src/db/ssl.ts` builds one TLS config for the pool and the migration client; `DATABASE_SSL_CA` (optional PEM, `\n`-escaped allowed) is threaded into both, and production now refuses `DATABASE_SSL_REJECT_UNAUTHORIZED=false`. Development still skips chain verification.
 2. **`JWT_SECRET` is a placeholder** in `.env.development`. Harmless in development; `assertProductionSafety` will block a production boot until replaced.
 3. **Development and integration tests share one Supabase project.** `DATABASE_URL` and `TEST_DATABASE_URL` point at the same database, and **the integration suite truncates every table**. Split them before this database holds anything worth keeping.
 4. **CI secrets not yet configured**: `TEST_DATABASE_URL`, `TEST_DATABASE_MIGRATION_URL`, `TEST_DATABASE_APP_ROLE_NAME`, `TEST_DATABASE_APP_ROLE_PASSWORD` must be added to GitHub repository secrets before the `integration` job can pass.
@@ -215,7 +215,15 @@ Approved plan; executed **milestone by milestone with a review between each**. T
    - `tx.ts` cannot open `REPEATABLE READ`; a multi-table pull under READ COMMITTED can permanently skip rows.
    - Master creates (`createCustomer`, `createItem`, `createCategory`) must be verified replay-idempotent before being registered as pushable.
    - A `users` rename does not bump `memberships.server_seq`, so renamed staff never reach devices.
-9. **Nothing is committed.** All M1 and M2 work is uncommitted on `main`.
+9. ~~Nothing is committed.~~ **Resolved.** M1 and M2 are committed on branch `phase1` (`269a407`); pre-flight work follows on the same branch. `main` still holds only the scaffolding commits until `phase1` is merged.
+
+### Pre-flight (17 Sep 2026, after M2, before M3)
+
+Small items the program plan pulled forward so Flutter F0 can start in parallel:
+
+- **Pluggable OTP delivery.** `src/modules/auth/sms.ts` is replaced by `src/modules/auth/delivery/` (`types.ts`, `registry.ts`, `providers/{console,fake,twilio,msg91}.ts`). Selection is `OTP_DELIVERY_PROVIDER`; each vendor owns its keys (`TWILIO_*`, `MSG91_*`) and `assertCoherence` fails boot on a half-configured provider in every environment. Failures are typed `DeliveryError { retryable }`: retryable → 503, terminal → 422 `OTP_DELIVERY_FAILED` (new, additive code). `POST /auth/otp/request` now returns `{ channel, maskedDestination, expiresInSeconds, resendAfterSeconds }`. Metric `otp_deliveries_total{provider,result}`. Guide: `docs/ADDING_A_DELIVERY_PROVIDER.md`. The `fake` provider records codes in memory for tests; an integration test of the real OTP path still needs Redis in CI (not yet added).
+- **Contract vectors** under `contracts/` (`tax-vectors.json` ≈ 1.5 MB, `numbering-vectors.json`), generated by `npm run contracts:generate` from `tests/contracts/`. `tests/contracts/contracts.test.ts` fails when a committed file no longer matches the engine. The Dart port in the Flutter repo copies these and asserts parity. Format: `contracts/README.md`.
+- Unit suite is now **10 files / 130 tests**.
 
 ---
 
@@ -231,7 +239,8 @@ Approved plan; executed **milestone by milestone with a review between each**. T
 
 ```bash
 npm run dev                  # watch mode, loads .env.development
-npm run check                # typecheck + lint + unit tests (expect 8 files / 106 tests)
+npm run check                # typecheck + lint + unit tests (expect 10 files / 130 tests)
+npm run contracts:generate   # rewrite contracts/*.json after a deliberate engine change
 npm run format:check         # CI gate; covers ts, json, md, yml
 npm run migrate:status       # list migrations (owner connection, session pooler)
 npm run migrate              # apply pending migrations

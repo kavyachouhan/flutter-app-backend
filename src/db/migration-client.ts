@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { env } from '../config/env.js';
+import { databaseSslConfig } from './ssl.js';
 
 /** Owner-role connection used by `migrate` and `db:bootstrap`; never by the API. */
 export function migrationClientConfig(): pg.ClientConfig {
@@ -8,6 +9,6 @@ export function migrationClientConfig(): pg.ClientConfig {
   }
   return {
     connectionString: env.DATABASE_MIGRATION_URL,
-    ssl: env.DATABASE_SSL ? { rejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED } : false,
+    ssl: databaseSslConfig(),
   };
 }

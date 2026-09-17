@@ -7,11 +7,30 @@ import {
   DependencyError,
   ErrorCode,
   RateLimitError,
+  UnprocessableError,
 } from '../../lib/errors.js';
-import { getSmsProvider } from './sms.js';
+import { createLogger } from '../../lib/logger.js';
+import { otpDeliveries } from '../../observability/metrics.js';
+import {
+  DeliveryError,
+  getOtpDeliveryProvider,
+  type OtpDeliveryChannel,
+} from './delivery/index.js';
+import { maskPhone } from './phone.js';
+
+const log = createLogger('otp');
 
 const otpKey = (phone: string) => `otp:${phone}`;
 const cooldownKey = (phone: string) => `otp:cooldown:${phone}`;
+
+export interface OtpIssued {
+  /** How the code was sent, so the client can say "sent by SMS" without assuming. */
+  channel: OtpDeliveryChannel;
+  /** "+••••••••1234" — confirms the destination without echoing the number. */
+  maskedDestination: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+}
 
 // HMAC-keyed so the small code space cannot be brute-forced offline from a
 // Redis dump, and bound to the phone so a hash is useless for another number.
@@ -29,10 +48,9 @@ async function withStore<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function issueOtp(
-  phone: string,
-): Promise<{ expiresInSeconds: number; resendAfterSeconds: number }> {
+export async function issueOtp(phone: string): Promise<OtpIssued> {
   const redis = requireRedis('OTP store');
+  const provider = getOtpDeliveryProvider();
 
   await withStore(async () => {
     const acquired = await redis.set(
@@ -53,16 +71,54 @@ export async function issueOtp(
       .expire(otpKey(phone), env.OTP_TTL_SECONDS)
       .exec();
 
+    const startedAt = performance.now();
     try {
-      await getSmsProvider().sendOtp(phone, code);
+      const receipt = await provider.sendOtp({ phone, code, ttlSeconds: env.OTP_TTL_SECONDS });
+      otpDeliveries.inc({ provider: provider.name, result: 'delivered' });
+      log.info(
+        {
+          provider: provider.name,
+          channel: provider.channel,
+          providerMessageId: receipt.providerMessageId,
+          latencyMs: Math.round(performance.now() - startedAt),
+        },
+        'OTP delivered',
+      );
     } catch (error) {
-      // Clear the cooldown too, so the user can retry as soon as the provider recovers.
+      // Clear the cooldown too, so the person can retry as soon as the
+      // provider recovers or after correcting the number.
       await redis.del(otpKey(phone), cooldownKey(phone));
-      throw new DependencyError('SMS delivery', { cause: error });
+
+      // Anything that is not a DeliveryError is a provider bug or an
+      // unexpected transport failure; treat it as transient rather than
+      // telling the person their number is wrong.
+      const retryable = error instanceof DeliveryError ? error.retryable : true;
+      otpDeliveries.inc({
+        provider: provider.name,
+        result: retryable ? 'retryable_error' : 'terminal_error',
+      });
+      log.warn(
+        {
+          err: error,
+          provider: provider.name,
+          retryable,
+          latencyMs: Math.round(performance.now() - startedAt),
+        },
+        'OTP delivery failed',
+      );
+
+      if (retryable) throw new DependencyError('OTP delivery', { cause: error });
+      throw new UnprocessableError(
+        'We could not send a code to this number. Check it and try again.',
+        ErrorCode.OTP_DELIVERY_FAILED,
+        { cause: error, details: { channel: provider.channel } },
+      );
     }
   });
 
   return {
+    channel: provider.channel,
+    maskedDestination: maskPhone(phone),
     expiresInSeconds: env.OTP_TTL_SECONDS,
     resendAfterSeconds: env.OTP_RESEND_COOLDOWN_SECONDS,
   };

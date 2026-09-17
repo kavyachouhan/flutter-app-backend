@@ -56,3 +56,12 @@ export function normalizePhone(input: string, rules: PhoneRules = configuredRule
   if (!E164_DIGITS.test(normalized)) throw invalid();
   return normalized;
 }
+
+/**
+ * "+••••••••1234": enough for the person to recognise which number the code
+ * went to, not enough for a shoulder-surfer to dial it.
+ */
+export function maskPhone(normalizedPhone: string, visibleDigits = 4): string {
+  const visible = normalizedPhone.slice(-visibleDigits);
+  return `+${'•'.repeat(Math.max(normalizedPhone.length - visible.length, 0))}${visible}`;
+}

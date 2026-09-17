@@ -52,8 +52,8 @@ export const testEnv: Record<string, string> = {
   PHONE_DEFAULT_COUNTRY_CODE: '91',
   PHONE_NATIONAL_NUMBER_LENGTH: '10',
 
-  SMS_PROVIDER: 'console',
-  SMS_REQUEST_TIMEOUT_MS: '1000',
+  OTP_DELIVERY_PROVIDER: 'console',
+  OTP_DELIVERY_TIMEOUT_MS: '1000',
   AUTH_DEV_BYPASS: 'true',
   AUTH_DEV_FIXED_OTP: '123456',
 

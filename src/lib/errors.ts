@@ -14,6 +14,8 @@ export const ErrorCode = {
   TOKEN_INVALID: 'TOKEN_INVALID',
   OTP_INVALID: 'OTP_INVALID',
   OTP_EXPIRED: 'OTP_EXPIRED',
+  /** The provider rejected the destination; retrying with the same number will not help. */
+  OTP_DELIVERY_FAILED: 'OTP_DELIVERY_FAILED',
 
   FORBIDDEN: 'FORBIDDEN',
   INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE',

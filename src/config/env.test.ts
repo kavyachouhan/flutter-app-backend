@@ -15,14 +15,16 @@ const SAFE_PRODUCTION: Record<string, string> = {
   DATABASE_URL: 'postgresql://app_user.projref:pw@pooler.example.invalid:6543/postgres',
   DATABASE_APP_ROLE_NAME: 'app_user',
   DATABASE_SSL: 'true',
+  DATABASE_SSL_REJECT_UNAUTHORIZED: 'true',
+  DATABASE_SSL_CA: '-----BEGIN CERTIFICATE-----\\nMIIB\\n-----END CERTIFICATE-----',
   JWT_SECRET: 'Zq4mR8tK2wF6yB1nX9cV3hJ7sL5gD0pAq1w2',
   OTP_HASH_SECRET: 'Pa9sD8fG7hJ6kL5zX4cV3bN2mQ1wE0rTy7u6',
-  SMS_PROVIDER: 'twilio',
-  SMS_API_BASE_URL: 'https://sms.invalid',
-  SMS_ACCOUNT_SID: 'sid',
-  SMS_API_KEY: 'key',
-  SMS_SENDER_ID: 'sender',
-  SMS_OTP_MESSAGE_TEMPLATE: 'Code {code}',
+  OTP_DELIVERY_PROVIDER: 'twilio',
+  TWILIO_API_BASE_URL: 'https://sms.invalid',
+  TWILIO_ACCOUNT_SID: 'sid',
+  TWILIO_AUTH_TOKEN: 'key',
+  TWILIO_SENDER_ID: 'sender',
+  TWILIO_OTP_MESSAGE_TEMPLATE: 'Code {code}',
   AUTH_DEV_BYPASS: 'false',
   AUTH_DEV_FIXED_OTP: '',
   CORS_ALLOWED_ORIGINS: 'https://app.invalid',
@@ -44,8 +46,17 @@ describe('production safety gate', () => {
   it.each([
     ['the dev auth bypass', { AUTH_DEV_BYPASS: 'true' }, /AUTH_DEV_BYPASS/],
     ['a fixed OTP', { AUTH_DEV_FIXED_OTP: '123456' }, /AUTH_DEV_FIXED_OTP/],
-    ['the console SMS provider', { SMS_PROVIDER: 'console' }, /SMS_PROVIDER=console/],
-    ['missing provider credentials', { SMS_ACCOUNT_SID: '' }, /SMS_ACCOUNT_SID/],
+    [
+      'the console OTP provider',
+      { OTP_DELIVERY_PROVIDER: 'console' },
+      /OTP_DELIVERY_PROVIDER=console/,
+    ],
+    ['the fake OTP provider', { OTP_DELIVERY_PROVIDER: 'fake' }, /OTP_DELIVERY_PROVIDER=fake/],
+    [
+      'an unverified database TLS chain',
+      { DATABASE_SSL_REJECT_UNAUTHORIZED: 'false' },
+      /DATABASE_SSL_REJECT_UNAUTHORIZED/,
+    ],
     [
       'a placeholder JWT secret',
       { JWT_SECRET: 'test-only-jwt-secret-value-at-least-32-chars' },
@@ -82,7 +93,11 @@ describe('production safety gate', () => {
 
   it('reports every violation at once', () => {
     expect(
-      production({ AUTH_DEV_BYPASS: 'true', SMS_PROVIDER: 'console', DATABASE_SSL: 'false' }),
+      production({
+        AUTH_DEV_BYPASS: 'true',
+        OTP_DELIVERY_PROVIDER: 'console',
+        DATABASE_SSL: 'false',
+      }),
     ).toThrow(/3 unsafe setting/);
   });
 
@@ -127,6 +142,31 @@ describe('coherence', () => {
     ['a fixed OTP without the bypass', { AUTH_DEV_BYPASS: 'false' }, /requires AUTH_DEV_BYPASS/],
     ['a fixed OTP of the wrong length', { AUTH_DEV_FIXED_OTP: '12' }, /OTP_LENGTH/],
     ['a default page size above the max', { PAGE_SIZE_DEFAULT: '500' }, /PAGE_SIZE_DEFAULT/],
+    [
+      'a database CA without TLS',
+      { DATABASE_SSL: 'false', DATABASE_SSL_CA: 'pem' },
+      /DATABASE_SSL_CA has no effect/,
+    ],
+    [
+      'an OTP provider missing one of its keys',
+      {
+        OTP_DELIVERY_PROVIDER: 'twilio',
+        TWILIO_API_BASE_URL: 'https://sms.invalid',
+        TWILIO_ACCOUNT_SID: 'sid',
+        TWILIO_AUTH_TOKEN: 'key',
+        TWILIO_OTP_MESSAGE_TEMPLATE: 'Code {code}',
+      },
+      /TWILIO_SENDER_ID is required for OTP_DELIVERY_PROVIDER=twilio/,
+    ],
+    [
+      'msg91 without a template',
+      {
+        OTP_DELIVERY_PROVIDER: 'msg91',
+        MSG91_API_BASE_URL: 'https://msg91.invalid',
+        MSG91_AUTH_KEY: 'key',
+      },
+      /MSG91_TEMPLATE_ID is required/,
+    ],
     [
       'a headers timeout not above keep-alive',
       { HTTP_HEADERS_TIMEOUT_MS: '5000' },

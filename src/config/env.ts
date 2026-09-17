@@ -59,6 +59,9 @@ const envSchema = z.object({
   DATABASE_APP_ROLE_PASSWORD: optional(z.string().min(1)),
   DATABASE_SSL: required(bool),
   DATABASE_SSL_REJECT_UNAUTHORIZED: required(bool),
+  // PEM of the CA that signs the pooler's certificate. Production must verify
+  // the chain, and Node does not trust Supavisor's by default.
+  DATABASE_SSL_CA: optional(z.string().min(1)),
   DATABASE_POOL_MAX: required(positiveInt),
   DATABASE_POOL_IDLE_TIMEOUT_MS: required(positiveInt),
   DATABASE_CONNECTION_TIMEOUT_MS: required(positiveInt),
@@ -96,14 +99,22 @@ const envSchema = z.object({
   PHONE_DEFAULT_COUNTRY_CODE: required(z.string().regex(/^[1-9]\d{0,2}$/)),
   PHONE_NATIONAL_NUMBER_LENGTH: required(positiveInt),
 
-  SMS_PROVIDER: required(z.enum(['console', 'twilio', 'msg91'])),
-  SMS_API_BASE_URL: optional(z.string().url()),
-  SMS_ACCOUNT_SID: optional(z.string().min(1)),
-  SMS_API_KEY: optional(z.string().min(1)),
-  SMS_SENDER_ID: optional(z.string().min(1)),
-  SMS_TEMPLATE_ID: optional(z.string().min(1)),
-  SMS_OTP_MESSAGE_TEMPLATE: optional(z.string().includes('{code}')),
-  SMS_REQUEST_TIMEOUT_MS: required(positiveInt),
+  // --- OTP delivery ---------------------------------------------------------
+  // The vendor is expected to change; a provider is one file under
+  // src/modules/auth/delivery/providers plus its own keys below. `console`
+  // and `fake` never deliver and are refused in production.
+  OTP_DELIVERY_PROVIDER: required(z.enum(['console', 'fake', 'twilio', 'msg91'])),
+  OTP_DELIVERY_TIMEOUT_MS: required(positiveInt),
+
+  TWILIO_API_BASE_URL: optional(z.string().url()),
+  TWILIO_ACCOUNT_SID: optional(z.string().min(1)),
+  TWILIO_AUTH_TOKEN: optional(z.string().min(1)),
+  TWILIO_SENDER_ID: optional(z.string().min(1)),
+  TWILIO_OTP_MESSAGE_TEMPLATE: optional(z.string().includes('{code}')),
+
+  MSG91_API_BASE_URL: optional(z.string().url()),
+  MSG91_AUTH_KEY: optional(z.string().min(1)),
+  MSG91_TEMPLATE_ID: optional(z.string().min(1)),
 
   // Development-only; refused under APP_ENV=production.
   AUTH_DEV_BYPASS: required(bool),
@@ -173,6 +184,30 @@ const envSchema = z.object({
 
 type RawEnv = z.infer<typeof envSchema>;
 
+/**
+ * Keys each OTP delivery provider needs. Checked in every environment, so
+ * choosing a provider without configuring it fails at boot rather than on
+ * the first sign-in attempt.
+ */
+const OTP_PROVIDER_REQUIRED_KEYS = {
+  console: [],
+  fake: [],
+  twilio: [
+    'TWILIO_API_BASE_URL',
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_SENDER_ID',
+    'TWILIO_OTP_MESSAGE_TEMPLATE',
+  ],
+  msg91: ['MSG91_API_BASE_URL', 'MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'],
+} as const satisfies Record<RawEnv['OTP_DELIVERY_PROVIDER'], readonly (keyof RawEnv)[]>;
+
+/** Providers that only pretend to deliver. */
+const NON_DELIVERING_OTP_PROVIDERS: readonly RawEnv['OTP_DELIVERY_PROVIDER'][] = [
+  'console',
+  'fake',
+];
+
 // Fragments that only appear in sample or test secrets.
 const PLACEHOLDER_SECRET_FRAGMENTS = [
   'dev-only',
@@ -209,24 +244,10 @@ function assertProductionSafety(parsed: RawEnv): void {
   if (parsed.AUTH_DEV_FIXED_OTP !== undefined) {
     violations.push('AUTH_DEV_FIXED_OTP is an OTP accepted for every phone; it must be unset.');
   }
-  if (parsed.SMS_PROVIDER === 'console') {
-    violations.push('SMS_PROVIDER=console never delivers an OTP, so nobody could sign in.');
-  }
-  if (parsed.SMS_PROVIDER === 'twilio') {
-    for (const key of [
-      'SMS_API_BASE_URL',
-      'SMS_ACCOUNT_SID',
-      'SMS_API_KEY',
-      'SMS_SENDER_ID',
-      'SMS_OTP_MESSAGE_TEMPLATE',
-    ] as const) {
-      if (!parsed[key]) violations.push(`${key} is required for SMS_PROVIDER=twilio.`);
-    }
-  }
-  if (parsed.SMS_PROVIDER === 'msg91') {
-    for (const key of ['SMS_API_BASE_URL', 'SMS_API_KEY', 'SMS_TEMPLATE_ID'] as const) {
-      if (!parsed[key]) violations.push(`${key} is required for SMS_PROVIDER=msg91.`);
-    }
+  if (NON_DELIVERING_OTP_PROVIDERS.includes(parsed.OTP_DELIVERY_PROVIDER)) {
+    violations.push(
+      `OTP_DELIVERY_PROVIDER=${parsed.OTP_DELIVERY_PROVIDER} never delivers an OTP, so nobody could sign in.`,
+    );
   }
 
   for (const key of ['JWT_SECRET', 'OTP_HASH_SECRET'] as const) {
@@ -244,6 +265,11 @@ function assertProductionSafety(parsed: RawEnv): void {
   }
   if (!parsed.DATABASE_SSL) {
     violations.push('DATABASE_SSL must be true.');
+  }
+  if (!parsed.DATABASE_SSL_REJECT_UNAUTHORIZED) {
+    violations.push(
+      'DATABASE_SSL_REJECT_UNAUTHORIZED must be true; supply the pooler CA in DATABASE_SSL_CA.',
+    );
   }
 
   const role = connectionRole(parsed.DATABASE_URL);
@@ -277,6 +303,16 @@ function assertCoherence(parsed: RawEnv): void {
     }
     if (parsed.AUTH_DEV_FIXED_OTP.length !== parsed.OTP_LENGTH) {
       violations.push('AUTH_DEV_FIXED_OTP must be OTP_LENGTH digits long.');
+    }
+  }
+  if (parsed.DATABASE_SSL_CA !== undefined && !parsed.DATABASE_SSL) {
+    violations.push('DATABASE_SSL_CA has no effect while DATABASE_SSL=false.');
+  }
+  for (const key of OTP_PROVIDER_REQUIRED_KEYS[parsed.OTP_DELIVERY_PROVIDER]) {
+    if (!parsed[key]) {
+      violations.push(
+        `${key} is required for OTP_DELIVERY_PROVIDER=${parsed.OTP_DELIVERY_PROVIDER}.`,
+      );
     }
   }
   if (parsed.PAGE_SIZE_DEFAULT > parsed.PAGE_SIZE_MAX) {
