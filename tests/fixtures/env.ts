@@ -98,6 +98,7 @@ export const testEnv: Record<string, string> = {
   PLAN_FREE_MAX_OUTLETS: '1',
   PLAN_FREE_MAX_COUNTERS: '1',
   PLAN_FREE_MAX_ITEMS: '100',
+  PLAN_FREE_FEATURES: 'offline_mode',
 
   LOG_LEVEL: 'silent',
   LOG_PRETTY: 'false',

@@ -101,6 +101,13 @@ export function createReceipt(body: CreateReceiptBody) {
       },
     ]);
 
+    await recordAudit(tx, {
+      action: 'payment.received',
+      entityType: 'payment',
+      entityId: body.id,
+      metadata: { amount: body.amount, mode: body.mode, customerId: body.customerId },
+    });
+
     return loadPayment(tx, body.id);
   });
 }

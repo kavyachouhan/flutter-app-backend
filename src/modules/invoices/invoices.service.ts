@@ -248,7 +248,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
         lineTotal: computed.lineTotal,
       };
     });
-    await invoicesRepository.insertLines(tx, body.id, lineRows);
+    await invoicesRepository.insertLines(tx, body.id, body.outletId, body.documentDate, lineRows);
 
     const stockLines = body.lines.flatMap((l) => {
       const item = itemFor(l.itemId);
@@ -326,6 +326,21 @@ export async function createInvoice(body: CreateInvoiceBody) {
     }
 
     await numberingRepository.markConsumed(tx, block.id, body.sequenceNo);
+
+    // Sales are the events an owner most wants to see in the trail; auditing
+    // only voids would leave the log unable to answer "who billed what".
+    await recordAudit(tx, {
+      action: 'invoice.issued',
+      entityType: 'invoice',
+      entityId: body.id,
+      metadata: {
+        documentNumber,
+        grandTotal: totals.grandTotal,
+        customerId: customer?.id ?? null,
+        outletId: body.outletId,
+      },
+    });
+
     return { invoice: await loadInvoice(tx, body.id), warnings, replayed: false };
   });
 

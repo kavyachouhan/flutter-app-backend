@@ -26,6 +26,8 @@
     "db:bootstrap:deploy": "node dist/db/bootstrap.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "ci:env": "tsx tests/integration/setup/write-env-file.ts",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

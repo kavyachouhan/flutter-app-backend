@@ -67,6 +67,7 @@ Access tokens are stateless, so role changes apply at the next refresh; deactiva
 | Numbering | `/numbering/series`, `/numbering/series/:id/leases`, `/numbering/series/:id/gaps`, `/numbering/leases`    |
 | Billing   | `/invoices`, `/invoices/:id/void`, `/invoices/:id/printed`, `/payments`, `/payments/:id/void`             |
 | Stock     | `/stock/balances`, `/stock/ledger`, `/stock/adjustments`                                                  |
+| Audit     | `/audit`                                                                                                  |
 
 Roles and their permissions are defined in `src/modules/auth/permissions.ts`.
 
@@ -100,11 +101,30 @@ Series formats are validated against `DOCUMENT_NUMBER_MAX_LENGTH` using the high
 | `npm run db:bootstrap`                           | Create the app role and revoke Data API grants |
 | `npm run migrate:deploy` / `db:bootstrap:deploy` | Same, from `dist/` with injected env           |
 | `npm run check`                                  | Typecheck, lint, unit tests                    |
+| `npm test` / `npm run test:integration`          | Unit suite / integration suite (real database) |
+| `npm run ci:env`                                 | Compose an env file from fixtures + secrets    |
 
 Migrations are forward-only and checksummed; editing an applied migration is refused.
 
 ## Status
 
-Done: production skeleton, Supabase data layer and RLS, auth (OTP, JWT, refresh rotation, dev bypass), RBAC, tenants, outlets, counters, members, devices, plan metering, catalogue, customers and khata ledger, document numbering, invoices, payments, stock ledger.
+Done: production skeleton, Supabase data layer and RLS, auth (OTP, JWT, refresh rotation, dev bypass), RBAC, tenants, outlets, counters, members, devices, plan metering and feature gating, catalogue, customers and khata ledger, document numbering, invoices, payments, stock ledger, audit trail, integration tests against a Supabase test project.
 
-Not yet: OpenAPI docs, idempotency keys and response caching (M3), sync push/pull and print payloads (M6), integration tests against a Supabase test project.
+Not yet: OpenAPI docs, sync push/pull, credit notes, expenses and day close, reports, print payloads.
+
+## Tests
+
+`npm test` runs the unit suite: pure functions only, configured from `tests/fixtures/env.ts`, no database, no network.
+
+`npm run test:integration` runs the suite in `tests/integration` against a real database, driving `createApp()` over HTTP as the unprivileged app role — so RLS, the immutability triggers and the numbering exclusion constraint are exercised rather than assumed. It needs `TEST_DATABASE_URL` and `TEST_DATABASE_MIGRATION_URL`; opting in is explicit because **the suite truncates every table between files**. Point it at a dedicated test database only. Apply migrations first with `npm run migrate`.
+
+Two rules the harness depends on, both learned the hard way:
+
+- Integration tests are excluded from `vitest.config.ts`. Without that they match its `tests/**` glob, and importing their harness replaces `DATABASE_URL` with the live test database — so `npm test` would connect to it and truncate it.
+- Tenant context in a test is set **per transaction**, never per session. On a transaction-mode pooler a `SET` outlives the client that issued it: the backend returns to the pool with `app.tenant_id` still attached and the next connection inherits it. This was observed, not theorised.
+
+### Entitlements
+
+Quotas (`max_users`, `max_outlets`, `max_counters`, `max_items`) are counts, enforced by `assertQuota` under a row lock. Features are capabilities, enforced by `assertFeature` against `subscriptions.features`.
+
+A feature lookup consults the key itself, then its group wildcard (`vertical.*`), then the global one (`*`), and stops at the first entry it finds. An explicit `false` therefore withholds one capability from an otherwise all-inclusive plan, which is how a single feature is disabled for one customer without a deploy. The free plan's grants come from `PLAN_FREE_FEATURES`.

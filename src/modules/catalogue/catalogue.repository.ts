@@ -44,7 +44,8 @@ const ITEM_COLUMNS = `
   i.unit, i.mrp, i.sale_price AS "salePrice", i.purchase_price AS "purchasePrice",
   i.prices_include_tax AS "pricesIncludeTax", i.track_stock AS "trackStock", i.reorder_level AS "reorderLevel",
   i.is_active AS "isActive", i.created_at AS "createdAt", i.updated_at AS "updatedAt",
-  COALESCE((SELECT array_agg(b.barcode ORDER BY b.barcode) FROM item_barcodes b WHERE b.item_id = i.id), '{}') AS barcodes`;
+  COALESCE((SELECT array_agg(b.barcode ORDER BY b.barcode) FROM item_barcodes b
+            WHERE b.item_id = i.id AND b.deleted_at IS NULL), '{}') AS barcodes`;
 
 const CATEGORY_UPDATABLE = { name: 'name', parentId: 'parent_id' } as const;
 
@@ -145,7 +146,8 @@ export const catalogueRepository = {
          AND ($4::text IS NULL
               OR i.name ILIKE $4 OR i.code ILIKE $4
               OR lower($5::text) = ANY(i.aliases)
-              OR EXISTS (SELECT 1 FROM item_barcodes b WHERE b.item_id = i.id AND b.barcode = $5))
+              OR EXISTS (SELECT 1 FROM item_barcodes b
+                         WHERE b.item_id = i.id AND b.barcode = $5 AND b.deleted_at IS NULL))
          AND ($6::text IS NULL OR (i.name, i.id) > ($6::text, $7::uuid))
        ORDER BY i.name, i.id
        LIMIT $8`,
@@ -172,7 +174,7 @@ export const catalogueRepository = {
   findItemByBarcode(tx: Tx, barcode: string): Promise<ItemRow | undefined> {
     return tx.one<ItemRow>(
       `SELECT ${ITEM_COLUMNS} FROM items i JOIN item_barcodes b ON b.item_id = i.id
-       WHERE b.barcode = $1 AND i.deleted_at IS NULL`,
+       WHERE b.barcode = $1 AND b.deleted_at IS NULL AND i.deleted_at IS NULL`,
       [barcode],
     );
   },
@@ -209,8 +211,16 @@ export const catalogueRepository = {
     if (clause) await tx.query(`UPDATE items SET ${clause} WHERE id = $1`, [id, ...values]);
   },
 
+  /**
+   * Soft delete, not DELETE: a removed row is invisible to a syncing device,
+   * which would keep resolving the barcode at the till. The partial unique
+   * index is what lets the same barcode be inserted again afterwards.
+   */
   async replaceBarcodes(tx: Tx, itemId: string, barcodes: readonly string[]): Promise<void> {
-    await tx.query('DELETE FROM item_barcodes WHERE item_id = $1', [itemId]);
+    await tx.query(
+      'UPDATE item_barcodes SET deleted_at = now() WHERE item_id = $1 AND deleted_at IS NULL',
+      [itemId],
+    );
     if (barcodes.length === 0) return;
     await tx.query(
       `INSERT INTO item_barcodes (id, tenant_id, item_id, barcode)
@@ -221,7 +231,10 @@ export const catalogueRepository = {
 
   /** Barcodes are freed so a replacement item can reuse them. */
   async softDeleteItem(tx: Tx, id: string): Promise<void> {
-    await tx.query('DELETE FROM item_barcodes WHERE item_id = $1', [id]);
+    await tx.query(
+      'UPDATE item_barcodes SET deleted_at = now() WHERE item_id = $1 AND deleted_at IS NULL',
+      [id],
+    );
     await tx.query('UPDATE items SET deleted_at = now(), is_active = false WHERE id = $1', [id]);
   },
 };

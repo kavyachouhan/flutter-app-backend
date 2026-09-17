@@ -158,6 +158,10 @@ const envSchema = z.object({
   PLAN_FREE_MAX_OUTLETS: optional(positiveInt),
   PLAN_FREE_MAX_COUNTERS: optional(positiveInt),
   PLAN_FREE_MAX_ITEMS: optional(positiveInt),
+  // Feature keys granted on the free plan; unset grants none. Gating is
+  // configuration, not code, so support can unlock one feature for one
+  // customer without a deploy.
+  PLAN_FREE_FEATURES: optional(csv),
 
   // --- Observability --------------------------------------------------------
   LOG_LEVEL: required(z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])),

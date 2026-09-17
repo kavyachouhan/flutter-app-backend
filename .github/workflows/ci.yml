@@ -26,7 +26,42 @@ jobs:
       - run: npm run format:check
 
       # Unit tests only. They configure themselves from tests/fixtures/env.ts
-      # and never touch a database; integration tests against a dedicated
-      # Supabase test project will get their own job, fed from repository
-      # secrets, so no shared or production database is reachable from CI.
+      # and never touch a database; the integration job below covers the rest.
       - run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: verify
+    # Forks cannot read repository secrets, and the step would fail confusingly
+    # rather than being skipped.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - run: npm ci
+
+      # migrate.ts imports src/config/env.ts, which requires every variable, so
+      # three database secrets are not enough on their own. This composes a full
+      # env file from the unit fixture plus the secrets.
+      - run: npm run ci:env
+        env:
+          CI: 'true'
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_DATABASE_MIGRATION_URL: ${{ secrets.TEST_DATABASE_MIGRATION_URL }}
+          TEST_DATABASE_APP_ROLE_NAME: ${{ secrets.TEST_DATABASE_APP_ROLE_NAME }}
+          TEST_DATABASE_APP_ROLE_PASSWORD: ${{ secrets.TEST_DATABASE_APP_ROLE_PASSWORD }}
+
+      - run: npm run migrate
+      - run: npm run db:bootstrap
+
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_DATABASE_MIGRATION_URL: ${{ secrets.TEST_DATABASE_MIGRATION_URL }}
+          TEST_DATABASE_APP_ROLE_NAME: ${{ secrets.TEST_DATABASE_APP_ROLE_NAME }}
+          TEST_DATABASE_APP_ROLE_PASSWORD: ${{ secrets.TEST_DATABASE_APP_ROLE_PASSWORD }}

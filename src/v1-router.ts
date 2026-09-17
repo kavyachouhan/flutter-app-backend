@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import { getContext } from './lib/context.js';
 import { requireAccessToken, requireIdentityToken } from './middleware/authenticate.js';
 import { rateLimit } from './middleware/rate-limit.js';
+import { auditRouter } from './modules/audit/audit.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { devAuthRouter } from './modules/auth/dev.routes.js';
 import { catalogueRouter } from './modules/catalogue/catalogue.routes.js';
@@ -50,6 +51,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/invoices', invoicesRouter);
   tenantScoped.use('/payments', paymentsRouter);
   tenantScoped.use('/stock', stockRouter);
+  tenantScoped.use('/audit', auditRouter);
 
   router.use(tenantScoped);
   return router;

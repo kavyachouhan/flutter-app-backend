@@ -5,6 +5,30 @@ import { newId } from '../../lib/ids.js';
 
 export type QuotaResource = 'users' | 'outlets' | 'counters' | 'items';
 
+/**
+ * Capabilities a plan may or may not include, as opposed to quotas, which are
+ * counts. Keys are grouped with dots so a whole group can be granted at once.
+ * Additive only: a rename silently un-grants whatever every existing
+ * subscription row already stores.
+ */
+export const FEATURES = [
+  'offline_mode',
+  'reports.all',
+  'credit_notes',
+  'purchases',
+  'price_lists',
+  'discount_rules',
+  'gst_workings',
+  'storefront',
+  'bulk_edit',
+  'barcode_printing',
+  'vertical.pharmacy',
+  'vertical.electronics',
+  'tally_sync',
+  'einvoice',
+] as const;
+export type Feature = (typeof FEATURES)[number];
+
 export interface Subscription {
   plan: string;
   status: string;
@@ -38,18 +62,64 @@ const LIMIT_FIELD = {
 // past_due stays writable so a declined renewal does not stop a shop billing mid-day.
 const WRITABLE_STATUSES = new Set(['active', 'past_due']);
 
+/**
+ * Keys consulted for one feature, most specific first: the feature itself,
+ * then its group wildcard, then the global one. An explicit entry therefore
+ * beats a wildcard in both directions, so a single feature can be withheld
+ * from an otherwise all-inclusive plan.
+ */
+function grantKeys(feature: string): string[] {
+  const keys = [feature];
+  const dot = feature.lastIndexOf('.');
+  if (dot > 0) keys.push(`${feature.slice(0, dot)}.*`);
+  keys.push('*');
+  return keys;
+}
+
+export function hasFeature(features: Record<string, unknown>, feature: string): boolean {
+  for (const key of grantKeys(feature)) {
+    const granted = features[key];
+    if (granted === true) return true;
+    if (granted === false) return false;
+  }
+  return false;
+}
+
 export async function insertFreeSubscription(tx: Tx): Promise<void> {
+  const features = Object.fromEntries((env.PLAN_FREE_FEATURES ?? []).map((key) => [key, true]));
   await tx.query(
     `INSERT INTO subscriptions (id, tenant_id, plan, status, max_users, max_outlets, max_counters, max_items, features)
-     VALUES ($1, app.current_tenant_id(), 'free', 'active', $2, $3, $4, $5, '{}'::jsonb)`,
+     VALUES ($1, app.current_tenant_id(), 'free', 'active', $2, $3, $4, $5, $6::jsonb)`,
     [
       newId(),
       env.PLAN_FREE_MAX_USERS ?? null,
       env.PLAN_FREE_MAX_OUTLETS ?? null,
       env.PLAN_FREE_MAX_COUNTERS ?? null,
       env.PLAN_FREE_MAX_ITEMS ?? null,
+      JSON.stringify(features),
     ],
   );
+}
+
+/**
+ * The gate for paid capabilities. No row lock, unlike `assertQuota`: nothing
+ * is being counted, so there is no race between two concurrent checks.
+ */
+export async function assertFeature(tx: Tx, feature: Feature): Promise<void> {
+  const subscription = await tx.one<Subscription>(
+    `SELECT ${SUBSCRIPTION_COLUMNS} FROM subscriptions`,
+  );
+  if (!subscription) throw new InternalError('Tenant has no subscription.');
+  if (!WRITABLE_STATUSES.has(subscription.status)) {
+    throw new EntitlementError('Your subscription is not active.');
+  }
+  if (!hasFeature(subscription.features, feature)) {
+    throw new EntitlementError(
+      'Your plan does not include this feature.',
+      ErrorCode.FEATURE_NOT_IN_PLAN,
+      { details: { feature } },
+    );
+  }
 }
 
 /**
