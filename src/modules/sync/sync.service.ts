@@ -29,6 +29,7 @@ import * as creditNotesService from '../credit-notes/credit-notes.service.js';
 import * as customersService from '../customers/customers.service.js';
 import * as invoicesService from '../invoices/invoices.service.js';
 import type { BlockRow } from '../numbering/numbering.repository.js';
+import * as operationsService from '../operations/operations.service.js';
 import { topUpLeasesForDevice } from '../numbering/numbering.service.js';
 import * as paymentsService from '../payments/payments.service.js';
 import * as stockService from '../stock/stock.service.js';
@@ -181,6 +182,11 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'category.create': 'catalogue:write',
   'category.update': 'catalogue:write',
   'stock.adjust': 'stock:adjust',
+  'held_bill.upsert': 'invoices:create',
+  'held_bill.release': 'invoices:create',
+  'expense.create': 'expenses:write',
+  'expense.void': 'expenses:void',
+  'day_close.create': 'day_close:create',
 };
 
 /** Table a create/update touches, for replay detection and stale-write checks. */
@@ -193,6 +199,9 @@ const OPERATION_TABLE: Partial<Record<OperationType, string>> = {
   'category.create': 'categories',
   'category.update': 'categories',
   'stock.adjust': 'stock_ledger_entries',
+  'held_bill.upsert': 'held_bills',
+  'expense.create': 'expenses',
+  'day_close.create': 'day_closes',
 };
 
 type Payload<T extends OperationType> = (typeof OPERATION_PAYLOADS)[T]['_output'];
@@ -280,6 +289,32 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
       const p = payload as Payload<'stock.adjust'>;
       await stockService.createAdjustment(p);
       return { id: p.id };
+    }
+    case 'held_bill.upsert': {
+      const p = payload as Payload<'held_bill.upsert'>;
+      await operationsService.upsertHeldBill(p);
+      return { id: p.id };
+    }
+    case 'held_bill.release': {
+      const p = payload as Payload<'held_bill.release'>;
+      const r = await operationsService.releaseHeldBill(p.id, p);
+      // Already released, here or on another device: not an error, just done.
+      return { id: p.id, replayed: !r.released };
+    }
+    case 'expense.create': {
+      const p = payload as Payload<'expense.create'>;
+      const r = await operationsService.createExpense(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'expense.void': {
+      const p = payload as Payload<'expense.void'>;
+      await operationsService.voidExpense(p.id, p.reason);
+      return { id: p.id };
+    }
+    case 'day_close.create': {
+      const p = payload as Payload<'day_close.create'>;
+      const r = await operationsService.createDayClose(p);
+      return { id: p.id, replayed: r.replayed, warnings: r.warnings };
     }
   }
 }

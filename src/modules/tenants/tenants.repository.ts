@@ -38,6 +38,9 @@ export type TenantSettings = Pick<
   | 'isGstRegistered'
   | 'isComposition'
   | 'fyStartMonth'
+  // The business day boundary for cash-up and reports is the shop's local
+  // midnight, not the server's.
+  | 'timezone'
   | 'allowNegativeStock'
   | 'defaultPricesIncludeTax'
 >;
@@ -121,7 +124,7 @@ export const tenantsRepository = {
   async getSettings(tx: Tx): Promise<TenantSettings> {
     const row = await tx.one<TenantSettings>(
       `SELECT state_code AS "stateCode", gstin, is_gst_registered AS "isGstRegistered",
-              is_composition AS "isComposition", fy_start_month AS "fyStartMonth",
+              is_composition AS "isComposition", fy_start_month AS "fyStartMonth", timezone,
               allow_negative_stock AS "allowNegativeStock", default_prices_include_tax AS "defaultPricesIncludeTax"
        FROM tenants WHERE id = app.current_tenant_id()`,
     );

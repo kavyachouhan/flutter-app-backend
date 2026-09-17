@@ -23,6 +23,7 @@ import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/stock/stock.openapi.js';
+import '../modules/operations/operations.openapi.js';
 import '../modules/audit/audit.openapi.js';
 import '../modules/sync/sync.openapi.js';
 
@@ -66,6 +67,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Payments', description: 'Receipts against the khata and their allocations.' },
       { name: 'Credit notes', description: 'Returns and corrections against issued invoices.' },
       { name: 'Stock', description: 'Balances, ledger and manual adjustments.' },
+      {
+        name: 'Operations',
+        description: 'Parked bills, expenses and the day’s cash-up.',
+      },
       { name: 'Audit', description: 'Who changed what, when.' },
       { name: 'Sync', description: 'Offline-first change feed and operation push.' },
       { name: 'Development', description: 'Mounted only in development with the auth bypass.' },

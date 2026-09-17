@@ -13,6 +13,11 @@ import { devicesRouter } from './modules/devices/devices.routes.js';
 import { invoicesRouter } from './modules/invoices/invoices.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
 import { numberingRouter } from './modules/numbering/numbering.routes.js';
+import {
+  dayCloseRouter,
+  expensesRouter,
+  heldBillsRouter,
+} from './modules/operations/operations.routes.js';
 import { outletsRouter } from './modules/outlets/outlets.routes.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
@@ -57,6 +62,9 @@ export function createV1Router(): Router {
   tenantScoped.use('/invoices', invoicesRouter);
   tenantScoped.use('/payments', paymentsRouter);
   tenantScoped.use('/credit-notes', creditNotesRouter);
+  tenantScoped.use('/held-bills', heldBillsRouter);
+  tenantScoped.use('/expenses', expensesRouter);
+  tenantScoped.use('/day-close', dayCloseRouter);
   tenantScoped.use('/stock', stockRouter);
   tenantScoped.use('/audit', auditRouter);
   tenantScoped.use('/sync', syncRouter);

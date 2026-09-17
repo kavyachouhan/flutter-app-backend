@@ -11,6 +11,13 @@ import { createCreditNoteBody } from '../credit-notes/credit-notes.schemas.js';
 import { createCustomerBody, updateCustomerBody } from '../customers/customers.schemas.js';
 import { createInvoiceBody, voidInvoiceBody } from '../invoices/invoices.schemas.js';
 import { createReceiptBody, voidPaymentBody } from '../payments/payments.schemas.js';
+import {
+  createDayCloseBody,
+  createExpenseBody,
+  releaseHeldBillBody,
+  upsertHeldBillBody,
+  voidExpenseBody,
+} from '../operations/operations.schemas.js';
 import { createAdjustmentBody } from '../stock/stock.schemas.js';
 
 export const pullQuery = z.object({
@@ -45,6 +52,11 @@ export const OPERATION_PAYLOADS = {
   'category.create': createCategoryBody,
   'category.update': update(updateCategoryBody),
   'stock.adjust': createAdjustmentBody,
+  'held_bill.upsert': upsertHeldBillBody,
+  'held_bill.release': z.object({ id: z.string().uuid(), ...releaseHeldBillBody.shape }),
+  'expense.create': createExpenseBody,
+  'expense.void': withId(voidExpenseBody.shape),
+  'day_close.create': createDayCloseBody,
 } as const;
 void voidInvoiceBody;
 

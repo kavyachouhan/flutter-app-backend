@@ -86,6 +86,12 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   table('customer_ledger_entries', ['id'], false),
   table('stock_ledger_entries', ['id'], false, ['stock.adjust']),
   table('stock_balances', ['outlet_id', 'item_id'], false),
+  // A parked bill is shared across the counter's devices on purpose: a
+  // cashier going home must not strand a customer's bill on their phone.
+  table('held_bills', ['id'], true, ['held_bill.upsert', 'held_bill.release']),
+  table('expense_categories', ['id'], true),
+  table('expenses', ['id'], false, ['expense.create', 'expense.void']),
+  table('day_closes', ['id'], false, ['day_close.create']),
 ];
 
 export const SYNC_ENTITIES = SYNC_TABLES.map((t) => t.entity);

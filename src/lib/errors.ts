@@ -46,6 +46,12 @@ export const ErrorCode = {
   INVOICE_NOT_RETURNABLE: 'INVOICE_NOT_RETURNABLE',
   /** A khata credit or partial refund needs a customer to carry the balance. */
   REFUND_REQUIRES_CUSTOMER: 'REFUND_REQUIRES_CUSTOMER',
+  /** The counter already holds as many parked bills as the plan allows. */
+  HELD_BILL_LIMIT_REACHED: 'HELD_BILL_LIMIT_REACHED',
+  HELD_BILL_ALREADY_RELEASED: 'HELD_BILL_ALREADY_RELEASED',
+  DAY_ALREADY_CLOSED: 'DAY_ALREADY_CLOSED',
+  /** A later cash-up already exists, so this one would rewrite history. */
+  DAY_CLOSE_OUT_OF_ORDER: 'DAY_CLOSE_OUT_OF_ORDER',
 
   /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',
@@ -68,6 +74,8 @@ export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const WarningCode = {
   CREDIT_LIMIT_EXCEEDED: 'CREDIT_LIMIT_EXCEEDED',
   NEGATIVE_STOCK: 'NEGATIVE_STOCK',
+  /** The drawer did not match the expectation by more than the tolerance. */
+  CASH_VARIANCE_EXCEEDED: 'CASH_VARIANCE_EXCEEDED',
 } as const;
 
 export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];

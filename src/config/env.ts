@@ -169,6 +169,13 @@ const envSchema = z.object({
   NUMBER_BLOCK_SIZE_MAX: required(positiveInt),
   NUMBER_BLOCK_TTL_HOURS: required(positiveInt),
 
+  // --- Counter operations ---------------------------------------------------
+  // Parked bills per counter. A cap exists because each one holds a draft in
+  // the database and an unbounded list is unusable at the till anyway.
+  HELD_BILL_MAX_PER_COUNTER: required(positiveInt),
+  // Cash-up difference, in paise, above which the close is flagged.
+  DAY_CLOSE_VARIANCE_WARN_PAISE: required(nonNegativeInt),
+
   // --- Tenant onboarding defaults -------------------------------------------
   TENANT_DEFAULT_LOCALE: required(z.string().min(1)),
   TENANT_DEFAULT_TIMEZONE: required(z.string().min(1)),
