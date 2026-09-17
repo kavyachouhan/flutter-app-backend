@@ -222,7 +222,7 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       originalInvoiceId: invoice.id,
       originalDocumentNumber: invoice.documentNumber,
       customerId: customer?.id ?? null,
-      customerName: (invoice.customerName as string | null) ?? null,
+      customerName: invoice.customerName,
       customerGstin: (invoice['customerGstin'] as string | null) ?? null,
       supplierGstin: (invoice['supplierGstin'] as string | null) ?? null,
       supplierStateCode: invoice['supplierStateCode'] as string,
