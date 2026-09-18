@@ -228,8 +228,10 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   }));
   // Change due is the number a cashier and a customer both look for, so it is
   // computed here rather than left to the renderer.
-  const cash = input.tenders.find((x) => x.mode === 'cash' && x.tenderedAmount != null);
-  if (cash?.tenderedAmount != null && cash.tenderedAmount > cash.amount) {
+  const cash = input.tenders.find(
+    (x) => x.mode === 'cash' && x.tenderedAmount !== null && x.tenderedAmount > x.amount,
+  );
+  if (cash?.tenderedAmount !== undefined && cash.tenderedAmount !== null) {
     tenders.push({
       label: 'Tendered',
       amount: money(cash.tenderedAmount),
