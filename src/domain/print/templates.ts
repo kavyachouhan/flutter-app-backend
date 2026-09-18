@@ -67,11 +67,7 @@ export const TEMPLATES: Record<TemplateKey, TemplateDefinition> = {
     showAmountInWords: true,
     showCustomerBlock: true,
     showSignature: true,
-    copyLabels: [
-      'ORIGINAL FOR RECIPIENT',
-      'DUPLICATE FOR TRANSPORTER',
-      'TRIPLICATE FOR SUPPLIER',
-    ],
+    copyLabels: ['ORIGINAL FOR RECIPIENT', 'DUPLICATE FOR TRANSPORTER', 'TRIPLICATE FOR SUPPLIER'],
   },
   a4_tally: {
     key: 'a4_tally',

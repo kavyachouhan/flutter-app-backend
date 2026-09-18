@@ -154,8 +154,7 @@ function titleFor(kind: PrintDocumentKind, mode: TaxMode): string {
 }
 
 export function resolvePrintDocument(input: ResolveInput): PrintDocument {
-  const money = (paise: number): string =>
-    formatCurrency(paise, { symbol: input.currencySymbol });
+  const money = (paise: number): string => formatCurrency(paise, { symbol: input.currencySymbol });
   const template = input.template;
   const showTax = template.showTaxColumn && input.taxMode === 'gst';
 
@@ -269,9 +268,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   // Section 10(5) of the CGST Act: a composition dealer must say this on every
   // bill of supply, in these words.
   if (input.taxMode === 'composition') {
-    termsLines.unshift(
-      'Composition taxable person, not eligible to collect tax on supplies.',
-    );
+    termsLines.unshift('Composition taxable person, not eligible to collect tax on supplies.');
   }
   if (input.notes) termsLines.push(input.notes);
   if (input.profile.bankLines.length > 0) termsLines.push(...input.profile.bankLines);
@@ -287,9 +284,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
       ...(input.business.phone ? { phone: input.business.phone } : {}),
       ...(input.business.gstin ? { gstin: input.business.gstin } : {}),
       ...(input.business.email ? { email: input.business.email } : {}),
-      ...(input.profile.logoObjectKey
-        ? { logoObjectKey: input.profile.logoObjectKey }
-        : {}),
+      ...(input.profile.logoObjectKey ? { logoObjectKey: input.profile.logoObjectKey } : {}),
       ...(input.profile.upiId ? { upiId: input.profile.upiId } : {}),
       bankLines: input.profile.bankLines,
     },
@@ -310,9 +305,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
     taxRows,
     tenders,
     customFields: input.customFields,
-    ...(template.showAmountInWords
-      ? { amountInWords: amountInWords(t.grandTotal) }
-      : {}),
+    ...(template.showAmountInWords ? { amountInWords: amountInWords(t.grandTotal) } : {}),
     ...resolveQr(input, outstanding),
     footerLines: input.profile.footerLines,
     termsLines,
@@ -347,12 +340,7 @@ function resolveQr(
   input: ResolveInput,
   outstanding: number,
 ): { qrPayload?: string; qrCaption?: string } {
-  if (
-    input.kind === 'invoice' &&
-    outstanding > 0 &&
-    input.profile.upiId &&
-    input.business.name
-  ) {
+  if (input.kind === 'invoice' && outstanding > 0 && input.profile.upiId && input.business.name) {
     return {
       qrPayload: upiIntent({
         vpa: input.profile.upiId,
