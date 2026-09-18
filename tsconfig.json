@@ -16,7 +16,10 @@
        caught a real class of bug in products like this one. */
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    /* exactOptionalPropertyTypes is off: Zod infers `prop?: T | undefined`,
+       which that flag refuses to assign to `prop?: T`, so every parsed
+       request body would need a manual strip before reaching a service. */
+    "exactOptionalPropertyTypes": false,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,

@@ -12,54 +12,56 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-
-    # Use services to run PostgreSQL and Redis for testing
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: khata
-          POSTGRES_PASSWORD: khata
-          POSTGRES_DB: khata_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U khata"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s --health-timeout 3s --health-retries 10
-
-    env:
-      APP_ENV: development
-      NODE_ENV: test
-      DATABASE_URL: postgresql://khata:khata@localhost:5432/khata_test
-      REDIS_URL: redis://localhost:6379
-      JWT_SECRET: ci-only-secret-value-at-least-thirty-two-chars-long
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: package.json
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+
+      # Unit tests only. They configure themselves from tests/fixtures/env.ts
+      # and never touch a database; the integration job below covers the rest.
+      - run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: verify
+    # Forks cannot read repository secrets, and the step would fail confusingly
+    # rather than being skipped.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
           cache: npm
 
       - run: npm ci
 
-      - name: Type-check
-        run: npm run typecheck
+      # migrate.ts imports src/config/env.ts, which requires every variable, so
+      # three database secrets are not enough on their own. This composes a full
+      # env file from the unit fixture plus the secrets.
+      - run: npm run ci:env
+        env:
+          CI: 'true'
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_DATABASE_MIGRATION_URL: ${{ secrets.TEST_DATABASE_MIGRATION_URL }}
+          TEST_DATABASE_APP_ROLE_NAME: ${{ secrets.TEST_DATABASE_APP_ROLE_NAME }}
+          TEST_DATABASE_APP_ROLE_PASSWORD: ${{ secrets.TEST_DATABASE_APP_ROLE_PASSWORD }}
 
-      - name: Lint
-        run: npm run lint
+      - run: npm run migrate
+      - run: npm run db:bootstrap
 
-      - name: Format check
-        run: npm run format:check
-
-      - name: Migrate test database
-        run: npm run migrate
-
-      - name: Test
-        run: npm test
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          TEST_DATABASE_MIGRATION_URL: ${{ secrets.TEST_DATABASE_MIGRATION_URL }}
+          TEST_DATABASE_APP_ROLE_NAME: ${{ secrets.TEST_DATABASE_APP_ROLE_NAME }}
+          TEST_DATABASE_APP_ROLE_PASSWORD: ${{ secrets.TEST_DATABASE_APP_ROLE_PASSWORD }}
