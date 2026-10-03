@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import { idParams } from '../../lib/validators.js';
+import { buildCreditNotePayload } from '../print/print.service.js';
+import { printPayloadQuery } from '../print/print.schemas.js';
 import * as service from './credit-notes.service.js';
 import {
   createCreditNoteBody,
@@ -63,5 +65,16 @@ creditNotesRouter.post(
   async (req, res) => {
     const { params } = validated<typeof byId>(req);
     res.json({ data: await service.markPrinted(params.id) });
+  },
+);
+
+const printPayload = { params: idParams, query: printPayloadQuery };
+creditNotesRouter.get(
+  '/:id/print-payload',
+  requirePermission('credit_notes:read'),
+  validate(printPayload),
+  async (req, res) => {
+    const { params, query } = validated<typeof printPayload>(req);
+    res.json({ data: await buildCreditNotePayload(params.id, query) });
   },
 );

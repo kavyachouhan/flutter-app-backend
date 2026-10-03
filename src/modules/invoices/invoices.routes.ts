@@ -4,6 +4,8 @@ import { validate, validated } from '../../middleware/validate.js';
 import { idParams } from '../../lib/validators.js';
 import * as invoicesService from './invoices.service.js';
 import { listReturnable } from '../credit-notes/credit-notes.service.js';
+import { buildInvoicePayload } from '../print/print.service.js';
+import { printPayloadQuery } from '../print/print.schemas.js';
 import { createInvoiceBody, listInvoicesQuery, voidInvoiceBody } from './invoices.schemas.js';
 
 export const invoicesRouter: Router = Router();
@@ -61,5 +63,19 @@ invoicesRouter.post(
   async (req, res) => {
     const { params } = validated<typeof byId>(req);
     res.json({ data: await invoicesService.markPrinted(params.id) });
+  },
+);
+
+// The whole document, formatted and ready to draw. Lives here rather than on
+// a /print router so it sits behind the same id validation and permission as
+// every other read of this invoice.
+const printPayload = { params: idParams, query: printPayloadQuery };
+invoicesRouter.get(
+  '/:id/print-payload',
+  requirePermission('invoices:read'),
+  validate(printPayload),
+  async (req, res) => {
+    const { params, query } = validated<typeof printPayload>(req);
+    res.json({ data: await buildInvoicePayload(params.id, query) });
   },
 );

@@ -23,6 +23,7 @@ import { numberingRepository } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { validateCustomFields } from '../print/custom-fields.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
@@ -99,6 +100,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
       ? await customersRepository.find(tx, body.customerId, true)
       : undefined;
     if (body.customerId && !customer) throw new NotFoundError('Customer');
+
+    // Before the bag becomes part of an immutable document. A device that
+    // billed offline against a field definition since deleted gets a clear
+    // rejection naming the key, rather than an invoice that cannot be printed
+    // with a proper label.
+    await validateCustomFields(tx, 'invoice', body.customFields);
 
     // Deleted items are still resolved: an item removed after an offline sale
     // must not block that sale from uploading.

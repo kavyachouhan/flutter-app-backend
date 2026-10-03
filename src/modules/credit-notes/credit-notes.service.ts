@@ -30,6 +30,7 @@ import { numberingRepository } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { validateCustomFields } from '../print/custom-fields.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import {
@@ -151,6 +152,10 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
     const customer = invoice.customerId
       ? await customersRepository.find(tx, invoice.customerId, true)
       : undefined;
+
+    // Same guard as the invoice path: a credit note is equally immutable, so
+    // the bag has to be right before it is written.
+    await validateCustomFields(tx, 'credit_note', body.customFields);
 
     const taxInput = body.lines.map((line) =>
       deriveReturnLine(sold.get(line.invoiceLineId) as SoldLineRow, line),

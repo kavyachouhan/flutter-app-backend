@@ -8,6 +8,10 @@
 export const ErrorCode = {
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   MALFORMED_REQUEST: 'MALFORMED_REQUEST',
+  /** The document carried a custom field key the tenant has not defined. */
+  CUSTOM_FIELD_UNKNOWN: 'CUSTOM_FIELD_UNKNOWN',
+  /** A defined custom field was missing, too long, or the wrong data type. */
+  CUSTOM_FIELD_INVALID: 'CUSTOM_FIELD_INVALID',
 
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',

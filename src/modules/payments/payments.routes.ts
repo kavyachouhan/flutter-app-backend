@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import { idParams } from '../../lib/validators.js';
+import { buildPaymentReceiptPayload } from '../print/print.service.js';
+import { printPayloadQuery } from '../print/print.schemas.js';
 import * as paymentsService from './payments.service.js';
 import { createReceiptBody, listPaymentsQuery, voidPaymentBody } from './payments.schemas.js';
 
@@ -38,5 +40,16 @@ paymentsRouter.post(
   async (req, res) => {
     const { params, body } = validated<typeof voidSchemas>(req);
     res.json({ data: await paymentsService.voidReceipt(params.id, body.reason) });
+  },
+);
+
+const printPayload = { params: idParams, query: printPayloadQuery };
+paymentsRouter.get(
+  '/:id/print-payload',
+  requirePermission('payments:read'),
+  validate(printPayload),
+  async (req, res) => {
+    const { params, query } = validated<typeof printPayload>(req);
+    res.json({ data: await buildPaymentReceiptPayload(params.id, query) });
   },
 );
