@@ -41,4 +41,19 @@ describe('openapi document', () => {
       expect(document.paths?.[path], path).toBeDefined();
     }
   });
+
+  it('documents the upload and import lifecycles', () => {
+    for (const path of [
+      '/v1/uploads/sign',
+      '/v1/uploads/url',
+      '/v1/imports',
+      '/v1/imports/{id}/ingest',
+      '/v1/imports/{id}/analyse',
+      '/v1/imports/{id}/apply',
+      '/v1/imports/{id}/rows',
+      '/v1/imports/{id}/cancel',
+    ]) {
+      expect(document.paths?.[path], path).toBeDefined();
+    }
+  });
 });

@@ -70,6 +70,27 @@ const envSchema = z.object({
   DATABASE_TRANSACTION_MAX_RETRIES: required(nonNegativeInt),
   DATABASE_RETRY_BASE_DELAY_MS: required(positiveInt),
 
+  // --- Object storage (Supabase Storage) ------------------------------------
+  // The bucket is private and the service-role key never leaves the server.
+  // Clients receive short-lived signed URLs and upload directly, so no file
+  // byte ever transits this API.
+  SUPABASE_URL: required(z.string().url()),
+  SUPABASE_SERVICE_ROLE_KEY: required(z.string().min(1)),
+  SUPABASE_STORAGE_BUCKET: required(z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}$/)),
+  STORAGE_UPLOAD_URL_TTL_SECONDS: required(positiveInt),
+  STORAGE_DOWNLOAD_URL_TTL_SECONDS: required(positiveInt),
+  STORAGE_MAX_UPLOAD_BYTES: required(positiveInt),
+  STORAGE_REQUEST_TIMEOUT_MS: required(positiveInt),
+
+  // --- Bulk import ----------------------------------------------------------
+  // Ingest reads the file once; analyse and apply then advance in chunks, so
+  // these bound one request's work, not the size of an import.
+  IMPORT_MAX_ROWS: required(positiveInt),
+  IMPORT_ANALYSE_CHUNK_ROWS: required(positiveInt),
+  IMPORT_APPLY_CHUNK_ROWS: required(positiveInt),
+  // After this long with no progress a job is abandoned and its upload purged.
+  IMPORT_JOB_TTL_HOURS: required(positiveInt),
+
   // --- Redis ----------------------------------------------------------------
   REDIS_URL: required(z.string().min(1)),
   REDIS_KEY_PREFIX: required(z.string().min(1)),
@@ -143,6 +164,11 @@ const envSchema = z.object({
   // Per device, on /sync/* and number-block leases.
   RATE_LIMIT_SYNC_POINTS: required(positiveInt),
   RATE_LIMIT_SYNC_WINDOW_SECONDS: required(positiveInt),
+  // Signing is cheap to call and expensive to abuse: each URL is a writable
+  // handle on the bucket, so it gets its own budget rather than sharing the
+  // general API allowance.
+  RATE_LIMIT_UPLOAD_SIGN_POINTS: required(positiveInt),
+  RATE_LIMIT_UPLOAD_SIGN_WINDOW_SECONDS: required(positiveInt),
 
   // --- Sync -----------------------------------------------------------------
   // Rows per pull page (the client keeps paging while hasMore is true).
@@ -292,6 +318,17 @@ function assertProductionSafety(parsed: RawEnv): void {
       violations.push(`${key} is a placeholder. Generate one: openssl rand -base64 48`);
     }
   }
+  // Not grouped with the above: the message has to say where to get it, and a
+  // placeholder here means every upload and download silently 401s.
+  if (
+    PLACEHOLDER_SECRET_FRAGMENTS.some((fragment) =>
+      parsed.SUPABASE_SERVICE_ROLE_KEY.toLowerCase().includes(fragment),
+    )
+  ) {
+    violations.push(
+      'SUPABASE_SERVICE_ROLE_KEY is a placeholder. Copy the service_role key from the Supabase project API settings.',
+    );
+  }
   if (parsed.JWT_SECRET === parsed.OTP_HASH_SECRET) {
     violations.push('JWT_SECRET and OTP_HASH_SECRET must differ.');
   }
@@ -361,6 +398,11 @@ function assertCoherence(parsed: RawEnv): void {
   // producing intermittent 502s behind a load balancer.
   if (parsed.HTTP_HEADERS_TIMEOUT_MS <= parsed.HTTP_KEEP_ALIVE_TIMEOUT_MS) {
     violations.push('HTTP_HEADERS_TIMEOUT_MS must be greater than HTTP_KEEP_ALIVE_TIMEOUT_MS.');
+  }
+  for (const key of ['IMPORT_ANALYSE_CHUNK_ROWS', 'IMPORT_APPLY_CHUNK_ROWS'] as const) {
+    if (parsed[key] > parsed.IMPORT_MAX_ROWS) {
+      violations.push(`${key} cannot exceed IMPORT_MAX_ROWS.`);
+    }
   }
 
   if (violations.length > 0) fail('incoherent configuration.', violations);

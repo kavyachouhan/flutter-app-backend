@@ -36,6 +36,10 @@ export const PERMISSIONS = [
   'day_close:create',
   'stock:read',
   'stock:adjust',
+  // Bulk import rewrites the price list wholesale, so it sits with the
+  // owner/manager tier rather than with catalogue:write.
+  'imports:read',
+  'imports:write',
   'numbering:read',
   'numbering:manage',
   'numbering:lease',

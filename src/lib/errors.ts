@@ -57,6 +57,17 @@ export const ErrorCode = {
   /** A later cash-up already exists, so this one would rewrite history. */
   DAY_CLOSE_OUT_OF_ORDER: 'DAY_CLOSE_OUT_OF_ORDER',
 
+  /** The spreadsheet carried more rows than IMPORT_MAX_ROWS. */
+  IMPORT_TOO_LARGE: 'IMPORT_TOO_LARGE',
+  /** The catalogue changed between analysis and apply; re-analyse before applying. */
+  IMPORT_STALE: 'IMPORT_STALE',
+  /** The job is not in a state that allows this step (e.g. analyse before ingest). */
+  IMPORT_WRONG_STATE: 'IMPORT_WRONG_STATE',
+  /** The file has no column that maps to a required field. */
+  IMPORT_COLUMN_UNMAPPED: 'IMPORT_COLUMN_UNMAPPED',
+  /** The uploaded file could not be read as a spreadsheet. */
+  IMPORT_UNREADABLE: 'IMPORT_UNREADABLE',
+
   /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',
   /** The device must discard its local database and pull from zero. */

@@ -23,6 +23,8 @@ import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/print/print.openapi.js';
+import '../modules/uploads/uploads.openapi.js';
+import '../modules/imports/imports.openapi.js';
 import '../modules/stock/stock.openapi.js';
 import '../modules/operations/operations.openapi.js';
 import '../modules/reports/reports.openapi.js';
@@ -74,6 +76,14 @@ export function buildOpenApiDocument(): OpenApiDocument {
           'Branding, templates and user-defined fields that shape every printed document.',
       },
       { name: 'Stock', description: 'Balances, ledger and manual adjustments.' },
+      {
+        name: 'Uploads',
+        description: 'Signed URLs for files, which never pass through this API.',
+      },
+      {
+        name: 'Imports',
+        description: 'Bulk catalogue import: upload, review the diff, then apply.',
+      },
       {
         name: 'Operations',
         description: 'Parked bills, expenses and the day’s cash-up.',
