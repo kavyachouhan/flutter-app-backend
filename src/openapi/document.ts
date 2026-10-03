@@ -25,6 +25,7 @@ import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/print/print.openapi.js';
 import '../modules/uploads/uploads.openapi.js';
 import '../modules/imports/imports.openapi.js';
+import '../modules/exports/exports.openapi.js';
 import '../modules/stock/stock.openapi.js';
 import '../modules/operations/operations.openapi.js';
 import '../modules/reports/reports.openapi.js';
@@ -84,6 +85,8 @@ export function buildOpenApiDocument(): OpenApiDocument {
         name: 'Imports',
         description: 'Bulk catalogue import: upload, review the diff, then apply.',
       },
+      { name: 'Exports', description: 'Spreadsheet extracts of the shop’s own data.' },
+      { name: 'Labels', description: 'Barcode shelf-label data, rendered by the client.' },
       {
         name: 'Operations',
         description: 'Parked bills, expenses and the day’s cash-up.',

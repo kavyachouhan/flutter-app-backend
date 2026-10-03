@@ -10,6 +10,7 @@ import { catalogueRouter } from './modules/catalogue/catalogue.routes.js';
 import { creditNotesRouter } from './modules/credit-notes/credit-notes.routes.js';
 import { customersRouter } from './modules/customers/customers.routes.js';
 import { devicesRouter } from './modules/devices/devices.routes.js';
+import { exportsRouter, labelsRouter } from './modules/exports/exports.routes.js';
 import { importsRouter } from './modules/imports/imports.routes.js';
 import { invoicesRouter } from './modules/invoices/invoices.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
@@ -73,6 +74,8 @@ export function createV1Router(): Router {
   tenantScoped.use('/custom-fields', customFieldsRouter);
   tenantScoped.use('/uploads', uploadsRouter);
   tenantScoped.use('/imports', importsRouter);
+  tenantScoped.use('/exports', exportsRouter);
+  tenantScoped.use('/labels', labelsRouter);
   tenantScoped.use('/stock', stockRouter);
   tenantScoped.use('/reports', reportsRouter);
   tenantScoped.use('/audit', auditRouter);

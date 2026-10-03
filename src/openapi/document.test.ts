@@ -56,4 +56,10 @@ describe('openapi document', () => {
       expect(document.paths?.[path], path).toBeDefined();
     }
   });
+
+  it('documents exports and barcode labels', () => {
+    for (const path of ['/v1/exports', '/v1/labels/templates', '/v1/labels/payload']) {
+      expect(document.paths?.[path], path).toBeDefined();
+    }
+  });
 });
