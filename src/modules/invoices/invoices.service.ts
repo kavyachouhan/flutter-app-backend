@@ -24,6 +24,8 @@ import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
+import { purchasesRepository } from '../purchases/purchases.repository.js';
+import { costOfGoodsSold } from '../../domain/costing/moving-average.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
@@ -229,11 +231,26 @@ export async function createInvoice(body: CreateInvoiceBody) {
       issuedBy: auth.userId,
     });
 
+    // The moving average in force right now, snapshotted onto each line
+    // below. Margin then reads a historical fact instead of being recomputed
+    // against whatever the item costs today — which is the bug that made
+    // Daily P&L restate itself every time a buying price moved.
+    const costs = await purchasesRepository.costsFor(
+      tx,
+      body.outletId,
+      body.lines.flatMap((l) => (l.itemId ? [l.itemId] : [])),
+    );
+
     const lineRows: InvoiceLineInsert[] = body.lines.map((l, index) => {
       const computed = totals.lines[index];
       if (!computed) throw new InternalError('Tax engine returned fewer lines than it was given.');
       const item = itemFor(l.itemId);
+      const avgCost = l.itemId ? costs.get(l.itemId) : undefined;
       return {
+        // Undefined, not zero, when the item has never been purchased
+        // through the system: reports must show margin as unknown rather
+        // than as total profit.
+        cogsAmount: avgCost === undefined ? null : costOfGoodsSold(avgCost, l.quantity),
         id: l.id,
         lineNo: index + 1,
         itemId: l.itemId ?? null,
@@ -286,6 +303,16 @@ export async function createInvoice(body: CreateInvoiceBody) {
       )) {
         warnings.push({ code: WarningCode.NEGATIVE_STOCK, details: balance });
       }
+
+      // Keeps item_costs.quantity_on_hand in step with stock_balances. The
+      // average itself does not move on a sale — only a purchase changes
+      // what goods cost — but the quantity has to, or the next receipt
+      // would blend against a stale pool.
+      await purchasesRepository.adjustCostQuantity(
+        tx,
+        body.outletId,
+        stockLines.map((s) => ({ itemId: s.itemId, quantityDelta: -s.quantity })),
+      );
     }
 
     if (tenders.length > 0) {

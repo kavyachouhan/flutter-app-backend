@@ -1,7 +1,19 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
 
-export const DOCUMENT_TYPES = ['invoice', 'credit_note', 'debit_note', 'payment_receipt'] as const;
+/**
+ * Must stay a subset of the `document_series_document_type_check` CHECK,
+ * which migration 0007 widened ahead of the features that use it. Purchase
+ * documents were added when M11 started issuing numbers for them.
+ */
+export const DOCUMENT_TYPES = [
+  'invoice',
+  'credit_note',
+  'debit_note',
+  'payment_receipt',
+  'purchase_order',
+  'purchase_bill',
+] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 export const createSeriesBody = z.object({

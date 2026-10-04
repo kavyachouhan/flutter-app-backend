@@ -254,7 +254,7 @@ export const REPORTS: readonly ReportDefinition[] = [
     id: 'daily-pnl',
     title: 'Daily profit and loss',
     description:
-      'Sales less estimated cost and expenses, per day. Cost uses each item’s current purchase price until purchase bills record what a unit actually cost.',
+      'Sales less cost of goods and expenses, per day. Cost is the moving average in force when each sale was made, recorded on the line at the time. Lines sold before purchase bills existed fall back to the item’s current purchase price; “Cost basis” reads Estimated on any day where that happened.',
     group: 'money',
     // A cashier may run the day book; they may not see the shop's margin.
     permission: 'reports:financial',
@@ -262,11 +262,12 @@ export const REPORTS: readonly ReportDefinition[] = [
     columns: [
       date('date', 'Date'),
       money('netSales', 'Net sales'),
-      money('estimatedCost', 'Est. cost'),
+      money('estimatedCost', 'Cost of goods'),
       money('grossMargin', 'Gross margin'),
       money('directExpenses', 'Direct exp.'),
       money('indirectExpenses', 'Other exp.'),
       money('netProfit', 'Net'),
+      text('costBasis', 'Cost basis', true),
     ],
     run: dailyProfitAndLoss,
   },

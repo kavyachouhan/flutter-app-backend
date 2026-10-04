@@ -50,9 +50,25 @@ export async function dailyProfitAndLoss(tx: Tx, params: ReportParams): Promise<
       WHERE c.status = 'issued' AND ${outletScope(p, 'c', params)} AND ${dateRange(p, 'c.document_date', params)}
       GROUP BY 1
     ),
+    -- Cost of goods sold.
+    --
+    -- Prefers l.cogs_amount, the moving-average cost snapshotted onto the
+    -- line when it was sold. Falling back to the item's *current* purchase
+    -- price, as this report used to do throughout, restates history every
+    -- time a buying price moves — a sale made last month silently changes
+    -- its own margin.
+    --
+    -- The fallback remains for lines sold before costing existed, and
+    -- "costedLines" reports how many lines the figure actually covers so a
+    -- partly-estimated margin is visible as such rather than presented as
+    -- fact.
     cost AS (
       SELECT l.document_date AS "date",
-             SUM(l.quantity * COALESCE(it.purchase_price, 0) / 1000)::bigint AS "estimatedCost"
+             SUM(COALESCE(l.cogs_amount,
+                          l.quantity * COALESCE(it.purchase_price, 0) / 1000))::bigint
+               AS "estimatedCost",
+             count(*) FILTER (WHERE l.cogs_amount IS NOT NULL)::int AS "costedLines",
+             count(*)::int AS "totalLines"
       FROM invoice_lines l
       JOIN invoices i ON i.id = l.invoice_id
       LEFT JOIN items it ON it.id = l.item_id
@@ -77,6 +93,11 @@ export async function dailyProfitAndLoss(tx: Tx, params: ReportParams): Promise<
     SELECT d."date",
            COALESCE(s."netSales", 0) - COALESCE(r."returns", 0) AS "netSales",
            COALESCE(k."estimatedCost", 0) AS "estimatedCost",
+           -- "Estimated" when some lines fell back to the item's current
+           -- purchase price, so an approximate margin is visible as such
+           -- instead of being presented as fact.
+           CASE WHEN COALESCE(k."costedLines", 0) = COALESCE(k."totalLines", 0)
+                THEN 'Actual' ELSE 'Estimated' END AS "costBasis",
            COALESCE(s."netSales", 0) - COALESCE(r."returns", 0) - COALESCE(k."estimatedCost", 0) AS "grossMargin",
            COALESCE(x."directExpenses", 0) AS "directExpenses",
            COALESCE(x."indirectExpenses", 0) AS "indirectExpenses",

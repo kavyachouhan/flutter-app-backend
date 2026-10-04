@@ -22,6 +22,9 @@ import '../modules/numbering/numbering.openapi.js';
 import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
+import '../modules/suppliers/suppliers.openapi.js';
+import '../modules/purchases/purchases.openapi.js';
+import '../modules/debit-notes/debit-notes.openapi.js';
 import '../modules/print/print.openapi.js';
 import '../modules/uploads/uploads.openapi.js';
 import '../modules/imports/imports.openapi.js';
@@ -71,6 +74,12 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Invoices', description: 'Issuing, voiding and listing invoices.' },
       { name: 'Payments', description: 'Receipts against the khata and their allocations.' },
       { name: 'Credit notes', description: 'Returns and corrections against issued invoices.' },
+      { name: 'Suppliers', description: 'Supplier master, payables ledger and ageing.' },
+      {
+        name: 'Purchases',
+        description: 'Purchase orders, supplier bills, payments, and what stock really cost.',
+      },
+      { name: 'Debit notes', description: 'Returns and corrections against a purchase bill.' },
       {
         name: 'Print settings',
         description:

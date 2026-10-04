@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/auth.routes.js';
 import { devAuthRouter } from './modules/auth/dev.routes.js';
 import { catalogueRouter } from './modules/catalogue/catalogue.routes.js';
 import { creditNotesRouter } from './modules/credit-notes/credit-notes.routes.js';
+import { debitNotesRouter } from './modules/debit-notes/debit-notes.routes.js';
 import { customersRouter } from './modules/customers/customers.routes.js';
 import { devicesRouter } from './modules/devices/devices.routes.js';
 import { exportsRouter, labelsRouter } from './modules/exports/exports.routes.js';
@@ -22,6 +23,12 @@ import {
 } from './modules/operations/operations.routes.js';
 import { outletsRouter } from './modules/outlets/outlets.routes.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
+import {
+  purchaseBillsRouter,
+  purchaseOrdersRouter,
+  supplierPaymentsRouter,
+} from './modules/purchases/purchases.routes.js';
+import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
 import { customFieldsRouter, printProfilesRouter } from './modules/print/print.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
@@ -67,6 +74,11 @@ export function createV1Router(): Router {
   tenantScoped.use('/invoices', invoicesRouter);
   tenantScoped.use('/payments', paymentsRouter);
   tenantScoped.use('/credit-notes', creditNotesRouter);
+  tenantScoped.use('/suppliers', suppliersRouter);
+  tenantScoped.use('/purchase-bills', purchaseBillsRouter);
+  tenantScoped.use('/purchase-orders', purchaseOrdersRouter);
+  tenantScoped.use('/supplier-payments', supplierPaymentsRouter);
+  tenantScoped.use('/debit-notes', debitNotesRouter);
   tenantScoped.use('/held-bills', heldBillsRouter);
   tenantScoped.use('/expenses', expensesRouter);
   tenantScoped.use('/day-close', dayCloseRouter);

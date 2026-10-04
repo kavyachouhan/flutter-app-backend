@@ -62,4 +62,22 @@ describe('openapi document', () => {
       expect(document.paths?.[path], path).toBeDefined();
     }
   });
+
+  it('documents the purchase side', () => {
+    for (const path of [
+      '/v1/suppliers',
+      '/v1/suppliers/ageing',
+      '/v1/suppliers/{id}/statement',
+      '/v1/suppliers/{id}/outstanding-bills',
+      '/v1/purchase-bills',
+      '/v1/purchase-bills/{id}/returnable',
+      '/v1/purchase-bills/{id}/void',
+      '/v1/purchase-orders',
+      '/v1/purchase-orders/{id}/cancel',
+      '/v1/supplier-payments',
+      '/v1/debit-notes',
+    ]) {
+      expect(document.paths?.[path], path).toBeDefined();
+    }
+  });
 });

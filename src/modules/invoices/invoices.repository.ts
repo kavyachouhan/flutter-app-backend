@@ -59,6 +59,12 @@ export interface InvoiceLineInsert {
   igst: number;
   cess: number;
   lineTotal: number;
+  /**
+   * Moving-average cost at the moment of sale. Null when the item has never
+   * been purchased through the system, so margin reads as unknown rather
+   * than as pure profit.
+   */
+  cogsAmount: number | null;
 }
 
 export interface InvoiceHeaderRow {
@@ -115,7 +121,8 @@ const LINE_COLUMNS = `
   id, line_no AS "lineNo", item_id AS "itemId", item_name AS "itemName", hsn_code AS "hsnCode", unit, quantity,
   unit_price AS "unitPrice", discount, gross_amount AS "grossAmount", line_discount AS "lineDiscount",
   bill_discount_share AS "billDiscountShare", taxable_amount AS "taxableAmount", tax_rate_percent AS "taxRatePercent",
-  cess_rate_percent AS "cessRatePercent", cgst, sgst, igst, cess, line_total AS "lineTotal"`;
+  cess_rate_percent AS "cessRatePercent", cgst, sgst, igst, cess, line_total AS "lineTotal",
+  cogs_amount AS "cogsAmount"`;
 
 export interface InvoiceListFilter {
   from: string | undefined;
@@ -224,16 +231,16 @@ export const invoicesRepository = {
     await tx.query(
       `INSERT INTO invoice_lines (id, tenant_id, invoice_id, outlet_id, document_date, line_no, item_id, item_name,
          hsn_code, unit, quantity, unit_price, discount, gross_amount, line_discount, bill_discount_share,
-         taxable_amount, tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total)
+         taxable_amount, tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total, cogs_amount)
        SELECT l.id, app.current_tenant_id(), $1, $2, $3, l."lineNo", l."itemId", l."itemName",
               l."hsnCode", l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount", l."lineDiscount",
               l."billDiscountShare", l."taxableAmount", l."taxRatePercent", l."cessRatePercent", l.cgst, l.sgst,
-              l.igst, l.cess, l."lineTotal"
+              l.igst, l.cess, l."lineTotal", l."cogsAmount"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "lineNo" int, "itemId" uuid, "itemName" text, "hsnCode" text, unit text, quantity bigint,
          "unitPrice" bigint, discount jsonb, "grossAmount" bigint, "lineDiscount" bigint, "billDiscountShare" bigint,
          "taxableAmount" bigint, "taxRatePercent" numeric, "cessRatePercent" numeric, cgst bigint, sgst bigint,
-         igst bigint, cess bigint, "lineTotal" bigint)`,
+         igst bigint, cess bigint, "lineTotal" bigint, "cogsAmount" bigint)`,
       [invoiceId, outletId, documentDate, JSON.stringify(lines)],
     );
   },

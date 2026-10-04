@@ -129,6 +129,28 @@ export const numberingRepository = {
     await tx.query('UPDATE document_series SET next_seq = $2 WHERE id = $1', [id, nextSeq]);
   },
 
+  /**
+   * Takes the next number from a series, server-side.
+   *
+   * Sales invoices lease blocks to devices because a till must number a bill
+   * with no network. Purchases, debit notes and the like are keyed in on a
+   * connected screen, so they can take a number directly — and should, since
+   * a lease that expires unused leaves a reported gap in the series for no
+   * reason.
+   *
+   * The UPDATE ... RETURNING is atomic: two concurrent entries are serialised
+   * by the row lock the update takes, so neither can read the same number.
+   */
+  async allocateSequence(tx: Tx, seriesId: string): Promise<number> {
+    const row = await tx.one<{ sequenceNo: number }>(
+      `UPDATE document_series SET next_seq = next_seq + 1
+       WHERE id = $1 RETURNING next_seq - 1 AS "sequenceNo"`,
+      [seriesId],
+    );
+    if (!row) throw new Error('series allocation returned no row');
+    return Number(row.sequenceNo);
+  },
+
   async insertBlock(
     tx: Tx,
     b: {

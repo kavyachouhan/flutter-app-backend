@@ -50,6 +50,19 @@ export const ErrorCode = {
   INVOICE_NOT_RETURNABLE: 'INVOICE_NOT_RETURNABLE',
   /** A khata credit or partial refund needs a customer to carry the balance. */
   REFUND_REQUIRES_CUSTOMER: 'REFUND_REQUIRES_CUSTOMER',
+  /** This supplier invoice number has already been entered for this year. */
+  DUPLICATE_SUPPLIER_INVOICE: 'DUPLICATE_SUPPLIER_INVOICE',
+  /** The receipt would take a purchase order line past what was ordered. */
+  RECEIPT_EXCEEDS_ORDER: 'RECEIPT_EXCEEDS_ORDER',
+  /** The purchase order is cancelled or already fully received. */
+  PURCHASE_ORDER_CLOSED: 'PURCHASE_ORDER_CLOSED',
+  /** More units returned than remain unreturned on the purchase bill line. */
+  RETURN_EXCEEDS_BILL: 'RETURN_EXCEEDS_BILL',
+  /** The purchase bill is void and cannot be returned against or paid. */
+  BILL_NOT_RETURNABLE: 'BILL_NOT_RETURNABLE',
+  /** Allocations across bills exceed the payment, or a bill's outstanding. */
+  OVERALLOCATION: 'OVERALLOCATION',
+
   /** The counter already holds as many parked bills as the plan allows. */
   HELD_BILL_LIMIT_REACHED: 'HELD_BILL_LIMIT_REACHED',
   HELD_BILL_ALREADY_RELEASED: 'HELD_BILL_ALREADY_RELEASED',

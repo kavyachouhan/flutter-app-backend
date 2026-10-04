@@ -29,6 +29,14 @@ export const PERMISSIONS = [
   'credit_notes:read',
   'credit_notes:create',
   'credit_notes:void',
+  'suppliers:read',
+  'suppliers:write',
+  'purchases:read',
+  'purchases:create',
+  'purchases:void',
+  'debit_notes:read',
+  'debit_notes:create',
+  'debit_notes:void',
   'expenses:read',
   'expenses:write',
   'expenses:void',
@@ -59,6 +67,10 @@ const READ_ONLY: Permission[] = PERMISSIONS.filter((p) => p.endsWith(':read'));
 const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
   owner: new Set(PERMISSIONS),
   manager: new Set(PERMISSIONS.filter((p) => p !== 'tenant:manage')),
+  // No purchasing: a cashier who can enter a purchase bill can inflate stock
+  // and create a payable, neither of which is a till function. They also do
+  // not get suppliers:read, because the supplier ledger is what the shop
+  // owes, not something a counter needs to see.
   cashier: new Set<Permission>([
     'tenant:read',
     'catalogue:read',
