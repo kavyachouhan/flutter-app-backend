@@ -54,3 +54,29 @@ export const timestamp = z.string().datetime({ offset: true });
 export const booleanQuery = z.enum(['true', 'false']).transform((v) => v === 'true');
 
 export const idParams = z.object({ id: z.string().uuid() });
+
+/**
+ * How a line is classified for the GST return. One definition, shared by every
+ * document type, because a sale, a return and a purchase are reported out of
+ * the same four buckets and a divergence between them would be a filing error
+ * nobody could see.
+ *
+ * Optional everywhere on the wire and absent means `taxable`, so an installed
+ * app that predates classification keeps uploading.
+ */
+export const SUPPLY_CATEGORIES = ['taxable', 'exempt', 'nil_rated', 'non_gst'] as const;
+export const supplyCategory = z.enum(SUPPLY_CATEGORIES);
+
+/**
+ * Supply types a caller may declare. The two state-based ones are derived from
+ * the place of supply and need not be sent; the export and SEZ ones cannot be
+ * derived from anything, so only the caller can say.
+ */
+export const DECLARABLE_SUPPLY_TYPES = [
+  'inter_state',
+  'export_with_tax',
+  'export_without_tax',
+  'sez_with_tax',
+  'sez_without_tax',
+] as const;
+export const declaredSupplyType = z.enum(DECLARABLE_SUPPLY_TYPES);

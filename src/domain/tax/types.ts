@@ -3,7 +3,31 @@
  * Amounts are integer paise; quantities are thousandths of a unit.
  */
 
-export type SupplyType = 'intra_state' | 'inter_state';
+/**
+ * Where the supply goes, which decides which tax heads apply.
+ *
+ * The first two are derived from the place of supply. The rest cannot be —
+ * nothing about a state code says a shipment is an export or goes to an SEZ —
+ * so a caller declares them. Both `_without_tax` forms are zero-rated: the
+ * supply is reported but no tax is charged on it.
+ */
+export type SupplyType =
+  | 'intra_state'
+  | 'inter_state'
+  | 'export_with_tax'
+  | 'export_without_tax'
+  | 'sez_with_tax'
+  | 'sez_without_tax';
+
+/**
+ * How a line is classified for the return, as distinct from what it is taxed
+ * at. A zero-rate line is not evidence of anything: it may be a taxable good
+ * notified at 0%, an exempt supply, a nil-rated one, or outside GST
+ * altogether, and GSTR-1 table 8 and GSTR-3B table 3.1 report the four
+ * separately. Nothing but the seller knows which, so it is recorded, never
+ * inferred from the rate.
+ */
+export type SupplyCategory = 'taxable' | 'exempt' | 'nil_rated' | 'non_gst';
 
 /**
  * gst          registered dealer, CGST/SGST/IGST charged
@@ -26,6 +50,8 @@ export interface TaxLineInput {
   readonly cessRatePercent?: number;
   readonly discount?: Discount;
   readonly hsnCode?: string;
+  /** Defaults to `taxable`, which is what every line was before this existed. */
+  readonly supplyCategory?: SupplyCategory;
 }
 
 export interface AdditionalCharge {
@@ -41,6 +67,17 @@ export interface TaxInvoiceInput {
   readonly mode: TaxMode;
   readonly supplierStateCode: string;
   readonly placeOfSupplyStateCode?: string;
+  /**
+   * Declares an export or SEZ supply. Omitted, the supply type is derived
+   * from the place of supply as it always was.
+   */
+  readonly supplyType?: SupplyType;
+  /**
+   * Reverse charge: the recipient pays the tax, so the document carries none
+   * while still reporting the value. Rates stay on the lines, because the
+   * recipient computes its liability from them.
+   */
+  readonly isReverseCharge?: boolean;
   readonly pricesIncludeTax: boolean;
   readonly lines: readonly TaxLineInput[];
   readonly billDiscount?: Discount;
@@ -67,6 +104,7 @@ export interface TaxLineResult {
   readonly cess: number;
   readonly lineTotal: number;
   readonly hsnCode: string | undefined;
+  readonly supplyCategory: SupplyCategory;
 }
 
 export interface TaxRateSummary {
@@ -82,6 +120,18 @@ export interface TaxRateSummary {
 export interface HsnSummary extends Omit<TaxRateSummary, 'taxRatePercent'> {
   readonly hsnCode: string;
   readonly quantity: number;
+}
+
+/**
+ * Value by classification, which is what the return asks for and what no
+ * amount of re-reading the rate can recover. Each is a sum of taxable values,
+ * so the four plus nothing else account for every line.
+ */
+export interface SupplyCategoryTotals {
+  readonly taxable: number;
+  readonly exempt: number;
+  readonly nilRated: number;
+  readonly nonGst: number;
 }
 
 export interface TaxInvoiceResult {
@@ -105,4 +155,6 @@ export interface TaxInvoiceResult {
   readonly grandTotal: number;
   readonly taxSummary: readonly TaxRateSummary[];
   readonly hsnSummary: readonly HsnSummary[];
+  readonly categoryTotals: SupplyCategoryTotals;
+  readonly isReverseCharge: boolean;
 }

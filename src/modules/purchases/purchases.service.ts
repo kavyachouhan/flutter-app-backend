@@ -40,6 +40,7 @@ import { accessibleOutletIds, assertOutletAccess } from '../../middleware/author
 import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import { itcRepository } from '../gst/itc.repository.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { stockRepository } from '../stock/stock.repository.js';
@@ -109,6 +110,11 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     // unregistered business never does, so the tax is part of what the goods
     // cost and must be capitalised.
     const itcEligible = taxMode === 'gst' && body.itcEligible;
+    // Classified once. The category drives both the stored bill and the ITC
+    // register row, so a register rebuilt from the bills later agrees with the
+    // one written now.
+    const itcCategory = itcEligible ? (body.itcCategory ?? 'inputs') : 'ineligible';
+    const itcIneligibleReason = itcEligible ? null : (body.itcIneligibleReason ?? null);
 
     const number = await allocateNumber(tx, {
       outletId: body.outletId,
@@ -148,6 +154,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
         supplierStateCode: supplier.stateCode ?? outlet.stateCode ?? settings.stateCode,
         placeOfSupplyStateCode:
           body.placeOfSupplyStateCode ?? outlet.stateCode ?? settings.stateCode,
+        isReverseCharge: body.isReverseCharge,
         pricesIncludeTax: body.pricesIncludeTax,
         roundOff: body.roundOff,
         billDiscount: body.billDiscount,
@@ -159,6 +166,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
           cessRatePercent: l.cessRatePercent,
           discount: l.discount,
           hsnCode: l.hsnCode ?? items.get(l.itemId)?.hsnCode ?? undefined,
+          supplyCategory: l.supplyCategory ?? items.get(l.itemId)?.supplyCategory ?? 'taxable',
         })),
       },
       { allowedGstRates: env.GST_ALLOWED_RATES },
@@ -205,6 +213,8 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       notes: body.notes ?? null,
       receivedAt: body.receivedAt,
       createdBy: auth.userId,
+      itcCategory,
+      itcIneligibleReason,
     });
 
     const lineRows: PurchaseBillLineInsert[] = body.lines.map((line, index) => {
@@ -238,6 +248,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
         lineTotal: computed.lineTotal,
         landedCostShare: cost.landedCostShare,
         effectiveUnitCost: cost.effectiveUnitCost,
+        supplyCategory: computed.supplyCategory,
       };
     });
     await purchasesRepository.insertBillLines(
@@ -364,6 +375,29 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       await ordersRepository.applyReceipt(tx, body.purchaseOrderId, receipts);
       await ordersRepository.refreshStatus(tx, body.purchaseOrderId);
     }
+
+    // The input tax credit this bill carries, recorded as it is entered.
+    // A separate ledger rather than a column on the bill, because the credit
+    // has its own life: claimed in a period that need not be the bill's,
+    // reversed if the supplier never files it, reclaimed when they do.
+    await itcRepository.insert(tx, {
+      id: randomUUID(),
+      gstin: outlet.gstin ?? settings.gstin ?? '',
+      sourceType: 'purchase_bill',
+      sourceId: body.id,
+      supplierId: supplier.id,
+      supplierGstin: supplier.gstin,
+      documentDate: body.supplierInvoiceDate,
+      itcCategory,
+      ineligibleReason: itcIneligibleReason,
+      isReverseCharge: body.isReverseCharge,
+      cgst: totals.totalCgst,
+      sgst: totals.totalSgst,
+      igst: totals.totalIgst,
+      cess: totals.totalCess,
+      taxableAmount: totals.taxableAmount,
+      state: itcEligible ? 'available' : 'ineligible',
+    });
 
     await recordAudit(tx, {
       action: 'purchase_bill.created',
@@ -512,6 +546,11 @@ export async function voidPurchaseBill(id: string, reason: string) {
       await ordersRepository.reverseReceipt(tx, header.purchaseOrderId, id);
       await ordersRepository.refreshStatus(tx, header.purchaseOrderId);
     }
+
+    // The credit goes with the bill. Reversed rather than deleted: the
+    // register is what an assessment is defended with, and a credit that was
+    // claimed and then reversed is part of that story.
+    await itcRepository.markReversed(tx, 'purchase_bill', id);
 
     await recordAudit(tx, {
       action: 'purchase_bill.voided',

@@ -1,4 +1,5 @@
 import type { Tx } from '../../db/tx.js';
+import type { SupplyCategory } from '../../domain/tax/types.js';
 import { buildSet, likeContains } from '../../db/sql.js';
 import type { Cursor } from '../../lib/pagination.js';
 
@@ -27,6 +28,7 @@ export interface ItemRow {
   pricesIncludeTax: boolean;
   trackStock: boolean;
   reorderLevel: number | null;
+  supplyCategory: SupplyCategory;
   isActive: boolean;
   barcodes: string[];
   createdAt: Date;
@@ -43,6 +45,7 @@ const ITEM_COLUMNS = `
   i.hsn_code AS "hsnCode", i.tax_rate_percent AS "taxRatePercent", i.cess_rate_percent AS "cessRatePercent",
   i.unit, i.mrp, i.sale_price AS "salePrice", i.purchase_price AS "purchasePrice",
   i.prices_include_tax AS "pricesIncludeTax", i.track_stock AS "trackStock", i.reorder_level AS "reorderLevel",
+  i.supply_category AS "supplyCategory",
   i.is_active AS "isActive", i.created_at AS "createdAt", i.updated_at AS "updatedAt",
   COALESCE((SELECT array_agg(b.barcode ORDER BY b.barcode) FROM item_barcodes b
             WHERE b.item_id = i.id AND b.deleted_at IS NULL), '{}') AS barcodes`;
@@ -65,6 +68,7 @@ const ITEM_UPDATABLE = {
   pricesIncludeTax: 'prices_include_tax',
   trackStock: 'track_stock',
   reorderLevel: 'reorder_level',
+  supplyCategory: 'supply_category',
   isActive: 'is_active',
 } as const;
 
@@ -182,8 +186,9 @@ export const catalogueRepository = {
   async insertItem(tx: Tx, item: NewItem): Promise<void> {
     await tx.query(
       `INSERT INTO items (id, tenant_id, category_id, item_type, name, code, aliases, hsn_code, tax_rate_percent,
-         cess_rate_percent, unit, mrp, sale_price, purchase_price, prices_include_tax, track_stock, reorder_level, is_active)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+         cess_rate_percent, unit, mrp, sale_price, purchase_price, prices_include_tax, track_stock, reorder_level,
+         supply_category, is_active)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         item.id,
         item.categoryId,
@@ -201,6 +206,7 @@ export const catalogueRepository = {
         item.pricesIncludeTax,
         item.trackStock,
         item.reorderLevel,
+        item.supplyCategory,
         item.isActive,
       ],
     );

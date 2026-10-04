@@ -16,14 +16,17 @@ import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { reverseReceipt } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
-import type { TaxMode } from '../../domain/tax/types.js';
+import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, InternalError, NotFoundError, UnprocessableError } from '../../lib/errors.js';
+import { newId } from '../../lib/ids.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import { outletsRepository } from '../outlets/outlets.repository.js';
+import { itcRepository } from '../gst/itc.repository.js';
 import { allocateNumber } from '../purchases/numbering.js';
 import { purchasesRepository } from '../purchases/purchases.repository.js';
 import { stockRepository } from '../stock/stock.repository.js';
@@ -46,6 +49,12 @@ interface BillForReturn {
   readonly documentNumber: string;
   readonly status: 'issued' | 'void';
   readonly taxMode: TaxMode;
+  // A debit note has no ITC eligibility of its own: it reverses whatever the
+  // bill claimed, so both come from the bill.
+  readonly itcEligible: boolean;
+  readonly itcCategory: string | null;
+  readonly supplyType: SupplyType;
+  readonly isReverseCharge: boolean;
   readonly placeOfSupplyStateCode: string | null;
   readonly pricesIncludeTax: boolean;
   readonly roundOffEnabled: boolean;
@@ -135,6 +144,11 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
         mode: bill.taxMode,
         supplierStateCode: supplier.stateCode ?? settings.stateCode,
         placeOfSupplyStateCode: bill.placeOfSupplyStateCode ?? settings.stateCode,
+        // Both carried over from the bill: a return of a reverse-charge
+        // purchase reverses the same self-assessed liability, so the two have
+        // to be reported on the same footing.
+        supplyType: bill.supplyType,
+        isReverseCharge: bill.isReverseCharge,
         pricesIncludeTax: bill.pricesIncludeTax,
         roundOff: bill.roundOffEnabled,
         lines: body.lines.map((line) => {
@@ -149,6 +163,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
             taxRatePercent: Number(source.taxRatePercent),
             cessRatePercent: Number(source.cessRatePercent),
             hsnCode: source.hsnCode ?? undefined,
+            supplyCategory: source.supplyCategory,
           };
         }),
       },
@@ -180,6 +195,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       roundOffEnabled: bill.roundOffEnabled,
       totals,
       reasonCode: body.reasonCode,
+      restock: body.restock,
       notes: body.notes ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
@@ -211,6 +227,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
         lineTotal: computed.lineTotal,
         // The cost the goods came in at, not today's average.
         effectiveUnitCost: source.effectiveUnitCost,
+        supplyCategory: computed.supplyCategory,
       };
     });
     await debitNotesRepository.insertLines(tx, body.id, bill.outletId, body.documentDate, lineRows);
@@ -264,6 +281,39 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
         createdBy: auth.userId,
       },
     ]);
+
+    // Reverse the credit on void as well, which the void path does below.
+    // Returning goods gives back the credit claimed on them. Signed negative,
+    // so the register sums to the claimable figure without a CASE on the
+    // source type — and only when the bill claimed credit at all, since there
+    // is nothing to reverse on an ineligible or composition purchase.
+    if (bill.itcEligible) {
+      await itcRepository.insert(tx, {
+        id: newId(),
+        // Our own registration, which an outlet may override. The register is
+        // read per GSTIN because each registration files its own return.
+        gstin:
+          (await outletsRepository.findOutlet(tx, bill.outletId))?.gstin ?? settings.gstin ?? '',
+        sourceType: 'debit_note',
+        sourceId: body.id,
+        supplierId: bill.supplierId,
+        supplierGstin: supplier.gstin,
+        documentDate: body.documentDate,
+        itcCategory: (bill.itcCategory ?? 'inputs') as
+          | 'inputs'
+          | 'input_services'
+          | 'capital_goods'
+          | 'ineligible',
+        ineligibleReason: null,
+        isReverseCharge: bill.isReverseCharge,
+        cgst: -totals.totalCgst,
+        sgst: -totals.totalSgst,
+        igst: -totals.totalIgst,
+        cess: -totals.totalCess,
+        taxableAmount: -totals.taxableAmount,
+        state: 'available',
+      });
+    }
 
     await recordAudit(tx, {
       action: 'debit_note.created',
@@ -321,15 +371,23 @@ export async function voidDebitNote(id: string, reason: string) {
 
     await debitNotesRepository.markVoid(tx, id, reason, auth.userId);
 
-    // Puts back whatever went out. The guard inside reverseEntries makes a
-    // repeated void a no-op, so stock cannot be restored twice.
-    await stockRepository.reverseEntries(tx, {
-      referenceType: 'debit_note',
-      referenceId: id,
-      entryType: 'purchase_return',
-      reversalType: 'purchase_return_void',
-      userId: auth.userId,
-    });
+    // Puts back whatever went out, and only if anything did: a return booked
+    // against damaged goods never left stock, so there is nothing to restore.
+    // The guard inside reverseEntries makes a repeated void a no-op on top of
+    // that, so stock cannot be restored twice.
+    if (header.restock) {
+      await stockRepository.reverseEntries(tx, {
+        referenceType: 'debit_note',
+        referenceId: id,
+        entryType: 'purchase_return',
+        reversalType: 'purchase_return_void',
+        userId: auth.userId,
+      });
+    }
+
+    // The reversal entry is itself reversed: the goods did not go back after
+    // all, so the credit stands as the bill claimed it.
+    await itcRepository.markReversed(tx, 'debit_note', id);
 
     await suppliersRepository.insertLedgerEntries(tx, [
       {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { errorResponses } from '../../openapi/common.js';
+import { errorResponses, supplyCategorySchema } from '../../openapi/common.js';
 import {
   accessTokenSecurity,
   calendarDate,
@@ -43,6 +43,7 @@ const billLine = registry.register(
     igst: paise,
     cess: paise,
     lineTotal: paise,
+    supplyCategory: supplyCategorySchema,
     landedCostShare: paise.openapi({ description: 'Freight apportioned to this line.' }),
     effectiveUnitCost: paise.openapi({
       description:

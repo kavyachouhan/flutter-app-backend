@@ -1,7 +1,11 @@
 import type { Tx } from '../../db/tx.js';
 import { jsonParam } from '../../db/sql.js';
 import type { LandedCostBasis } from '../../domain/costing/landed-cost.js';
-import type { Discount, TaxInvoiceResult } from '../../domain/tax/types.js';
+import type {
+  Discount,
+  SupplyCategory,
+  TaxInvoiceResult,
+} from '../../domain/tax/types.js';
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface PurchaseBillHeaderInsert {
@@ -23,6 +27,8 @@ export interface PurchaseBillHeaderInsert {
   pricesIncludeTax: boolean;
   roundOffEnabled: boolean;
   itcEligible: boolean;
+  itcCategory: string | null;
+  itcIneligibleReason: string | null;
   totals: TaxInvoiceResult;
   billDiscount: Discount | null;
   freightAmount: number;
@@ -57,6 +63,7 @@ export interface PurchaseBillLineInsert {
   lineTotal: number;
   landedCostShare: number;
   effectiveUnitCost: number;
+  supplyCategory: SupplyCategory;
 }
 
 export interface PurchaseBillHeaderRow {
@@ -108,6 +115,8 @@ const HEADER_COLUMNS = `
   pb.place_of_supply_state_code AS "placeOfSupplyStateCode", pb.tax_mode AS "taxMode",
   pb.supply_type AS "supplyType", pb.prices_include_tax AS "pricesIncludeTax",
   pb.round_off_enabled AS "roundOffEnabled", pb.itc_eligible AS "itcEligible",
+  pb.is_reverse_charge AS "isReverseCharge", pb.itc_category AS "itcCategory",
+  pb.itc_ineligible_reason AS "itcIneligibleReason",
   pb.gross_amount AS "grossAmount", pb.line_discount_total AS "lineDiscountTotal",
   pb.bill_discount AS "billDiscount", pb.bill_discount_amount AS "billDiscountAmount",
   pb.taxable_amount AS "taxableAmount", pb.total_cgst AS "totalCgst", pb.total_sgst AS "totalSgst",
@@ -208,7 +217,8 @@ export const purchasesRepository = {
          gross_amount, line_discount_total, bill_discount, bill_discount_amount, taxable_amount,
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
          grand_total, tax_summary, hsn_summary, freight_amount, other_charges_amount,
-         landed_cost_basis, notes, status, received_at, created_by)
+         landed_cost_basis, notes, status, received_at, created_by, is_reverse_charge,
+         itc_category, itc_ineligible_reason)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6,
          $7, $8, $9, $10, $11,
@@ -217,7 +227,7 @@ export const purchasesRepository = {
          $21, $22, $23, $24, $25,
          $26, $27, $28, $29, $30, $31, $32,
          $33, $34, $35, $36, $37,
-         $38, $39, 'issued', $40, $41)`,
+         $38, $39, 'issued', $40, $41, $42, $43, $44)`,
       [
         h.id,
         h.outletId,
@@ -260,6 +270,9 @@ export const purchasesRepository = {
         h.notes,
         h.receivedAt,
         h.createdBy,
+        t.isReverseCharge,
+        h.itcCategory,
+        h.itcIneligibleReason,
       ],
     );
   },
@@ -276,19 +289,19 @@ export const purchasesRepository = {
          outlet_id, document_date, line_no, item_id, item_name, hsn_code, unit, quantity, unit_price,
          discount, gross_amount, line_discount, bill_discount_share, taxable_amount,
          tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total,
-         landed_cost_share, effective_unit_cost)
+         landed_cost_share, effective_unit_cost, supply_category)
        SELECT l.id, app.current_tenant_id(), $1, l."purchaseOrderLineId", $2, $3, l."lineNo",
               l."itemId", l."itemName", l."hsnCode", l.unit, l.quantity, l."unitPrice",
               l.discount, l."grossAmount", l."lineDiscount", l."billDiscountShare", l."taxableAmount",
               l."taxRatePercent", l."cessRatePercent", l.cgst, l.sgst, l.igst, l.cess, l."lineTotal",
-              l."landedCostShare", l."effectiveUnitCost"
+              l."landedCostShare", l."effectiveUnitCost", l."supplyCategory"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "purchaseOrderLineId" uuid, "lineNo" int, "itemId" uuid, "itemName" text,
          "hsnCode" text, unit text, quantity bigint, "unitPrice" bigint, discount jsonb,
          "grossAmount" bigint, "lineDiscount" bigint, "billDiscountShare" bigint,
          "taxableAmount" bigint, "taxRatePercent" numeric, "cessRatePercent" numeric,
          cgst bigint, sgst bigint, igst bigint, cess bigint, "lineTotal" bigint,
-         "landedCostShare" bigint, "effectiveUnitCost" bigint)`,
+         "landedCostShare" bigint, "effectiveUnitCost" bigint, "supplyCategory" text)`,
       [billId, outletId, documentDate, JSON.stringify(lines)],
     );
   },

@@ -130,10 +130,8 @@ describe('schema', () => {
     expect(parsed.CORS_ALLOWED_ORIGINS).toEqual(['a', 'b']);
   });
 
-  it('treats unset plan limits as unlimited', () => {
-    expect(
-      envSchema.parse({ ...testEnv, PLAN_FREE_MAX_ITEMS: '' }).PLAN_FREE_MAX_ITEMS,
-    ).toBeUndefined();
+  it('treats an empty optional as unset', () => {
+    expect(envSchema.parse({ ...testEnv, DATABASE_SSL_CA: '' }).DATABASE_SSL_CA).toBeUndefined();
   });
 });
 

@@ -581,6 +581,11 @@ async function writeRow(
       pricesIncludeTax: true,
       trackStock: (values['trackStock'] as boolean | null) ?? true,
       reorderLevel: (values['reorderLevel'] as number | null) ?? null,
+      // The spreadsheet has no column for it; an imported item is taxable
+      // until someone says otherwise, which is the safe default — an exempt
+      // item wrongly marked taxable is visible on the first return, whereas
+      // the reverse under-reports turnover.
+      supplyCategory: 'taxable',
       isActive: true,
     });
     if (barcode) await catalogueRepository.replaceBarcodes(tx, itemId, [barcode]);

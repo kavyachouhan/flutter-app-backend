@@ -3,6 +3,7 @@ import { idParams } from '../../lib/validators.js';
 import {
   documentStatusSchema,
   errorResponses,
+  supplyCategorySchema,
   supplyTypeSchema,
   taxModeSchema,
   tenderModeSchema,
@@ -89,6 +90,11 @@ export const invoiceLineSchema = registry.register(
     igst: paise,
     cess: paise,
     lineTotal: paise,
+    supplyCategory: supplyCategorySchema,
+    priceListId: uuid.nullable().openapi({
+      description: 'Which price list priced this line. Null when the item’s own price was used.',
+    }),
+    priceSource: z.enum(['price_list_item', 'price_list_rule', 'item']).nullable(),
   }),
 );
 
@@ -141,6 +147,7 @@ export const invoiceSchema = registry.register(
     placeOfSupplyStateCode: z.string().nullable(),
     taxMode: taxModeSchema,
     supplyType: supplyTypeSchema,
+    isReverseCharge: z.boolean(),
     pricesIncludeTax: z.boolean(),
     roundOffEnabled: z.boolean(),
     grossAmount: paise,

@@ -11,6 +11,7 @@ import {
   positivePaise,
   quantity,
   stateCode,
+  supplyCategory,
   timestamp,
 } from '../../lib/validators.js';
 
@@ -32,6 +33,8 @@ const purchaseLine = z.object({
   taxRatePercent: gstRate,
   cessRatePercent: z.number().min(0).max(100).default(0),
   discount: discount.optional(),
+  /** Omitted, the item's own classification applies, then `taxable`. */
+  supplyCategory: supplyCategory.optional(),
   /** Links the receipt to a purchase order line, for partial receipt. */
   purchaseOrderLineId: z.string().uuid().optional(),
 });
@@ -56,6 +59,23 @@ export const createPurchaseBillBody = z.object({
    * is unregistered or on composition, because such a dealer never reclaims.
    */
   itcEligible: z.boolean().default(true),
+  /**
+   * How the credit is classified. GSTR-3B table 4 splits input tax credit
+   * four ways and `itcEligible` alone cannot fill it. Defaults to `inputs`,
+   * which is what a shop buying stock is almost always claiming.
+   */
+  itcCategory: z
+    .enum(['inputs', 'input_services', 'capital_goods', 'ineligible'])
+    .optional(),
+  /** Why the credit is blocked — a section 17(5) reason, for the register. */
+  itcIneligibleReason: nonEmpty.max(200).optional(),
+  /**
+   * Reverse charge: the supplier charged no tax and the business owes it
+   * instead. The bill therefore carries no tax, while the line rates stay on
+   * it — GSTR-3B reports the self-assessed liability and the matching credit
+   * from those rates.
+   */
+  isReverseCharge: z.boolean().default(false),
   lines: z.array(purchaseLine).min(1).max(500),
   billDiscount: discount.optional(),
   /** Capitalised into stock cost per `landedCostBasis`. */

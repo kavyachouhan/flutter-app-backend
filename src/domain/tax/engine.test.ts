@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeInvoice, resolveSupplyType } from './engine.js';
+import { HSN_UNCLASSIFIED, computeInvoice, resolveSupplyType } from './engine.js';
 import type { TaxEngineRules, TaxInvoiceInput, TaxLineInput } from './types.js';
 import { ValidationError } from '../../lib/errors.js';
 
@@ -21,6 +21,9 @@ function line(overrides: Partial<TaxLineInput> = {}): TaxLineInput {
 }
 
 const compute = (input: TaxInvoiceInput) => computeInvoice(input, RULES);
+
+const sumOf = <T,>(rows: readonly T[], pick: (row: T) => number): number =>
+  rows.reduce((total, row) => total + pick(row), 0);
 
 describe('supply type', () => {
   it('is intra-state within a state and inter-state across states', () => {
@@ -229,12 +232,93 @@ describe('summaries and consistency', () => {
       }),
     );
     expect(result.taxSummary.map((r) => r.taxRatePercent)).toEqual([5, 18]);
-    expect(result.hsnSummary).toHaveLength(2);
     expect(result.hsnSummary[0]).toMatchObject({
       hsnCode: '1001',
       quantity: 2000,
       taxableAmount: 20000,
     });
+
+    // Line 'd' carries no HSN. It is still in the summary, under the
+    // unclassified bucket, because the GSTR-1 HSN table has to account for
+    // the whole invoice — dropping it would under-report the turnover.
+    expect(result.hsnSummary.map((r) => r.hsnCode)).toEqual([
+      '1001',
+      '2002',
+      HSN_UNCLASSIFIED,
+    ]);
+    expect(sumOf(result.hsnSummary, (r) => r.taxableAmount)).toBe(result.taxableAmount);
+  });
+
+  it('classifies lines and totals them by category', () => {
+    const result = compute(
+      invoice({
+        lines: [
+          line({ id: 'a', taxRatePercent: 18 }),
+          line({ id: 'b', taxRatePercent: 18, supplyCategory: 'exempt' }),
+          line({ id: 'c', taxRatePercent: 18, supplyCategory: 'nil_rated' }),
+          line({ id: 'd', taxRatePercent: 18, supplyCategory: 'non_gst' }),
+        ],
+      }),
+    );
+    // Only the taxable line bears tax, whatever rate the others carry.
+    expect(result.totalTax).toBe(1800);
+    expect(result.categoryTotals).toEqual({
+      taxable: 10000,
+      exempt: 10000,
+      nilRated: 10000,
+      nonGst: 10000,
+    });
+    expect(
+      result.categoryTotals.taxable +
+        result.categoryTotals.exempt +
+        result.categoryTotals.nilRated +
+        result.categoryTotals.nonGst,
+    ).toBe(result.taxableAmount);
+  });
+
+  it('charges no tax under reverse charge but still reports the value', () => {
+    const result = compute(
+      invoice({ isReverseCharge: true, lines: [line({ taxRatePercent: 18 })] }),
+    );
+    expect(result.totalTax).toBe(0);
+    expect(result.taxableAmount).toBe(10000);
+    expect(result.isReverseCharge).toBe(true);
+    // The rate stays on the line: the recipient computes its liability from it.
+    expect(result.lines[0]?.taxRatePercent).toBe(18);
+  });
+
+  it('puts tax under IGST for an export with payment and none without', () => {
+    const withTax = compute(
+      invoice({
+        supplyType: 'export_with_tax',
+        placeOfSupplyStateCode: '96',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    );
+    expect(withTax.totalIgst).toBe(1800);
+    expect(withTax.totalCgst).toBe(0);
+
+    const withoutTax = compute(
+      invoice({
+        supplyType: 'export_without_tax',
+        placeOfSupplyStateCode: '96',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    );
+    expect(withoutTax.totalTax).toBe(0);
+    expect(withoutTax.taxableAmount).toBe(10000);
+  });
+
+  it('refuses an export whose place of supply is the supplier state', () => {
+    expect(() =>
+      compute(
+        invoice({
+          supplyType: 'export_without_tax',
+          placeOfSupplyStateCode: '27',
+          lines: [line({})],
+        }),
+      ),
+    ).toThrow(/export or SEZ/);
   });
 
   it('has line totals plus round-off equal to the grand total', () => {

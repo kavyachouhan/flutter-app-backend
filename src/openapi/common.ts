@@ -10,6 +10,7 @@ import { PERMISSIONS, ROLES } from '../modules/auth/permissions.js';
 import { FEATURES } from '../modules/entitlements/entitlements.js';
 import { TENDER_MODES } from '../modules/invoices/invoices.schemas.js';
 import { DOCUMENT_TYPES } from '../modules/numbering/numbering.schemas.js';
+import { SUPPLY_CATEGORIES } from '../lib/validators.js';
 import { REASON_CODES } from '../modules/stock/stock.schemas.js';
 import { jsonResponse, registry } from './registry.js';
 
@@ -43,7 +44,21 @@ export const taxModeSchema = registry.register(
 );
 export const supplyTypeSchema = registry.register(
   'SupplyType',
-  z.enum(['intra_state', 'inter_state']),
+  z.enum([
+    'intra_state',
+    'inter_state',
+    'export_with_tax',
+    'export_without_tax',
+    'sez_with_tax',
+    'sez_without_tax',
+  ]),
+);
+export const supplyCategorySchema = registry.register(
+  'SupplyCategory',
+  z.enum(SUPPLY_CATEGORIES).openapi({
+    description:
+      'How the line is reported in the GST return. A 0% taxable line and an exempt line are indistinguishable by rate and appear in different tables, so this is recorded rather than inferred.',
+  }),
 );
 export const documentStatusSchema = registry.register('DocumentStatus', z.enum(['issued', 'void']));
 export const platformSchema = registry.register(

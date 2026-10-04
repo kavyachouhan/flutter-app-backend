@@ -1,5 +1,5 @@
 import type { Tx } from '../../db/tx.js';
-import type { TaxInvoiceResult } from '../../domain/tax/types.js';
+import type { SupplyCategory, TaxInvoiceResult } from '../../domain/tax/types.js';
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface DebitNoteHeaderInsert {
@@ -8,8 +8,8 @@ export interface DebitNoteHeaderInsert {
   supplierId: string;
   purchaseBillId: string;
   originalDocumentNumber: string;
-  seriesId: string | null;
-  sequenceNo: number | null;
+  seriesId: string;
+  sequenceNo: number;
   documentNumber: string;
   documentDate: string;
   fyStartYear: number;
@@ -20,6 +20,7 @@ export interface DebitNoteHeaderInsert {
   roundOffEnabled: boolean;
   totals: TaxInvoiceResult;
   reasonCode: string;
+  restock: boolean;
   notes: string | null;
   issuedAt: string;
   issuedBy: string;
@@ -46,6 +47,7 @@ export interface DebitNoteLineInsert {
   cess: number;
   lineTotal: number;
   effectiveUnitCost: number;
+  supplyCategory: SupplyCategory;
 }
 
 export interface DebitNoteHeaderRow {
@@ -56,6 +58,7 @@ export interface DebitNoteHeaderRow {
   documentNumber: string;
   grandTotal: number;
   status: 'issued' | 'void';
+  restock: boolean;
   [column: string]: unknown;
 }
 
@@ -72,6 +75,7 @@ export interface ReturnableLineRow {
   taxRatePercent: string;
   cessRatePercent: string;
   effectiveUnitCost: number;
+  supplyCategory: SupplyCategory;
   returnedQuantity: number;
 }
 
@@ -89,15 +93,18 @@ const HEADER_COLUMNS = `
   d.total_igst AS "totalIgst", d.total_cess AS "totalCess", d.total_tax AS "totalTax",
   d.sub_total AS "subTotal", d.round_off AS "roundOff", d.grand_total AS "grandTotal",
   d.tax_summary AS "taxSummary", d.hsn_summary AS "hsnSummary", d.reason_code AS "reasonCode",
+  d.restock, d.is_reverse_charge AS "isReverseCharge",
   d.notes, d.status, d.issued_at AS "issuedAt", d.issued_by AS "issuedBy",
-  d.void_reason AS "voidReason", d.voided_at AS "voidedAt", d.created_at AS "createdAt"`;
+  d.void_reason AS "voidReason", d.voided_at AS "voidedAt", d.voided_by AS "voidedBy",
+  d.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
   id, purchase_bill_line_id AS "purchaseBillLineId", line_no AS "lineNo", item_id AS "itemId",
   item_name AS "itemName", hsn_code AS "hsnCode", unit, quantity, unit_price AS "unitPrice",
   gross_amount AS "grossAmount", line_discount AS "lineDiscount", taxable_amount AS "taxableAmount",
   tax_rate_percent AS "taxRatePercent", cess_rate_percent AS "cessRatePercent",
-  cgst, sgst, igst, cess, line_total AS "lineTotal", effective_unit_cost AS "effectiveUnitCost"`;
+  cgst, sgst, igst, cess, line_total AS "lineTotal", effective_unit_cost AS "effectiveUnitCost",
+  supply_category AS "supplyCategory"`;
 
 export const debitNotesRepository = {
   async exists(tx: Tx, id: string): Promise<boolean> {
@@ -119,7 +126,7 @@ export const debitNotesRepository = {
       `SELECT l.id, l.line_no AS "lineNo", l.item_id AS "itemId", l.item_name AS "itemName",
               l.hsn_code AS "hsnCode", l.unit, l.quantity, l.unit_price AS "unitPrice",
               l.tax_rate_percent AS "taxRatePercent", l.cess_rate_percent AS "cessRatePercent",
-              l.effective_unit_cost AS "effectiveUnitCost",
+              l.effective_unit_cost AS "effectiveUnitCost", l.supply_category AS "supplyCategory",
               COALESCE((SELECT SUM(dl.quantity) FROM debit_note_lines dl
                         JOIN debit_notes d ON d.id = dl.debit_note_id
                         WHERE dl.purchase_bill_line_id = l.id AND d.status = 'issued'), 0)
@@ -142,7 +149,8 @@ export const debitNotesRepository = {
          tax_mode, supply_type, prices_include_tax, round_off_enabled,
          gross_amount, line_discount_total, bill_discount_amount, taxable_amount,
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
-         grand_total, tax_summary, hsn_summary, reason_code, notes, status, issued_at, issued_by)
+         grand_total, tax_summary, hsn_summary, reason_code, restock, notes, status, issued_at, issued_by,
+         is_reverse_charge)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5,
          $6, $7, $8, $9, $10,
@@ -150,7 +158,7 @@ export const debitNotesRepository = {
          $14, $15, $16, $17,
          $18, $19, $20, $21,
          $22, $23, $24, $25, $26, $27, $28,
-         $29, $30, $31, $32, $33, 'issued', $34, $35)`,
+         $29, $30, $31, $32, $33, $34, 'issued', $35, $36, $37)`,
       [
         h.id,
         h.outletId,
@@ -184,9 +192,11 @@ export const debitNotesRepository = {
         JSON.stringify(t.taxSummary),
         JSON.stringify(t.hsnSummary),
         h.reasonCode,
+        h.restock,
         h.notes,
         h.issuedAt,
         h.issuedBy,
+        t.isReverseCharge,
       ],
     );
   },
@@ -202,18 +212,18 @@ export const debitNotesRepository = {
       `INSERT INTO debit_note_lines (id, tenant_id, debit_note_id, purchase_bill_line_id, outlet_id,
          document_date, line_no, item_id, item_name, hsn_code, unit, quantity, unit_price,
          gross_amount, line_discount, taxable_amount, tax_rate_percent, cess_rate_percent,
-         cgst, sgst, igst, cess, line_total, effective_unit_cost)
+         cgst, sgst, igst, cess, line_total, effective_unit_cost, supply_category)
        SELECT l.id, app.current_tenant_id(), $1, l."purchaseBillLineId", $2, $3, l."lineNo",
               l."itemId", l."itemName", l."hsnCode", l.unit, l.quantity, l."unitPrice",
               l."grossAmount", l."lineDiscount", l."taxableAmount", l."taxRatePercent",
               l."cessRatePercent", l.cgst, l.sgst, l.igst, l.cess, l."lineTotal",
-              l."effectiveUnitCost"
+              l."effectiveUnitCost", l."supplyCategory"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "purchaseBillLineId" uuid, "lineNo" int, "itemId" uuid, "itemName" text,
          "hsnCode" text, unit text, quantity bigint, "unitPrice" bigint, "grossAmount" bigint,
          "lineDiscount" bigint, "taxableAmount" bigint, "taxRatePercent" numeric,
          "cessRatePercent" numeric, cgst bigint, sgst bigint, igst bigint, cess bigint,
-         "lineTotal" bigint, "effectiveUnitCost" bigint)`,
+         "lineTotal" bigint, "effectiveUnitCost" bigint, "supplyCategory" text)`,
       [noteId, outletId, documentDate, JSON.stringify(lines)],
     );
   },

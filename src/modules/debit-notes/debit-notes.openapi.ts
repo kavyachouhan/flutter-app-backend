@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { errorResponses } from '../../openapi/common.js';
+import { errorResponses, supplyCategorySchema } from '../../openapi/common.js';
 import {
   accessTokenSecurity,
   calendarDate,
@@ -48,6 +48,7 @@ const debitNote = registry.register(
         taxRatePercent: percent,
         lineTotal: paise,
         effectiveUnitCost: paise,
+        supplyCategory: supplyCategorySchema,
       }),
     ),
   }),

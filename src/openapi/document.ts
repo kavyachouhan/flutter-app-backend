@@ -25,6 +25,8 @@ import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/suppliers/suppliers.openapi.js';
 import '../modules/purchases/purchases.openapi.js';
 import '../modules/debit-notes/debit-notes.openapi.js';
+import '../modules/price-lists/price-lists.openapi.js';
+import '../modules/gst/gst.openapi.js';
 import '../modules/print/print.openapi.js';
 import '../modules/uploads/uploads.openapi.js';
 import '../modules/imports/imports.openapi.js';
@@ -80,6 +82,16 @@ export function buildOpenApiDocument(): OpenApiDocument {
         description: 'Purchase orders, supplier bills, payments, and what stock really cost.',
       },
       { name: 'Debit notes', description: 'Returns and corrections against a purchase bill.' },
+      {
+        name: 'GST',
+        description:
+          'GSTR-1 and 3B workings, the input tax credit register, GSTR-2B reconciliation and CMP-08. Nothing here files a return on the shop’s behalf.',
+      },
+      {
+        name: 'Pricing',
+        description:
+          'Price lists per customer, bulk price revision, and the discount caps that stop margin leaving unchecked.',
+      },
       {
         name: 'Print settings',
         description:

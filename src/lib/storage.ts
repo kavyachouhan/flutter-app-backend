@@ -69,8 +69,23 @@ const POLICIES: Readonly<Record<ObjectKind, KindPolicy>> = {
     maxBytes: 5 * MB,
     clientSignable: true,
   },
-  import: { types: SPREADSHEET_TYPES, maxBytes: 10 * MB, clientSignable: true },
-  export: { types: SPREADSHEET_TYPES, maxBytes: 25 * MB, clientSignable: false },
+  // JSON as well as spreadsheets, because a GSTR-2B statement is downloaded
+  // from the GST portal as JSON. It is parsed, never served back, so the
+  // content type is only ever used to pick an extension and bound the size.
+  import: {
+    types: { ...SPREADSHEET_TYPES, 'application/json': 'json' },
+    maxBytes: 10 * MB,
+    clientSignable: true,
+  },
+  // JSON as well, for a GST return in the portal's own upload format. Still
+  // server-written only: an export is generated from tenant data, and letting
+  // a client upload one would put arbitrary bytes behind a URL the UI presents
+  // as the shop's own return.
+  export: {
+    types: { ...SPREADSHEET_TYPES, 'application/json': 'json' },
+    maxBytes: 25 * MB,
+    clientSignable: false,
+  },
 };
 
 export interface SignedUpload {

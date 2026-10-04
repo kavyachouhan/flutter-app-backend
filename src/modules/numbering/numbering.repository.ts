@@ -125,6 +125,32 @@ export const numberingRepository = {
     );
   },
 
+  /**
+   * Any live series issuing `documentType` for an outlet in a financial year,
+   * whatever its counter scope.
+   *
+   * `findSeriesByScope` answers a narrower question — the series for one exact
+   * scope — and is the right one when continuing a known series. This one
+   * exists for provisioning: a shop that already numbers invoices per counter
+   * must not have an outlet-wide series created underneath it. Outlet-scoped
+   * rows sort first so the answer is stable when both exist.
+   */
+  findSeriesForDocumentType(
+    tx: Tx,
+    outletId: string,
+    documentType: string,
+    fyStartYear: number,
+  ): Promise<SeriesRow | undefined> {
+    return tx.one<SeriesRow>(
+      `SELECT ${SERIES_COLUMNS} ${SERIES_FROM}
+       WHERE s.deleted_at IS NULL AND s.is_active AND s.outlet_id = $1
+         AND s.document_type = $2 AND s.fy_start_year = $3
+       ORDER BY s.counter_id NULLS FIRST, s.created_at
+       LIMIT 1`,
+      [outletId, documentType, fyStartYear],
+    );
+  },
+
   async setNextSeq(tx: Tx, id: string, nextSeq: number): Promise<void> {
     await tx.query('UPDATE document_series SET next_seq = $2 WHERE id = $1', [id, nextSeq]);
   },

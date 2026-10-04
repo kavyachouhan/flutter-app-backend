@@ -48,6 +48,22 @@ export const PERMISSIONS = [
   // owner/manager tier rather than with catalogue:write.
   'imports:read',
   'imports:write',
+  'price_lists:read',
+  // Changing a price list changes what every customer on it pays, and a bulk
+  // revision does it across the catalogue, so this sits with the owner/manager
+  // tier rather than with catalogue:write.
+  'price_lists:write',
+  'discount_policies:read',
+  'discount_policies:manage',
+  // Authorise a discount that breaches the policy. Held by whoever the shop
+  // decides approves — the policy names the permission, so a shop can move it
+  // without a code change.
+  'discounts:approve',
+  'gst:read',
+  // Preparing and recording a return as filed. Separate from reports:financial
+  // because a return is a declaration to the department, not a view of the
+  // shop's own numbers — an accountant reads it, an owner files it.
+  'gst:manage',
   'numbering:read',
   'numbering:manage',
   'numbering:lease',
@@ -88,6 +104,10 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'day_close:read',
     'day_close:create',
     'stock:read',
+    // Needed to price a customer correctly at the till. Writing a list and
+    // approving a breach are both withheld — that is the point of the cap.
+    'price_lists:read',
+    'discount_policies:read',
     'numbering:read',
     'numbering:lease',
     'sync:read',

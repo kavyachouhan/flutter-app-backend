@@ -54,6 +54,7 @@ export function createCustomer(body: CreateCustomerBody) {
       city: body.city ?? null,
       pincode: body.pincode ?? null,
       creditLimit: body.creditLimit ?? null,
+      priceListId: body.priceListId ?? null,
       notes: body.notes ?? null,
     });
 

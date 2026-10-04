@@ -13,7 +13,14 @@
 import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
 import type { Tx } from '../../db/tx.js';
-import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
+import {
+  financialYearOf,
+  financialYearStarting,
+  formatDocumentNumber,
+  pickFittingFormat,
+} from '../../domain/numbering/series.js';
+import { outletsRepository } from '../outlets/outlets.repository.js';
+import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type SeriesRow } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 
@@ -39,6 +46,28 @@ async function ensureSeries(
   });
   if (existing) return existing;
 
+  const outlet = await outletsRepository.findOutlet(tx, outletId);
+  // The outlet code only earns its characters when there is a second branch to
+  // distinguish, and the 16-character legal limit has none to spare:
+  // PB/MAIN/26-27/0001 is eighteen. `pickFittingFormat` drops segments in the
+  // order that keeps numbers unique for longest.
+  const outlets = await outletsRepository.listOutlets(tx, null);
+  const settings = await tenantsRepository.getSettings(tx);
+  const format = pickFittingFormat(
+    {
+      prefix: DEFAULT_PREFIX[documentType],
+      outletCode: outlets.length > 1 ? (outlet?.code ?? undefined) : undefined,
+      includeFinancialYear: true,
+      padding: 4,
+      separator: '/',
+    },
+    financialYearStarting(fyStartYear, settings.fyStartMonth),
+    {
+      maxLength: env.DOCUMENT_NUMBER_MAX_LENGTH,
+      minSequenceHeadroom: env.DOCUMENT_SEQUENCE_MIN_HEADROOM,
+    },
+  );
+
   const id = randomUUID();
   await numberingRepository.insertSeries(tx, {
     id,
@@ -46,14 +75,12 @@ async function ensureSeries(
     counterId: null,
     documentType,
     fyStartYear,
-    prefix: DEFAULT_PREFIX[documentType],
-    // Outlet code on by default so a two-branch shop does not end up with
-    // two documents numbered PB/0001.
-    includeOutletCode: true,
+    prefix: format.prefix,
+    includeOutletCode: format.outletCode !== undefined,
     includeCounterCode: false,
-    includeFinancialYear: true,
-    padding: 4,
-    separator: '/',
+    includeFinancialYear: format.includeFinancialYear,
+    padding: format.padding,
+    separator: format.separator,
     nextSeq: 1,
   });
 

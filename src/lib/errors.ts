@@ -23,6 +23,13 @@ export const ErrorCode = {
 
   FORBIDDEN: 'FORBIDDEN',
   INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE',
+  /**
+   * An approval names someone who does not hold the permission the discount
+   * policy requires. Structural, so it is rejected rather than warned about:
+   * an approval from someone not entitled to give it is not evidence of
+   * anything, and storing it would make the audit trail say something untrue.
+   */
+  APPROVER_NOT_PERMITTED: 'APPROVER_NOT_PERMITTED',
   OUTLET_NOT_PERMITTED: 'OUTLET_NOT_PERMITTED',
   ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
 
@@ -104,6 +111,19 @@ export const WarningCode = {
   NEGATIVE_STOCK: 'NEGATIVE_STOCK',
   /** The drawer did not match the expectation by more than the tolerance. */
   CASH_VARIANCE_EXCEEDED: 'CASH_VARIANCE_EXCEEDED',
+  /**
+   * A discount on the document exceeds the shop's policy and no approval
+   * accompanied it. A warning rather than a rejection: the sale has already
+   * happened, and the device may have been offline when the cap was tightened.
+   * The breach is in `details` and in the discount-audit report.
+   */
+  DISCOUNT_CAP_EXCEEDED: 'DISCOUNT_CAP_EXCEEDED',
+  /**
+   * The price charged is not what the customer's price list says it should be.
+   * Never a rejection: the device priced from the list it held at the time, and
+   * the list may have moved since the sale.
+   */
+  PRICE_LIST_MISMATCH: 'PRICE_LIST_MISMATCH',
 } as const;
 
 export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];

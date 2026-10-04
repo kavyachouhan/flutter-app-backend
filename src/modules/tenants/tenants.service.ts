@@ -1,10 +1,11 @@
 import { env } from '../../config/env.js';
+import { DEFAULT_COMPOSITION_RATES } from '../../domain/gst/composition.js';
 import { withReadTransaction, withTransaction } from '../../db/tx.js';
 import { ConflictError, ErrorCode, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
 import { diffFields, recordAudit } from '../audit/audit.js';
 import { createSession } from '../auth/auth.service.js';
-import { getSubscriptionWithUsage, insertFreeSubscription } from '../entitlements/entitlements.js';
+import { getSubscriptionWithUsage, insertSubscription } from '../entitlements/entitlements.js';
 import { membersRepository } from '../members/members.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from './tenants.repository.js';
@@ -63,9 +64,23 @@ export async function onboardTenant(userId: string, body: CreateTenantBody) {
         allowNegativeStock: body.allowNegativeStock ?? env.TENANT_DEFAULT_ALLOW_NEGATIVE_STOCK,
         defaultPricesIncludeTax:
           body.defaultPricesIncludeTax ?? env.TENANT_DEFAULT_PRICES_INCLUDE_TAX,
+        // A composition shop is asked for its category and rate in settings,
+        // not at onboarding: the scheme has four rates and guessing one would
+        // put a wrong figure on the first CMP-08.
+        compositionCategory: body.compositionCategory ?? null,
+        // pg reads NUMERIC back as a string, so the row type is a string; the
+        // wire takes a number, which is the right shape for a percentage.
+        compositionRatePercent:
+          body.compositionRatePercent !== undefined && body.compositionRatePercent !== null
+            ? String(body.compositionRatePercent)
+            : isComposition && body.compositionCategory
+              ? String(DEFAULT_COMPOSITION_RATES[body.compositionCategory])
+              : null,
+        filingFrequency: body.filingFrequency ?? 'monthly',
+        registrationEffectiveFrom: body.registrationEffectiveFrom ?? null,
       });
 
-      await insertFreeSubscription(tx);
+      await insertSubscription(tx);
       await membersRepository.insert(tx, { id: newId(), userId, role: 'owner', outletIds: null });
       await outletsRepository.insertOutlet(tx, {
         id: body.outlet.id,

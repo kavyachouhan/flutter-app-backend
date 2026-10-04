@@ -88,6 +88,33 @@ const envSchema = z.object({
   IMPORT_MAX_ROWS: required(positiveInt),
   IMPORT_ANALYSE_CHUNK_ROWS: required(positiveInt),
   IMPORT_APPLY_CHUNK_ROWS: required(positiveInt),
+  // Bulk price revision works in chunks for the same reason the importer
+  // does, plus one of its own: every repriced row republishes to every
+  // device, so the write should not arrive as a single lock-held burst.
+  PRICE_REVISION_ANALYSE_CHUNK_ROWS: required(positiveInt),
+  PRICE_REVISION_APPLY_CHUNK_ROWS: required(positiveInt),
+
+  // --- GST reconciliation ---------------------------------------------------
+  // Matching tolerances, passed into the pure reconciler the way GST rates are
+  // passed into the tax engine. They are judgement calls about other people's
+  // data entry, not arithmetic, so support should be able to tune them for one
+  // customer without a deploy.
+  //
+  // Paise of tax difference treated as equal. Two systems computing the same
+  // invoice genuinely round differently, and a one-paisa discrepancy is not
+  // worth a shopkeeper's attention.
+  GSTR2B_TAX_TOLERANCE_PAISE: required(nonNegativeInt),
+  // Days a supplier's invoice date may differ from ours and still match. A
+  // date keyed a day out is common; a month out is a different invoice.
+  GSTR2B_DATE_TOLERANCE_DAYS: required(nonNegativeInt),
+  // Months either side of the 2B period to compare our own bills over. A bill
+  // dated in March can appear in a supplier's April filing, and a strictly
+  // period-bounded comparison reports that twice — as a gap in one month and
+  // an unknown invoice in the next.
+  GSTR2B_COMPARISON_MONTHS: required(nonNegativeInt),
+  // How many historical bills one `prepare` call folds into the ITC register.
+  // Idempotent, so it costs nothing once it has caught up.
+  ITC_BACKFILL_CHUNK_ROWS: required(positiveInt),
   // After this long with no progress a job is abandoned and its upload purged.
   IMPORT_JOB_TTL_HOURS: required(positiveInt),
 
@@ -196,9 +223,11 @@ const envSchema = z.object({
   NUMBER_BLOCK_TTL_HOURS: required(positiveInt),
 
   // --- Reports --------------------------------------------------------------
-  // Report ids available without the `reports.all` feature. Gating is
-  // configuration so support can open one report for one customer.
-  PLAN_FREE_REPORT_IDS: optional(csv),
+  // Which reports a plan includes is no longer configuration: each definition
+  // in reports.registry.ts names the feature that unlocks it, and the plan
+  // catalogue says which plans grant that feature. An id list in the
+  // environment did not survive the jump from thirteen reports to thirty-eight.
+  //
   // A window wider than this is refused rather than served slowly.
   REPORT_MAX_RANGE_DAYS: required(positiveInt),
   REPORT_MAX_ROWS: required(positiveInt),
@@ -219,15 +248,16 @@ const envSchema = z.object({
   TENANT_DEFAULT_ALLOW_NEGATIVE_STOCK: required(bool),
   TENANT_DEFAULT_PRICES_INCLUDE_TAX: required(bool),
 
-  // --- Free plan limits (unset = unlimited) ---------------------------------
-  PLAN_FREE_MAX_USERS: optional(positiveInt),
-  PLAN_FREE_MAX_OUTLETS: optional(positiveInt),
-  PLAN_FREE_MAX_COUNTERS: optional(positiveInt),
-  PLAN_FREE_MAX_ITEMS: optional(positiveInt),
-  // Feature keys granted on the free plan; unset grants none. Gating is
-  // configuration, not code, so support can unlock one feature for one
-  // customer without a deploy.
-  PLAN_FREE_FEATURES: optional(csv),
+  // --- Plans ----------------------------------------------------------------
+  // Quotas and grants per plan live in src/modules/entitlements/plans.ts, so
+  // the price list is one reviewable file rather than a spread of environment
+  // variables that drift between deployments. A per-tenant override still goes
+  // in subscriptions.features.
+  //
+  // Development-only; refused under APP_ENV=production. Grants every feature
+  // and lifts every quota, so the whole paid surface is reachable without
+  // seeding a subscription.
+  PLAN_DEV_GRANT_ALL: required(bool),
 
   // --- OpenAPI --------------------------------------------------------------
   // Serves GET /v1/openapi.json and the Swagger UI at /v1/docs, unauthenticated.
@@ -302,6 +332,11 @@ function assertProductionSafety(parsed: RawEnv): void {
 
   if (parsed.AUTH_DEV_BYPASS) {
     violations.push('AUTH_DEV_BYPASS mints tokens with no credential check; it must be false.');
+  }
+  if (parsed.PLAN_DEV_GRANT_ALL) {
+    violations.push(
+      'PLAN_DEV_GRANT_ALL grants every paid feature to every tenant and lifts every quota; it must be false.',
+    );
   }
   if (parsed.AUTH_DEV_FIXED_OTP !== undefined) {
     violations.push('AUTH_DEV_FIXED_OTP is an OTP accepted for every phone; it must be unset.');

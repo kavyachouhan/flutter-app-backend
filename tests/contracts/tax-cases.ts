@@ -258,6 +258,132 @@ export function handWrittenTaxCases(): TaxContractCase[] {
       name: 'unnotified line rate in GST mode is rejected',
       input: invoice({ lines: [line({ taxRatePercent: 7 })] }),
     },
+
+    // --- Supply classification, reverse charge, exports and SEZ -------------
+    {
+      name: 'exempt line bears no tax although a rate is recorded',
+      input: invoice({ lines: [line({ supplyCategory: 'exempt', taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'nil-rated line bears no tax',
+      input: invoice({ lines: [line({ supplyCategory: 'nil_rated', taxRatePercent: 5 })] }),
+    },
+    {
+      name: 'non-GST line bears no tax',
+      input: invoice({ lines: [line({ supplyCategory: 'non_gst', taxRatePercent: 12 })] }),
+    },
+    {
+      name: 'mixed classifications total separately',
+      input: invoice({
+        lines: [
+          line({ id: 'a', taxRatePercent: 18 }),
+          line({ id: 'b', taxRatePercent: 18, supplyCategory: 'exempt' }),
+          line({ id: 'c', taxRatePercent: 5, supplyCategory: 'nil_rated' }),
+          line({ id: 'd', taxRatePercent: 0, supplyCategory: 'non_gst' }),
+        ],
+      }),
+    },
+    {
+      name: 'an unnotified rate on an exempt line is not validated',
+      input: invoice({ lines: [line({ supplyCategory: 'exempt', taxRatePercent: 7 })] }),
+    },
+    {
+      name: 'classification applies to an inclusive price too',
+      input: invoice({
+        pricesIncludeTax: true,
+        lines: [line({ unitPrice: 11800, supplyCategory: 'exempt', taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'bill discount apportions across classifications',
+      input: invoice({
+        lines: [
+          line({ id: 'a', unitPrice: 10000, taxRatePercent: 18 }),
+          line({ id: 'b', unitPrice: 20000, taxRatePercent: 18, supplyCategory: 'exempt' }),
+        ],
+        billDiscount: { kind: 'percent', value: 10 },
+        roundOff: true,
+      }),
+    },
+    {
+      name: 'reverse charge carries no tax but reports the value',
+      input: invoice({ isReverseCharge: true, lines: [line({ taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'reverse charge inter-state carries no IGST',
+      input: invoice({
+        isReverseCharge: true,
+        placeOfSupplyStateCode: '29',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'reverse charge on an inclusive price takes the price as-is',
+      input: invoice({
+        isReverseCharge: true,
+        pricesIncludeTax: true,
+        lines: [line({ unitPrice: 11800 })],
+      }),
+    },
+    {
+      name: 'export with payment of tax charges IGST',
+      input: invoice({
+        supplyType: 'export_with_tax',
+        placeOfSupplyStateCode: '96',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'export without payment of tax is zero-rated',
+      input: invoice({
+        supplyType: 'export_without_tax',
+        placeOfSupplyStateCode: '96',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'SEZ with payment of tax charges IGST',
+      input: invoice({
+        supplyType: 'sez_with_tax',
+        placeOfSupplyStateCode: '29',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'SEZ without payment of tax is zero-rated',
+      input: invoice({
+        supplyType: 'sez_without_tax',
+        placeOfSupplyStateCode: '29',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'a taxable charge on a zero-rated export bears no tax',
+      input: invoice({
+        supplyType: 'export_without_tax',
+        placeOfSupplyStateCode: '96',
+        lines: [line({ taxRatePercent: 18 })],
+        additionalCharges: [charge({ taxable: true, taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'an export whose place of supply is the supplier state is rejected',
+      input: invoice({
+        supplyType: 'export_without_tax',
+        placeOfSupplyStateCode: '27',
+        lines: [line()],
+      }),
+    },
+    {
+      name: 'a declared inter-state supply overrides the derived one',
+      input: invoice({ supplyType: 'inter_state', lines: [line({ taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'a line with no HSN is reported under the unclassified bucket',
+      input: invoice({
+        lines: [line({ id: 'a', hsnCode: '1001' }), line({ id: 'b' })],
+      }),
+    },
   ];
 }
 

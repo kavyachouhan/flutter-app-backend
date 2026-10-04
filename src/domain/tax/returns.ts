@@ -7,11 +7,12 @@
  * original line's discounts (its own and its share of the bill discount) are
  * scaled to the returned quantity with the same half-away-from-zero rounding
  * as the engine, then handed to the engine as an amount discount. Rates and
- * the tax-inclusive flag are copied from the invoice unchanged.
+ * the tax-inclusive flag are copied from the invoice unchanged, as is the
+ * supply classification.
  */
 import { roundHalfAwayFromZero } from '../../lib/money.js';
 import { ValidationError } from '../../lib/errors.js';
-import type { TaxLineInput } from './types.js';
+import type { SupplyCategory, TaxLineInput } from './types.js';
 
 export interface SoldLine {
   readonly id: string;
@@ -22,6 +23,12 @@ export interface SoldLine {
   readonly taxRatePercent: number;
   readonly cessRatePercent: number;
   readonly hsnCode: string | null;
+  /**
+   * Copied from the invoice line, never re-derived. A credit note is reported
+   * in GSTR-1 against the supply it reverses, so an exempt sale returned as a
+   * taxable credit would leave both tables wrong.
+   */
+  readonly supplyCategory: SupplyCategory;
 }
 
 export interface ReturnRequest {
@@ -56,6 +63,7 @@ export function deriveReturnLine(sold: SoldLine, request: ReturnRequest): TaxLin
     unitPrice: sold.unitPrice,
     taxRatePercent: sold.taxRatePercent,
     cessRatePercent: sold.cessRatePercent,
+    supplyCategory: sold.supplyCategory,
     ...(scaledDiscount > 0 ? { discount: { kind: 'amount', value: scaledDiscount } } : {}),
     ...(sold.hsnCode ? { hsnCode: sold.hsnCode } : {}),
   };

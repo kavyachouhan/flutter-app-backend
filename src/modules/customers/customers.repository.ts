@@ -14,6 +14,8 @@ export interface CustomerRow {
   city: string | null;
   pincode: string | null;
   creditLimit: number | null;
+  /** Which price list this customer is billed at; null takes the default. */
+  priceListId: string | null;
   notes: string | null;
   /** Paise the customer owes; negative is an advance. */
   balance: number;
@@ -60,7 +62,8 @@ export interface LedgerEntryRow {
 
 const CUSTOMER_COLUMNS = `
   c.id, c.name, c.phone, c.email, c.gstin, c.state_code AS "stateCode", c.address_line1 AS "addressLine1",
-  c.address_line2 AS "addressLine2", c.city, c.pincode, c.credit_limit AS "creditLimit", c.notes,
+  c.address_line2 AS "addressLine2", c.city, c.pincode, c.credit_limit AS "creditLimit",
+  c.price_list_id AS "priceListId", c.notes,
   COALESCE(b.balance, 0) AS balance, c.created_at AS "createdAt", c.updated_at AS "updatedAt"`;
 
 const FROM = 'FROM customers c LEFT JOIN customer_balances b ON b.customer_id = c.id';
@@ -76,6 +79,7 @@ const UPDATABLE = {
   city: 'city',
   pincode: 'pincode',
   creditLimit: 'credit_limit',
+  priceListId: 'price_list_id',
   notes: 'notes',
 } as const;
 
@@ -113,8 +117,8 @@ export const customersRepository = {
   async insert(tx: Tx, c: NewCustomer): Promise<void> {
     await tx.query(
       `INSERT INTO customers (id, tenant_id, name, phone, email, gstin, state_code, address_line1, address_line2,
-         city, pincode, credit_limit, notes)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         city, pincode, credit_limit, price_list_id, notes)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         c.id,
         c.name,
@@ -127,6 +131,7 @@ export const customersRepository = {
         c.city,
         c.pincode,
         c.creditLimit,
+        c.priceListId,
         c.notes,
       ],
     );

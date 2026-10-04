@@ -1,7 +1,9 @@
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import {
+  financialYearOf,
   financialYearStarting,
+  pickFittingFormat,
   maxSequenceFor,
   remainingInBlock,
   validateSeriesFormat,
@@ -14,6 +16,7 @@ import { newId } from '../../lib/ids.js';
 import { createLogger } from '../../lib/logger.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
+import { devicesRepository } from '../devices/devices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type BlockRow, type SeriesRow } from './numbering.repository.js';
@@ -232,21 +235,151 @@ async function ensureSuccessorSeries(tx: Tx, series: SeriesRow): Promise<SeriesR
 }
 
 /**
- * Called from every pull. For each series the device is issuing from, leases a
- * fresh block when the remaining numbers fall below the threshold, and in the
- * last weeks of the financial year makes sure next year's series exists and
- * the device holds a block on it — so a till that goes offline on 31 March
- * still bills legally on 1 April.
+ * Document types a till issues itself, and the prefix each gets when the shop
+ * has not set one up.
+ *
+ * Keyed documents provision their series on first use (see
+ * `purchases/numbering.ts`); a leased one cannot, because the device needs
+ * both the series and a block on it *before* it goes offline. So these are
+ * provisioned on first pull instead. Credit notes matter most here: a return
+ * is a legal obligation, and until this existed a shop could not issue its
+ * first one without hand-creating a series it had no reason to know about.
+ */
+const BOOTSTRAP_SERIES: Record<'invoice' | 'credit_note', string> = {
+  invoice: 'INV',
+  credit_note: 'CN',
+};
+
+/**
+ * Makes sure the outlet has a live series for `documentType` in this financial
+ * year, creating an outlet-scoped one if it has none.
+ *
+ * Deliberately a no-op when any series already issues this type for the
+ * outlet, including a per-counter one: a shop that chose counter-wise
+ * numbering must not find an outlet-wide series appearing beside it.
+ */
+async function ensureBootstrapSeries(
+  tx: Tx,
+  outletId: string,
+  documentType: keyof typeof BOOTSTRAP_SERIES,
+  fyStartYear: number,
+): Promise<SeriesRow | undefined> {
+  const existing = await numberingRepository.findSeriesForDocumentType(
+    tx,
+    outletId,
+    documentType,
+    fyStartYear,
+  );
+  if (existing) return numberingRepository.findSeries(tx, existing.id, true);
+
+  const outlet = await outletsRepository.findOutlet(tx, outletId);
+  // Only a shop with more than one outlet needs the outlet code in its
+  // numbers, and including it costs characters that the 16-character legal
+  // limit does not have to spare. A single-branch shop gets INV/26-27/0001.
+  const outlets = await outletsRepository.listOutlets(tx, null);
+  const format = pickFittingFormat(
+    {
+      prefix: BOOTSTRAP_SERIES[documentType],
+      outletCode: outlets.length > 1 ? (outlet?.code ?? undefined) : undefined,
+      includeFinancialYear: true,
+      padding: 4,
+      separator: '/',
+    },
+    financialYearStarting(fyStartYear, (await tenantsRepository.getSettings(tx)).fyStartMonth),
+    { maxLength: env.DOCUMENT_NUMBER_MAX_LENGTH, minSequenceHeadroom: env.DOCUMENT_SEQUENCE_MIN_HEADROOM },
+  );
+
+  const id = newId();
+  await numberingRepository.insertSeries(tx, {
+    id,
+    outletId,
+    counterId: null,
+    documentType,
+    fyStartYear,
+    prefix: format.prefix,
+    includeOutletCode: format.outletCode !== undefined,
+    includeCounterCode: false,
+    includeFinancialYear: format.includeFinancialYear,
+    padding: format.padding,
+    separator: format.separator,
+    nextSeq: 1,
+  });
+  await recordAudit(tx, {
+    action: 'series.provisioned',
+    entityType: 'document_series',
+    entityId: id,
+    metadata: { outletId, documentType, fyStartYear },
+  });
+  log.info({ seriesId: id, outletId, documentType }, 'Provisioned a document series on first pull');
+  return numberingRepository.findSeries(tx, id, true);
+}
+
+/**
+ * Leases the device its first block on each series a till must be able to
+ * issue from, so a freshly registered device can bill and take returns
+ * offline without a numbering setup step.
+ */
+async function bootstrapLeases(
+  tx: Tx,
+  deviceId: string,
+  fyStartMonth: number,
+  live: readonly BlockRow[],
+): Promise<BlockRow[]> {
+  // A device onboarded moments ago has no outlet binding: onboarding creates
+  // the device and the outlet in one transaction and does not link them. So
+  // fall back to the default outlet, which is the only one a single-branch
+  // shop has — without this the bootstrap silently does nothing in exactly
+  // the case it exists for.
+  const device = await devicesRepository.findById(tx, deviceId);
+  const outletId = device?.outletId ?? (await outletsRepository.findDefaultOutlet(tx))?.id;
+  if (!outletId) return [];
+
+  const fy = financialYearOf(businessDateOf(new Date()), fyStartMonth);
+
+  // Keyed on the document type, not the series id: a shop numbering per
+  // counter has several invoice series, and a device holding a block on any
+  // of them can already bill. Matching on ids would lease it a second one.
+  const held = new Set<string>();
+  for (const block of live) {
+    const series = await numberingRepository.findSeries(tx, block.seriesId);
+    if (series && series.fyStartYear === fy.startYear) held.add(series.documentType);
+  }
+
+  const leased: BlockRow[] = [];
+  for (const documentType of Object.keys(BOOTSTRAP_SERIES) as (keyof typeof BOOTSTRAP_SERIES)[]) {
+    if (held.has(documentType)) continue;
+    const series = await ensureBootstrapSeries(tx, outletId, documentType, fy.startYear);
+    if (!series) continue;
+    const block = await leaseInTx(tx, series, fy, deviceId, undefined);
+    if (block) leased.push(block);
+  }
+  return leased;
+}
+
+/** Today in UTC, as the date string the financial-year helpers take. */
+function businessDateOf(at: Date): string {
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * Called from every pull. Makes sure the device holds a block on each series a
+ * till issues from; for each series it is already issuing from, leases a fresh
+ * block when the remaining numbers fall below the threshold; and in the last
+ * weeks of the financial year makes sure next year's series exists and the
+ * device holds a block on it — so a till that goes offline on 31 March still
+ * bills legally on 1 April.
  */
 export async function topUpLeasesForDevice(
   tx: Tx,
   deviceId: string,
   options: TopUpOptions,
 ): Promise<BlockRow[]> {
-  const live = await numberingRepository.listLiveBlocks(tx, deviceId);
-  if (live.length === 0) return [];
-
   const settings = await tenantsRepository.getSettings(tx);
+  const live = await numberingRepository.listLiveBlocks(tx, deviceId);
+
+  const bootstrapped = await bootstrapLeases(tx, deviceId, settings.fyStartMonth, live);
+  if (live.length === 0) return bootstrapped;
+
   const remainingBySeries = new Map<string, number>();
   for (const block of live) {
     remainingBySeries.set(
@@ -255,7 +388,7 @@ export async function topUpLeasesForDevice(
     );
   }
 
-  const leased: BlockRow[] = [];
+  const leased: BlockRow[] = [...bootstrapped];
   const leadMs = options.rolloverLeadDays * 24 * 60 * 60 * 1000;
 
   for (const [seriesId, remaining] of remainingBySeries) {

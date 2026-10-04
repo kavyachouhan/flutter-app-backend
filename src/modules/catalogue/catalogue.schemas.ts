@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
-import { booleanQuery, gstRate, hsnCode, nonEmpty, paise } from '../../lib/validators.js';
+import {
+  booleanQuery,
+  gstRate,
+  hsnCode,
+  nonEmpty,
+  paise,
+  supplyCategory,
+} from '../../lib/validators.js';
 
 export const createCategoryBody = z.object({
   id: clientId,
@@ -30,6 +37,11 @@ const itemFields = {
   trackStock: z.boolean().optional(),
   /** Thousandths of a unit. */
   reorderLevel: paise.nullable().optional(),
+  /**
+   * How the item is reported in the GST return. Defaults to `taxable`; set it
+   * on exempt or nil-rated goods, which a 0% rate alone cannot distinguish.
+   */
+  supplyCategory: supplyCategory.optional(),
   isActive: z.boolean().optional(),
   barcodes: z.array(nonEmpty).optional(),
 };

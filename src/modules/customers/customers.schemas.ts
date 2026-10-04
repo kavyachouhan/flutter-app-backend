@@ -15,6 +15,12 @@ const customerFields = {
   pincode: nonEmpty.nullable().optional(),
   /** null means no limit. */
   creditLimit: paise.nullable().optional(),
+  /**
+   * Which price list this customer is billed at. Null takes the tenant
+   * default, which is how a retail walk-in and an unassigned customer end up
+   * priced the same way.
+   */
+  priceListId: z.string().uuid().nullable().optional(),
   notes: nonEmpty.nullable().optional(),
 };
 

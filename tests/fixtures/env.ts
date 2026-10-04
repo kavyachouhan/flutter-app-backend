@@ -38,6 +38,12 @@ export const testEnv: Record<string, string> = {
   IMPORT_MAX_ROWS: '50000',
   IMPORT_ANALYSE_CHUNK_ROWS: '1000',
   IMPORT_APPLY_CHUNK_ROWS: '5000',
+  PRICE_REVISION_ANALYSE_CHUNK_ROWS: '500',
+  PRICE_REVISION_APPLY_CHUNK_ROWS: '500',
+  GSTR2B_TAX_TOLERANCE_PAISE: '100',
+  GSTR2B_DATE_TOLERANCE_DAYS: '7',
+  GSTR2B_COMPARISON_MONTHS: '1',
+  ITC_BACKFILL_CHUNK_ROWS: '5000',
   IMPORT_JOB_TTL_HOURS: '24',
 
   REDIS_URL: 'redis://127.0.0.1:1',
@@ -108,7 +114,6 @@ export const testEnv: Record<string, string> = {
   NUMBER_BLOCK_SIZE_MAX: '500',
   NUMBER_BLOCK_TTL_HOURS: '168',
 
-  PLAN_FREE_REPORT_IDS: 'day-book,sales-summary,current-stock,low-stock,customer-outstanding',
   REPORT_MAX_RANGE_DAYS: '400',
   REPORT_MAX_ROWS: '2000',
 
@@ -123,11 +128,7 @@ export const testEnv: Record<string, string> = {
   TENANT_DEFAULT_ALLOW_NEGATIVE_STOCK: 'true',
   TENANT_DEFAULT_PRICES_INCLUDE_TAX: 'true',
 
-  PLAN_FREE_MAX_USERS: '1',
-  PLAN_FREE_MAX_OUTLETS: '1',
-  PLAN_FREE_MAX_COUNTERS: '1',
-  PLAN_FREE_MAX_ITEMS: '100',
-  PLAN_FREE_FEATURES: 'offline_mode',
+  PLAN_DEV_GRANT_ALL: 'false',
 
   OPENAPI_ENABLED: 'true',
   OPENAPI_TITLE: 'Khata API (test)',

@@ -50,6 +50,7 @@ export interface TenantFixture {
   get: (path: string) => request.Test;
   post: (path: string) => request.Test;
   patch: (path: string) => request.Test;
+  put: (path: string) => request.Test;
   del: (path: string) => request.Test;
 }
 
@@ -104,6 +105,7 @@ export async function createTenant(options: TenantOptions = {}): Promise<TenantF
     get: (path) => request(app).get(path).set('Authorization', auth),
     post: (path) => request(app).post(path).set('Authorization', auth),
     patch: (path) => request(app).patch(path).set('Authorization', auth),
+    put: (path) => request(app).put(path).set('Authorization', auth),
     del: (path) => request(app).delete(path).set('Authorization', auth),
   };
 }
