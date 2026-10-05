@@ -28,6 +28,8 @@ import type {
   AdditionalCharge,
   Discount,
   HsnSummary,
+  SupplyCategory,
+  SupplyCategoryTotals,
   SupplyType,
   TaxEngineRules,
   TaxInvoiceInput,
@@ -53,6 +55,24 @@ export function resolveSupplyType(
 ): SupplyType {
   if (!placeOfSupplyStateCode) return 'intra_state';
   return placeOfSupplyStateCode === supplierStateCode ? 'intra_state' : 'inter_state';
+}
+
+/**
+ * Lines with no HSN still have to appear in the GSTR-1 HSN table, which must
+ * account for the whole invoice. They are bucketed under this key rather than
+ * dropped, so the table reconciles and the omission is visible to whoever has
+ * to fix the catalogue.
+ */
+export const HSN_UNCLASSIFIED = 'UNCLASSIFIED';
+
+/** Everything but a plain intra-state supply puts its tax under IGST. */
+function isIntraState(supplyType: SupplyType): boolean {
+  return supplyType === 'intra_state';
+}
+
+/** Zero-rated supplies are reported at value and carry no tax. */
+function supplyTypeChargesTax(supplyType: SupplyType): boolean {
+  return supplyType !== 'export_without_tax' && supplyType !== 'sez_without_tax';
 }
 
 /** The odd paisa goes to CGST. The rule must match the client and every credit note. */
@@ -97,8 +117,27 @@ function validateInput(input: TaxInvoiceInput, rules: TaxEngineRules): void {
       });
     }
     // Unregistered and composition documents charge no tax, so their stored
-    // rates are informational and not validated.
-    if (input.mode === 'gst') assertRate(line.taxRatePercent, rules, { lineId: line.id });
+    // rates are informational and not validated. Nor is an exempt, nil-rated
+    // or non-GST line: it has no notified rate to check against.
+    if (input.mode === 'gst' && (line.supplyCategory ?? 'taxable') === 'taxable') {
+      assertRate(line.taxRatePercent, rules, { lineId: line.id });
+    }
+  }
+
+  // An export or SEZ supply leaves the state, so a declared one that resolves
+  // intra-state means the place of supply and the declaration disagree — and
+  // whichever is wrong, the return would be too.
+  if (
+    input.supplyType &&
+    input.supplyType !== 'intra_state' &&
+    input.supplyType !== 'inter_state' &&
+    resolveSupplyType(input.supplierStateCode, input.placeOfSupplyStateCode) === 'intra_state' &&
+    input.placeOfSupplyStateCode !== undefined
+  ) {
+    throw new ValidationError(
+      'An export or SEZ supply cannot have a place of supply in the supplier state.',
+      { details: { supplyType: input.supplyType, placeOfSupply: input.placeOfSupplyStateCode } },
+    );
   }
 }
 
@@ -138,15 +177,21 @@ function computeCharge(
     amount: charge.amount,
     cgst,
     sgst,
-    igst: supplyType === 'inter_state' ? tax : 0,
+    igst: isIntraState(supplyType) ? 0 : tax,
   };
 }
 
 export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): TaxInvoiceResult {
   validateInput(input, rules);
 
-  const supplyType = resolveSupplyType(input.supplierStateCode, input.placeOfSupplyStateCode);
-  const taxesApply = input.mode === 'gst';
+  const supplyType =
+    input.supplyType ?? resolveSupplyType(input.supplierStateCode, input.placeOfSupplyStateCode);
+  // Three independent reasons a document carries no tax: the shop is not a
+  // regular registered dealer, the supply is zero-rated, or the recipient
+  // pays under reverse charge. Values are still reported in every case.
+  const isReverseCharge = input.isReverseCharge ?? false;
+  const taxesApply =
+    input.mode === 'gst' && supplyTypeChargesTax(supplyType) && !isReverseCharge;
 
   const grossAmounts = input.lines.map((line) => lineAmount(line.unitPrice, line.quantity));
   const lineDiscounts = input.lines.map((line, i) =>
@@ -160,14 +205,18 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
 
   const lines: TaxLineResult[] = input.lines.map((line, i) => {
     const net = (afterLineDiscount[i] ?? 0) - (billDiscountShares[i] ?? 0);
-    const taxRate = taxesApply ? line.taxRatePercent : 0;
-    const cessRate = taxesApply ? (line.cessRatePercent ?? 0) : 0;
+    const supplyCategory: SupplyCategory = line.supplyCategory ?? 'taxable';
+    // An exempt, nil-rated or non-GST line bears no tax whatever rate is
+    // recorded against it; the rate is kept because the catalogue carries it.
+    const lineTaxesApply = taxesApply && supplyCategory === 'taxable';
+    const taxRate = lineTaxesApply ? line.taxRatePercent : 0;
+    const cessRate = lineTaxesApply ? (line.cessRatePercent ?? 0) : 0;
 
     const taxableAmount = input.pricesIncludeTax ? extractTaxable(net, taxRate, cessRate) : net;
     const tax = percentOf(taxableAmount, taxRate);
     const cess = percentOf(taxableAmount, cessRate);
-    const { cgst, sgst } = supplyType === 'intra_state' ? splitCgstSgst(tax) : { cgst: 0, sgst: 0 };
-    const igst = supplyType === 'inter_state' ? tax : 0;
+    const { cgst, sgst } = isIntraState(supplyType) ? splitCgstSgst(tax) : { cgst: 0, sgst: 0 };
+    const igst = isIntraState(supplyType) ? 0 : tax;
 
     return {
       id: line.id,
@@ -183,6 +232,7 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
       cess,
       lineTotal: taxableAmount + cgst + sgst + igst + cess,
       hsnCode: line.hsnCode,
+      supplyCategory,
     };
   });
 
@@ -228,7 +278,24 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
       input.lines.map((l) => l.quantity),
       lines,
     ),
+    categoryTotals: buildCategoryTotals(lines),
+    isReverseCharge,
   };
+}
+
+/**
+ * Taxable value per classification. Taxable charges land under `taxable`:
+ * a charge is part of the principal supply and is taxed at its rate.
+ */
+function buildCategoryTotals(lines: readonly TaxLineResult[]): SupplyCategoryTotals {
+  const totals = { taxable: 0, exempt: 0, nilRated: 0, nonGst: 0 };
+  for (const line of lines) {
+    if (line.supplyCategory === 'exempt') totals.exempt += line.taxableAmount;
+    else if (line.supplyCategory === 'nil_rated') totals.nilRated += line.taxableAmount;
+    else if (line.supplyCategory === 'non_gst') totals.nonGst += line.taxableAmount;
+    else totals.taxable += line.taxableAmount;
+  }
+  return totals;
 }
 
 function buildTaxSummary(
@@ -266,10 +333,10 @@ function buildHsnSummary(
 ): HsnSummary[] {
   const byHsn = new Map<string, HsnSummary>();
   lines.forEach((line, i) => {
-    if (!line.hsnCode) return;
-    const prev = byHsn.get(line.hsnCode);
-    byHsn.set(line.hsnCode, {
-      hsnCode: line.hsnCode,
+    const hsnCode = line.hsnCode || HSN_UNCLASSIFIED;
+    const prev = byHsn.get(hsnCode);
+    byHsn.set(hsnCode, {
+      hsnCode,
       quantity: (prev?.quantity ?? 0) + (quantities[i] ?? 0),
       taxableAmount: (prev?.taxableAmount ?? 0) + line.taxableAmount,
       cgst: (prev?.cgst ?? 0) + line.cgst,

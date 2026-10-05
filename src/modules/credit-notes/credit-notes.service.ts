@@ -9,7 +9,7 @@ import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
 import { deriveReturnLine } from '../../domain/tax/returns.js';
-import type { TaxMode } from '../../domain/tax/types.js';
+import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   ConflictError,
@@ -30,6 +30,7 @@ import { numberingRepository } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { validateCustomFields } from '../print/custom-fields.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import {
@@ -152,6 +153,10 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       ? await customersRepository.find(tx, invoice.customerId, true)
       : undefined;
 
+    // Same guard as the invoice path: a credit note is equally immutable, so
+    // the bag has to be right before it is written.
+    await validateCustomFields(tx, 'credit_note', body.customFields);
+
     const taxInput = body.lines.map((line) =>
       deriveReturnLine(sold.get(line.invoiceLineId) as SoldLineRow, line),
     );
@@ -160,6 +165,12 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
         mode: invoice['taxMode'] as TaxMode,
         supplierStateCode: invoice['supplierStateCode'] as string,
         placeOfSupplyStateCode: (invoice['placeOfSupplyStateCode'] as string | null) ?? undefined,
+        // Carried over from the invoice, not re-derived. A credit note against
+        // an export is itself an export credit note, and one against a
+        // reverse-charge supply carries no tax for the same reason the invoice
+        // did not — GSTR-1 reports the pair together.
+        supplyType: invoice['supplyType'] as SupplyType,
+        isReverseCharge: invoice['isReverseCharge'] as boolean,
         pricesIncludeTax: invoice['pricesIncludeTax'] as boolean,
         roundOff: invoice['roundOffEnabled'] as boolean,
         lines: taxInput,
@@ -265,6 +276,7 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
         igst: computed.igst,
         cess: computed.cess,
         lineTotal: computed.lineTotal,
+        supplyCategory: computed.supplyCategory,
       };
     });
     await creditNotesRepository.insertLines(

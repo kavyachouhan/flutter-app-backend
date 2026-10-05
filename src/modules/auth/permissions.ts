@@ -29,6 +29,14 @@ export const PERMISSIONS = [
   'credit_notes:read',
   'credit_notes:create',
   'credit_notes:void',
+  'suppliers:read',
+  'suppliers:write',
+  'purchases:read',
+  'purchases:create',
+  'purchases:void',
+  'debit_notes:read',
+  'debit_notes:create',
+  'debit_notes:void',
   'expenses:read',
   'expenses:write',
   'expenses:void',
@@ -36,6 +44,26 @@ export const PERMISSIONS = [
   'day_close:create',
   'stock:read',
   'stock:adjust',
+  // Bulk import rewrites the price list wholesale, so it sits with the
+  // owner/manager tier rather than with catalogue:write.
+  'imports:read',
+  'imports:write',
+  'price_lists:read',
+  // Changing a price list changes what every customer on it pays, and a bulk
+  // revision does it across the catalogue, so this sits with the owner/manager
+  // tier rather than with catalogue:write.
+  'price_lists:write',
+  'discount_policies:read',
+  'discount_policies:manage',
+  // Authorise a discount that breaches the policy. Held by whoever the shop
+  // decides approves — the policy names the permission, so a shop can move it
+  // without a code change.
+  'discounts:approve',
+  'gst:read',
+  // Preparing and recording a return as filed. Separate from reports:financial
+  // because a return is a declaration to the department, not a view of the
+  // shop's own numbers — an accountant reads it, an owner files it.
+  'gst:manage',
   'numbering:read',
   'numbering:manage',
   'numbering:lease',
@@ -55,6 +83,10 @@ const READ_ONLY: Permission[] = PERMISSIONS.filter((p) => p.endsWith(':read'));
 const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
   owner: new Set(PERMISSIONS),
   manager: new Set(PERMISSIONS.filter((p) => p !== 'tenant:manage')),
+  // No purchasing: a cashier who can enter a purchase bill can inflate stock
+  // and create a payable, neither of which is a till function. They also do
+  // not get suppliers:read, because the supplier ledger is what the shop
+  // owes, not something a counter needs to see.
   cashier: new Set<Permission>([
     'tenant:read',
     'catalogue:read',
@@ -72,6 +104,10 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'day_close:read',
     'day_close:create',
     'stock:read',
+    // Needed to price a customer correctly at the till. Writing a list and
+    // approving a breach are both withheld — that is the point of the cap.
+    'price_lists:read',
+    'discount_policies:read',
     'numbering:read',
     'numbering:lease',
     'sync:read',

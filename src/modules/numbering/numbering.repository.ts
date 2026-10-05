@@ -125,8 +125,56 @@ export const numberingRepository = {
     );
   },
 
+  /**
+   * Any live series issuing `documentType` for an outlet in a financial year,
+   * whatever its counter scope.
+   *
+   * `findSeriesByScope` answers a narrower question — the series for one exact
+   * scope — and is the right one when continuing a known series. This one
+   * exists for provisioning: a shop that already numbers invoices per counter
+   * must not have an outlet-wide series created underneath it. Outlet-scoped
+   * rows sort first so the answer is stable when both exist.
+   */
+  findSeriesForDocumentType(
+    tx: Tx,
+    outletId: string,
+    documentType: string,
+    fyStartYear: number,
+  ): Promise<SeriesRow | undefined> {
+    return tx.one<SeriesRow>(
+      `SELECT ${SERIES_COLUMNS} ${SERIES_FROM}
+       WHERE s.deleted_at IS NULL AND s.is_active AND s.outlet_id = $1
+         AND s.document_type = $2 AND s.fy_start_year = $3
+       ORDER BY s.counter_id NULLS FIRST, s.created_at
+       LIMIT 1`,
+      [outletId, documentType, fyStartYear],
+    );
+  },
+
   async setNextSeq(tx: Tx, id: string, nextSeq: number): Promise<void> {
     await tx.query('UPDATE document_series SET next_seq = $2 WHERE id = $1', [id, nextSeq]);
+  },
+
+  /**
+   * Takes the next number from a series, server-side.
+   *
+   * Sales invoices lease blocks to devices because a till must number a bill
+   * with no network. Purchases, debit notes and the like are keyed in on a
+   * connected screen, so they can take a number directly — and should, since
+   * a lease that expires unused leaves a reported gap in the series for no
+   * reason.
+   *
+   * The UPDATE ... RETURNING is atomic: two concurrent entries are serialised
+   * by the row lock the update takes, so neither can read the same number.
+   */
+  async allocateSequence(tx: Tx, seriesId: string): Promise<number> {
+    const row = await tx.one<{ sequenceNo: number }>(
+      `UPDATE document_series SET next_seq = next_seq + 1
+       WHERE id = $1 RETURNING next_seq - 1 AS "sequenceNo"`,
+      [seriesId],
+    );
+    if (!row) throw new Error('series allocation returned no row');
+    return Number(row.sequenceNo);
   },
 
   async insertBlock(

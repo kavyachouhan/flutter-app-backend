@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
-import { gstin, nonEmpty, pan, shortCode, stateCode } from '../../lib/validators.js';
+import { gstin, isoDate, nonEmpty, pan, shortCode, stateCode } from '../../lib/validators.js';
 import { deviceInput } from '../auth/auth.schemas.js';
 
 const profileFields = {
@@ -9,6 +9,25 @@ const profileFields = {
   isGstRegistered: z.boolean(),
   gstin: gstin.nullable().optional(),
   isComposition: z.boolean().optional(),
+  /**
+   * What the business does under the composition scheme, which decides the
+   * flat rate: 1% for a trader or manufacturer, 5% for a restaurant, 6% for a
+   * service provider.
+   */
+  compositionCategory: z
+    .enum(['trader', 'manufacturer', 'restaurant', 'service'])
+    .nullable()
+    .optional(),
+  /**
+   * The rate actually used. Defaulted from the category but stored
+   * separately, because the notified rates change and a CMP-08 already filed
+   * must keep reporting the rate it was filed at.
+   */
+  compositionRatePercent: z.number().min(0).max(100).nullable().optional(),
+  /** Decides which periods exist to file at all. */
+  filingFrequency: z.enum(['monthly', 'qrmp']).optional(),
+  /** Supplies before this date are outside GST for this business. */
+  registrationEffectiveFrom: isoDate.nullable().optional(),
   pan: pan.nullable().optional(),
   stateCode,
   addressLine1: nonEmpty.nullable().optional(),

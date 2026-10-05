@@ -8,6 +8,10 @@
 export const ErrorCode = {
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   MALFORMED_REQUEST: 'MALFORMED_REQUEST',
+  /** The document carried a custom field key the tenant has not defined. */
+  CUSTOM_FIELD_UNKNOWN: 'CUSTOM_FIELD_UNKNOWN',
+  /** A defined custom field was missing, too long, or the wrong data type. */
+  CUSTOM_FIELD_INVALID: 'CUSTOM_FIELD_INVALID',
 
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
@@ -19,6 +23,13 @@ export const ErrorCode = {
 
   FORBIDDEN: 'FORBIDDEN',
   INSUFFICIENT_ROLE: 'INSUFFICIENT_ROLE',
+  /**
+   * An approval names someone who does not hold the permission the discount
+   * policy requires. Structural, so it is rejected rather than warned about:
+   * an approval from someone not entitled to give it is not evidence of
+   * anything, and storing it would make the audit trail say something untrue.
+   */
+  APPROVER_NOT_PERMITTED: 'APPROVER_NOT_PERMITTED',
   OUTLET_NOT_PERMITTED: 'OUTLET_NOT_PERMITTED',
   ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
 
@@ -46,12 +57,36 @@ export const ErrorCode = {
   INVOICE_NOT_RETURNABLE: 'INVOICE_NOT_RETURNABLE',
   /** A khata credit or partial refund needs a customer to carry the balance. */
   REFUND_REQUIRES_CUSTOMER: 'REFUND_REQUIRES_CUSTOMER',
+  /** This supplier invoice number has already been entered for this year. */
+  DUPLICATE_SUPPLIER_INVOICE: 'DUPLICATE_SUPPLIER_INVOICE',
+  /** The receipt would take a purchase order line past what was ordered. */
+  RECEIPT_EXCEEDS_ORDER: 'RECEIPT_EXCEEDS_ORDER',
+  /** The purchase order is cancelled or already fully received. */
+  PURCHASE_ORDER_CLOSED: 'PURCHASE_ORDER_CLOSED',
+  /** More units returned than remain unreturned on the purchase bill line. */
+  RETURN_EXCEEDS_BILL: 'RETURN_EXCEEDS_BILL',
+  /** The purchase bill is void and cannot be returned against or paid. */
+  BILL_NOT_RETURNABLE: 'BILL_NOT_RETURNABLE',
+  /** Allocations across bills exceed the payment, or a bill's outstanding. */
+  OVERALLOCATION: 'OVERALLOCATION',
+
   /** The counter already holds as many parked bills as the plan allows. */
   HELD_BILL_LIMIT_REACHED: 'HELD_BILL_LIMIT_REACHED',
   HELD_BILL_ALREADY_RELEASED: 'HELD_BILL_ALREADY_RELEASED',
   DAY_ALREADY_CLOSED: 'DAY_ALREADY_CLOSED',
   /** A later cash-up already exists, so this one would rewrite history. */
   DAY_CLOSE_OUT_OF_ORDER: 'DAY_CLOSE_OUT_OF_ORDER',
+
+  /** The spreadsheet carried more rows than IMPORT_MAX_ROWS. */
+  IMPORT_TOO_LARGE: 'IMPORT_TOO_LARGE',
+  /** The catalogue changed between analysis and apply; re-analyse before applying. */
+  IMPORT_STALE: 'IMPORT_STALE',
+  /** The job is not in a state that allows this step (e.g. analyse before ingest). */
+  IMPORT_WRONG_STATE: 'IMPORT_WRONG_STATE',
+  /** The file has no column that maps to a required field. */
+  IMPORT_COLUMN_UNMAPPED: 'IMPORT_COLUMN_UNMAPPED',
+  /** The uploaded file could not be read as a spreadsheet. */
+  IMPORT_UNREADABLE: 'IMPORT_UNREADABLE',
 
   /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',
@@ -76,6 +111,19 @@ export const WarningCode = {
   NEGATIVE_STOCK: 'NEGATIVE_STOCK',
   /** The drawer did not match the expectation by more than the tolerance. */
   CASH_VARIANCE_EXCEEDED: 'CASH_VARIANCE_EXCEEDED',
+  /**
+   * A discount on the document exceeds the shop's policy and no approval
+   * accompanied it. A warning rather than a rejection: the sale has already
+   * happened, and the device may have been offline when the cap was tightened.
+   * The breach is in `details` and in the discount-audit report.
+   */
+  DISCOUNT_CAP_EXCEEDED: 'DISCOUNT_CAP_EXCEEDED',
+  /**
+   * The price charged is not what the customer's price list says it should be.
+   * Never a rejection: the device priced from the list it held at the time, and
+   * the list may have moved since the sale.
+   */
+  PRICE_LIST_MISMATCH: 'PRICE_LIST_MISMATCH',
 } as const;
 
 export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];

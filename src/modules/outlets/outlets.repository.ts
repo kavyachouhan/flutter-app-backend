@@ -74,6 +74,23 @@ export const outletsRepository = {
     );
   },
 
+  /**
+   * The outlet a device belongs to when it has not been bound to one.
+   *
+   * A newly onboarded device has no outlet binding — onboarding creates the
+   * device and the outlet in the same transaction and does not link them — so
+   * anything that needs "where is this till" has to fall back to the default
+   * outlet, which is the only one a single-branch shop has.
+   */
+  findDefaultOutlet(tx: Tx): Promise<OutletRow | undefined> {
+    return tx.one<OutletRow>(
+      `SELECT ${OUTLET_COLUMNS} FROM outlets
+       WHERE deleted_at IS NULL AND is_active
+       ORDER BY is_default DESC, created_at
+       LIMIT 1`,
+    );
+  },
+
   findOutlet(tx: Tx, id: string, forUpdate = false): Promise<OutletRow | undefined> {
     return tx.one<OutletRow>(
       `SELECT ${OUTLET_COLUMNS} FROM outlets WHERE id = $1 AND deleted_at IS NULL ${lock(forUpdate)}`,

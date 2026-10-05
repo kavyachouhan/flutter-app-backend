@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
+import { discountApproval } from '../price-lists/price-lists.schemas.js';
 import {
+  declaredSupplyType,
   hsnCode,
   isoDate,
   nonEmpty,
@@ -9,6 +11,7 @@ import {
   positivePaise,
   quantity,
   stateCode,
+  supplyCategory,
   timestamp,
 } from '../../lib/validators.js';
 
@@ -31,6 +34,8 @@ const line = z
     // Validated by the tax engine against the tenant's tax mode rather than here.
     taxRatePercent: z.number().nonnegative(),
     cessRatePercent: z.number().nonnegative().optional(),
+    /** Omitted, the item's own classification applies, then `taxable`. */
+    supplyCategory: supplyCategory.optional(),
   })
   .refine((l) => l.itemId || l.itemName, {
     message: 'itemName is required without itemId',
@@ -65,6 +70,13 @@ export const createInvoiceBody = z.object({
   issuedAt: timestamp,
   customerId: z.string().uuid().nullable().optional(),
   placeOfSupplyStateCode: stateCode.optional(),
+  /**
+   * Declares an export or SEZ supply, which no state code implies. Omitted,
+   * the supply type is derived from the place of supply.
+   */
+  supplyType: declaredSupplyType.optional(),
+  /** Reverse charge: the recipient pays the tax, so this document carries none. */
+  isReverseCharge: z.boolean().optional(),
   pricesIncludeTax: z.boolean(),
   roundOff: z.boolean(),
   lines: z.array(line).nonempty(),
@@ -75,6 +87,13 @@ export const createInvoiceBody = z.object({
   notes: nonEmpty.optional(),
   /** Values for the tenant's user-defined fields (PO no, vehicle no...); write-once. */
   customFields: z.record(z.string()).optional(),
+  /**
+   * Approvals for discounts that breach the shop's policy, captured at the
+   * till and travelling with the document so the authority and the discount
+   * commit together. The server checks each named approver actually holds the
+   * permission the policy requires.
+   */
+  discountApprovals: z.array(discountApproval).max(50).optional(),
   /** The device's own computation, re-checked on the server. */
   expectedTotals: z.object({
     grandTotal: z.number().int(),

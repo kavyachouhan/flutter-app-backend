@@ -5,7 +5,7 @@
 > backend developer or AI session continuing the build. Load it first; it
 > records what exists, what it does, and what has deliberately not been built.
 >
-> **State as of 18 September 2026.** Contains no secrets.
+> **State as of 5 October 2026.** Contains no secrets.
 
 ---
 
@@ -35,10 +35,17 @@ Programme plan: `~/.claude/plans/role-you-are-wise-whisper.md`.
 | M5         | Credit notes and returns, refunds, GSTR-1 gap view across types      | ✅                                                            |
 | M6         | Held bills, expenses, day close                                      | ✅                                                            |
 | M7         | Reports kernel and thirteen reports                                  | ✅                                                            |
-| M8         | Print payloads, templates, custom fields                             | 🚧 pure domain written (`src/domain/print/`), no endpoint yet |
+| M8         | Print payloads, templates, custom fields                             | ✅                                                            |
 | M9         | Outbox, idempotency middleware, WhatsApp, alerts                     | ⏳                                                            |
-| M10        | Bulk import/export, barcode labels                                   | ⏳ → P0 complete                                              |
-| M11–M21    | P1, P2, P3                                                           | ⏳                                                            |
+| M10        | Bulk import/export, barcode labels                                   | ✅                                                            |
+| M11        | Purchases, suppliers, POs, debit notes, landed cost                  | ✅                                                            |
+| M11 cont.  | Series auto-provisioned on first pull; debit notes synced and `restock` persisted | ✅                                        |
+| Plans      | Named plans (`lite`/`standard`/`pro`/`trial`) in `plans.ts`; report gating moved onto the registry | ✅                       |
+| Supply class. | `supply_category` per line, reverse charge, export/SEZ supply types; tax vectors regenerated | ✅                         |
+| M12        | Price lists, bulk price revision, discount caps with approval audit  | ✅ (bank accounts and UPI still ⏳)                            |
+| M13        | GSTR-1/3B workings, GSTR-2B reconciliation, ITC register, composition | ✅ (storefront still ⏳)                                      |
+| M13 cont.  | Reports expanded to 39, with generic CSV export                      | ✅                                                            |
+| M14–M21    | P1 remainder, P2, P3                                                 | ⏳                                                            |
 
 | Flutter milestone | What it delivered                                              | State     |
 | ----------------- | -------------------------------------------------------------- | --------- |

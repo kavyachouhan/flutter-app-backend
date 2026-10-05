@@ -2,7 +2,8 @@ import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
-import type { TaxMode } from '../../domain/tax/types.js';
+import type { SupplyCategory, TaxMode } from '../../domain/tax/types.js';
+import { capBreaches } from '../../domain/pricing/resolve.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   ConflictError,
@@ -23,6 +24,13 @@ import { numberingRepository } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { validateCustomFields } from '../print/custom-fields.js';
+import { purchasesRepository } from '../purchases/purchases.repository.js';
+import { hasPermission, type Permission } from '../auth/permissions.js';
+import { membersRepository } from '../members/members.repository.js';
+import { discountsRepository } from '../price-lists/discounts.repository.js';
+import { effectivePolicyFor, resolveLinePrices } from '../price-lists/price-lists.service.js';
+import { costOfGoodsSold } from '../../domain/costing/moving-average.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
@@ -100,6 +108,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
       : undefined;
     if (body.customerId && !customer) throw new NotFoundError('Customer');
 
+    // Before the bag becomes part of an immutable document. A device that
+    // billed offline against a field definition since deleted gets a clear
+    // rejection naming the key, rather than an invoice that cannot be printed
+    // with a proper label.
+    await validateCustomFields(tx, 'invoice', body.customFields);
+
     // Deleted items are still resolved: an item removed after an offline sale
     // must not block that sale from uploading.
     const itemIds = [...new Set(body.lines.flatMap((l) => (l.itemId ? [l.itemId] : [])))];
@@ -112,11 +126,19 @@ export async function createInvoice(body: CreateInvoiceBody) {
 
     const itemFor = (itemId: string | null | undefined) => (itemId ? items.get(itemId) : undefined);
 
+    // What the line says, then what the catalogue says, then taxable. The
+    // line wins because a till may know something the catalogue does not —
+    // the same good sold exempt to one buyer and taxable to another.
+    const categoryFor = (line: (typeof body.lines)[number]): SupplyCategory =>
+      line.supplyCategory ?? itemFor(line.itemId)?.supplyCategory ?? 'taxable';
+
     const totals = computeInvoice(
       {
         mode: taxModeFor(settings),
         supplierStateCode: outlet.stateCode ?? settings.stateCode,
         placeOfSupplyStateCode: body.placeOfSupplyStateCode ?? customer?.stateCode ?? undefined,
+        supplyType: body.supplyType,
+        isReverseCharge: body.isReverseCharge,
         pricesIncludeTax: body.pricesIncludeTax,
         roundOff: body.roundOff,
         billDiscount: body.billDiscount,
@@ -129,6 +151,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
           cessRatePercent: l.cessRatePercent,
           discount: l.discount,
           hsnCode: l.hsnCode ?? itemFor(l.itemId)?.hsnCode ?? undefined,
+          supplyCategory: categoryFor(l),
         })),
       },
       { allowedGstRates: env.GST_ALLOWED_RATES },
@@ -172,6 +195,28 @@ export async function createInvoice(body: CreateInvoiceBody) {
       );
     }
 
+    // The moving average in force right now. It is snapshotted onto each line
+    // below, so margin reads a historical fact rather than being recomputed
+    // against whatever the item costs today — the bug that made Daily P&L
+    // restate itself every time a buying price moved. The margin cap below
+    // needs the same figures, so it is read once, here, before either.
+    const costs = await purchasesRepository.costsFor(
+      tx,
+      body.outletId,
+      body.lines.flatMap((l) => (l.itemId ? [l.itemId] : [])),
+    );
+
+    // What the customer's price list says each line should have cost. The
+    // device priced from the list it held, so a difference is reported, never
+    // corrected: rewriting the figure would make the stored invoice disagree
+    // with the bill the customer is holding.
+    const expectedPrices = await resolveLinePrices(tx, {
+      outletId: body.outletId,
+      customerId: customer?.id ?? null,
+      documentDate: body.documentDate,
+      lines: body.lines.map((l) => ({ id: l.id, itemId: l.itemId, quantity: l.quantity })),
+    });
+
     const warnings: Warning[] = [];
     if (
       customer &&
@@ -186,6 +231,61 @@ export async function createInvoice(body: CreateInvoiceBody) {
           balanceAfter: customer.balance + creditAmount,
         },
       });
+    }
+
+    // Discount caps. The till holds the policy and runs the same pure check,
+    // so by the time a bill reaches here it either respected the cap or
+    // carries an approval. The server re-runs the check anyway — that is what
+    // makes a fabricated approval, or a device running a stale policy,
+    // visible — and reports what it finds as a warning. Rejecting would
+    // strand a sale that has already happened, which is the one thing an
+    // offline till cannot recover from.
+    const { policy, approverPermission } = await effectivePolicyFor(tx, body.outletId);
+    const breaches = capBreaches({
+      policy,
+      grossAmount: totals.grossAmount,
+      billDiscount: totals.billDiscount,
+      lines: totals.lines.map((line, index) => {
+        const source = body.lines[index];
+        const avgCost = source?.itemId ? costs.get(source.itemId) : undefined;
+        return {
+          id: line.id,
+          grossAmount: line.grossAmount,
+          lineDiscount: line.lineDiscount,
+          billDiscountShare: line.apportionedBillDiscount,
+          costAmount:
+            avgCost === undefined || !source
+              ? undefined
+              : costOfGoodsSold(avgCost, source.quantity),
+        };
+      }),
+    });
+
+    const approvals = body.discountApprovals ?? [];
+    const approvedKinds = new Set(approvals.map((approval) => approval.breachKind));
+    const unapproved = breaches.filter((breach) => !approvedKinds.has(breach.kind));
+    if (unapproved.length > 0) {
+      warnings.push({
+        code: WarningCode.DISCOUNT_CAP_EXCEEDED,
+        details: { breaches: unapproved },
+      });
+    }
+
+    const mispriced = body.lines.flatMap((line) => {
+      const expected = expectedPrices.get(line.id);
+      if (!expected || expected.unitPrice === line.unitPrice) return [];
+      return [
+        {
+          lineId: line.id,
+          charged: line.unitPrice,
+          expected: expected.unitPrice,
+          source: expected.source,
+          priceListId: expected.priceListId ?? null,
+        },
+      ];
+    });
+    if (mispriced.length > 0) {
+      warnings.push({ code: WarningCode.PRICE_LIST_MISMATCH, details: { lines: mispriced } });
     }
 
     const documentNumber = formatDocumentNumber(
@@ -226,7 +326,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
       const computed = totals.lines[index];
       if (!computed) throw new InternalError('Tax engine returned fewer lines than it was given.');
       const item = itemFor(l.itemId);
+      const avgCost = l.itemId ? costs.get(l.itemId) : undefined;
       return {
+        // Undefined, not zero, when the item has never been purchased
+        // through the system: reports must show margin as unknown rather
+        // than as total profit.
+        cogsAmount: avgCost === undefined ? null : costOfGoodsSold(avgCost, l.quantity),
         id: l.id,
         lineNo: index + 1,
         itemId: l.itemId ?? null,
@@ -247,6 +352,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
         igst: computed.igst,
         cess: computed.cess,
         lineTotal: computed.lineTotal,
+        supplyCategory: computed.supplyCategory,
+        // Which list priced the line, and whether the list or the item
+        // decided it. Stored for the same reason cogsAmount is: a margin or
+        // discount report must read what was true at the sale.
+        priceListId: expectedPrices.get(l.id)?.priceListId ?? null,
+        priceSource: expectedPrices.get(l.id)?.source ?? null,
       };
     });
     await invoicesRepository.insertLines(tx, body.id, body.outletId, body.documentDate, lineRows);
@@ -279,6 +390,16 @@ export async function createInvoice(body: CreateInvoiceBody) {
       )) {
         warnings.push({ code: WarningCode.NEGATIVE_STOCK, details: balance });
       }
+
+      // Keeps item_costs.quantity_on_hand in step with stock_balances. The
+      // average itself does not move on a sale — only a purchase changes
+      // what goods cost — but the quantity has to, or the next receipt
+      // would blend against a stale pool.
+      await purchasesRepository.adjustCostQuantity(
+        tx,
+        body.outletId,
+        stockLines.map((s) => ({ itemId: s.itemId, quantityDelta: -s.quantity })),
+      );
     }
 
     if (tenders.length > 0) {
@@ -328,6 +449,40 @@ export async function createInvoice(body: CreateInvoiceBody) {
 
     await numberingRepository.markConsumed(tx, block.id, body.sequenceNo);
 
+    // Written after the header, so the foreign key holds and the approval can
+    // never exist without the invoice it authorised.
+    for (const approval of approvals) {
+      const approver = await membersRepository.findByUser(tx, approval.approvedBy);
+      // Rejected, not warned about: an approval from someone not entitled to
+      // give it is not evidence of anything, and storing it would make the
+      // trail assert something untrue. This is a structural problem a device
+      // cannot have been right about, which is the line the warning
+      // mechanism draws.
+      if (!approver?.isActive || !hasPermission(approver.role, approverPermission as Permission)) {
+        throw new UnprocessableError(
+          'The named approver cannot authorise a discount.',
+          ErrorCode.APPROVER_NOT_PERMITTED,
+          { details: { approvedBy: approval.approvedBy, required: approverPermission } },
+        );
+      }
+      await discountsRepository.insertApproval(tx, {
+        id: approval.id,
+        outletId: body.outletId,
+        invoiceId: body.id,
+        invoiceLineId: approval.invoiceLineId ?? null,
+        breachKind: approval.breachKind,
+        requestedValue: approval.requestedValue,
+        allowedValue: approval.allowedValue,
+        requestedBy: auth.userId,
+        approvedBy: approval.approvedBy,
+        // The role at the time. Memberships change, and "was this person
+        // entitled to approve it then" has to stay answerable afterwards.
+        approverRole: approver.role,
+        reason: approval.reason ?? null,
+        approvedAt: approval.approvedAt,
+      });
+    }
+
     // Sales are the events an owner most wants to see in the trail; auditing
     // only voids would leave the log unable to answer "who billed what".
     await recordAudit(tx, {
@@ -341,6 +496,28 @@ export async function createInvoice(body: CreateInvoiceBody) {
         outletId: body.outletId,
       },
     });
+
+    // A separate entry, and only when something was actually discounted. The
+    // issued entry above carries no discount figures, which is why no
+    // discount audit was possible before: the trail knew a sale happened but
+    // not that margin had left with it.
+    if (totals.totalDiscount > 0 || breaches.length > 0) {
+      await recordAudit(tx, {
+        action: 'invoice.discounted',
+        entityType: 'invoice',
+        entityId: body.id,
+        metadata: {
+          documentNumber,
+          lineDiscountTotal: totals.totalLineDiscount,
+          billDiscount: totals.billDiscount,
+          totalDiscount: totals.totalDiscount,
+          grandTotal: totals.grandTotal,
+          breaches,
+          approvedBy: approvals.map((approval) => approval.approvedBy),
+          outletId: body.outletId,
+        },
+      });
+    }
 
     return { invoice: await loadInvoice(tx, body.id), warnings, replayed: false };
   });

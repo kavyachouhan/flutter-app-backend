@@ -5,7 +5,6 @@
  * boundary, the range limit, the row cap, the plan gate and the totals row.
  * A report definition only says what to select.
  */
-import { env } from '../../config/env.js';
 import { withReadTransaction } from '../../db/tx.js';
 import { NotFoundError, ForbiddenError, ErrorCode, ValidationError } from '../../lib/errors.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
@@ -20,13 +19,6 @@ import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { REPORTS, findReport } from './reports.registry.js';
 import { resolveReportParams, type ReportParamsQuery } from './reports.filters.js';
 import type { ReportDefinition, ReportResult, ReportRow } from './reports.types.js';
-
-const FREE_REPORT_IDS = new Set(env.PLAN_FREE_REPORT_IDS ?? []);
-
-/** Free-plan reports are listed by id; everything else needs `reports.all`. */
-function isFree(report: ReportDefinition): boolean {
-  return FREE_REPORT_IDS.has(report.id);
-}
 
 function businessDateIn(timezone: string, at: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -63,7 +55,7 @@ export function listReports(): Promise<ReportCatalogueEntry[]> {
       description: report.description,
       group: report.group,
       filters: report.filters,
-      locked: !isFree(report) && !hasFeature(subscription.features, 'reports.all'),
+      locked: report.feature !== undefined && !hasFeature(subscription.features, report.feature),
       restricted: report.permission !== undefined && !hasPermission(auth.role, report.permission),
     }));
   });
@@ -95,7 +87,9 @@ export function runReport(reportId: string, query: ReportParamsQuery): Promise<R
   }
 
   return withReadTransaction(async (tx) => {
-    if (!isFree(report)) await assertFeature(tx, 'reports.all');
+    // Each definition names its own gate, so adding a report to a tier is a
+    // one-line change where the report is declared.
+    if (report.feature) await assertFeature(tx, report.feature);
 
     const settings = await tenantsRepository.getSettings(tx);
     const params = resolveReportParams(

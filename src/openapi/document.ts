@@ -22,6 +22,15 @@ import '../modules/numbering/numbering.openapi.js';
 import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
+import '../modules/suppliers/suppliers.openapi.js';
+import '../modules/purchases/purchases.openapi.js';
+import '../modules/debit-notes/debit-notes.openapi.js';
+import '../modules/price-lists/price-lists.openapi.js';
+import '../modules/gst/gst.openapi.js';
+import '../modules/print/print.openapi.js';
+import '../modules/uploads/uploads.openapi.js';
+import '../modules/imports/imports.openapi.js';
+import '../modules/exports/exports.openapi.js';
 import '../modules/stock/stock.openapi.js';
 import '../modules/operations/operations.openapi.js';
 import '../modules/reports/reports.openapi.js';
@@ -67,7 +76,38 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Invoices', description: 'Issuing, voiding and listing invoices.' },
       { name: 'Payments', description: 'Receipts against the khata and their allocations.' },
       { name: 'Credit notes', description: 'Returns and corrections against issued invoices.' },
+      { name: 'Suppliers', description: 'Supplier master, payables ledger and ageing.' },
+      {
+        name: 'Purchases',
+        description: 'Purchase orders, supplier bills, payments, and what stock really cost.',
+      },
+      { name: 'Debit notes', description: 'Returns and corrections against a purchase bill.' },
+      {
+        name: 'GST',
+        description:
+          'GSTR-1 and 3B workings, the input tax credit register, GSTR-2B reconciliation and CMP-08. Nothing here files a return on the shop’s behalf.',
+      },
+      {
+        name: 'Pricing',
+        description:
+          'Price lists per customer, bulk price revision, and the discount caps that stop margin leaving unchecked.',
+      },
+      {
+        name: 'Print settings',
+        description:
+          'Branding, templates and user-defined fields that shape every printed document.',
+      },
       { name: 'Stock', description: 'Balances, ledger and manual adjustments.' },
+      {
+        name: 'Uploads',
+        description: 'Signed URLs for files, which never pass through this API.',
+      },
+      {
+        name: 'Imports',
+        description: 'Bulk catalogue import: upload, review the diff, then apply.',
+      },
+      { name: 'Exports', description: 'Spreadsheet extracts of the shop’s own data.' },
+      { name: 'Labels', description: 'Barcode shelf-label data, rendered by the client.' },
       {
         name: 'Operations',
         description: 'Parked bills, expenses and the day’s cash-up.',

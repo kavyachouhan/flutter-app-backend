@@ -151,6 +151,7 @@ export function createItem(body: CreateItemBody) {
       pricesIncludeTax: body.pricesIncludeTax ?? settings.defaultPricesIncludeTax,
       trackStock,
       reorderLevel: body.reorderLevel ?? null,
+      supplyCategory: body.supplyCategory ?? 'taxable',
       isActive: body.isActive ?? true,
     });
     if (body.barcodes) await catalogueRepository.replaceBarcodes(tx, body.id, body.barcodes);

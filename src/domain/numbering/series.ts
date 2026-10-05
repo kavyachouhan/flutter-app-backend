@@ -127,6 +127,48 @@ export function maxSequenceFor(format: SeriesFormat, fy: FinancialYear, maxLengt
   return Math.min(10 ** digits - 1, Number.MAX_SAFE_INTEGER);
 }
 
+/**
+ * Picks the richest default format that still fits inside the legal length.
+ *
+ * GST rule 46(b) caps a document number at 16 characters, and the obvious
+ * default — prefix, outlet code, financial year, four digits — does not fit:
+ * `INV/MAIN/26-27/0001` is nineteen. A shop that has never opened the
+ * numbering screen must still be able to bill, so a provisioning path cannot
+ * assume its preferred format works and cannot fail if it does not.
+ *
+ * Order of preference, most informative first:
+ *   1. prefix / outlet / year / seq   — only asked for when outlets differ
+ *   2. prefix / outlet / seq          — drops the year; the date implies it
+ *   3. prefix / year / seq
+ *   4. prefix / seq
+ *
+ * The outlet code is kept ahead of the year whenever it was asked for, because
+ * dropping it is the one change that can make two branches of one GSTIN issue
+ * the same number — which is a filing problem, where a missing year segment is
+ * only a readability one.
+ */
+export function pickFittingFormat(
+  base: SeriesFormat,
+  fy: FinancialYear,
+  rules: NumberingRules,
+): SeriesFormat {
+  const candidates: SeriesFormat[] = [
+    base,
+    { ...base, includeFinancialYear: false },
+    { ...base, outletCode: undefined, counterCode: undefined },
+    { ...base, outletCode: undefined, counterCode: undefined, includeFinancialYear: false },
+  ];
+  for (const candidate of candidates) {
+    if (maxSequenceFor(candidate, fy, rules.maxLength) >= rules.minSequenceHeadroom) {
+      return candidate;
+    }
+  }
+  // Every candidate overflows, which means the prefix or the outlet code alone
+  // is too long. Return the shortest so the caller fails with the actionable
+  // message from validateSeriesFormat rather than an arbitrary one.
+  return candidates[candidates.length - 1] as SeriesFormat;
+}
+
 export function validateSeriesFormat(
   format: SeriesFormat,
   fy: FinancialYear,

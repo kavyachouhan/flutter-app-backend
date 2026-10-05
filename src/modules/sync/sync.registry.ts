@@ -84,11 +84,29 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   ]),
   table('payment_allocations', ['id'], false, ['invoice.create', 'payment.create']),
   table('customer_ledger_entries', ['id'], false),
+  // Pull-only, and mandatory rather than optional: a till cannot price a
+  // wholesale customer offline without the lists, and cannot enforce a cap it
+  // has never seen. The policy rows are small and change rarely.
+  table('price_lists', ['id'], true),
+  table('price_list_items', ['price_list_id', 'item_id', 'min_quantity'], true),
+  table('discount_policies', ['id'], true),
+  // Pushed with the invoice that carries the discount, never on its own, so
+  // there is no operation type of its own — `invoice.create` writes it.
+  table('discount_approvals', ['id'], false),
+  // Pull-only. A supplier return is keyed in on a connected screen, so the
+  // device never originates one — but it must see them, or a till shows stock
+  // it no longer has and a reorder suggestion built on it is wrong.
+  table('debit_notes', ['id'], false),
+  table('debit_note_lines', ['id'], false),
   table('stock_ledger_entries', ['id'], false, ['stock.adjust']),
   table('stock_balances', ['outlet_id', 'item_id'], false),
   // A parked bill is shared across the counter's devices on purpose: a
   // cashier going home must not strand a customer's bill on their phone.
   table('held_bills', ['id'], true, ['held_bill.upsert', 'held_bill.release']),
+  // Deliberately absent: gst_return_periods, itc_register, gstr2b_*. A return
+  // is prepared and filed on a connected screen by whoever does the books, and
+  // a till has no use for an ITC register — syncing it would push a shop's tax
+  // position onto every phone for nothing.
   table('expense_categories', ['id'], true),
   table('expenses', ['id'], false, ['expense.create', 'expense.void']),
   table('day_closes', ['id'], false, ['day_close.create']),

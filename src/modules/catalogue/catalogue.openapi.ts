@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { idParams } from '../../lib/validators.js';
-import { errorResponses } from '../../openapi/common.js';
+import { errorResponses, supplyCategorySchema } from '../../openapi/common.js';
 import {
   accessTokenSecurity,
   dataEnvelope,
@@ -53,6 +53,7 @@ export const itemSchema = registry.register(
     pricesIncludeTax: z.boolean(),
     trackStock: z.boolean(),
     reorderLevel: quantity.nullable(),
+    supplyCategory: supplyCategorySchema,
     isActive: z.boolean(),
     barcodes: z.array(z.string()),
     createdAt: timestamp,

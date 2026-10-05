@@ -3,6 +3,7 @@ import { idParams } from '../../lib/validators.js';
 import {
   documentStatusSchema,
   errorResponses,
+  supplyCategorySchema,
   supplyTypeSchema,
   taxModeSchema,
 } from '../../openapi/common.js';
@@ -62,6 +63,7 @@ export const creditNoteLineSchema = registry.register(
     igst: paise,
     cess: paise,
     lineTotal: paise,
+    supplyCategory: supplyCategorySchema,
   }),
 );
 
@@ -104,6 +106,7 @@ export const creditNoteSchema = registry.register(
     placeOfSupplyStateCode: z.string().nullable(),
     taxMode: taxModeSchema,
     supplyType: supplyTypeSchema,
+    isReverseCharge: z.boolean(),
     pricesIncludeTax: z.boolean(),
     roundOffEnabled: z.boolean(),
     grossAmount: paise,

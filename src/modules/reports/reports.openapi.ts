@@ -89,12 +89,33 @@ registry.registerPath({
   path: '/v1/reports/{reportId}',
   tags: ['Reports'],
   summary: 'Run a report',
-  description:
-    'One envelope for every report: a column schema and rows keyed by it, so one widget renders all of them and CSV export is generic. Results are scoped to the outlets the member may see, capped by row count and date range.',
+  description: [
+    'One envelope for every report: a column schema and rows keyed by it, so one widget renders',
+    'all of them. Results are scoped to the outlets the member may see, and capped by row count',
+    'and date range.',
+    '',
+    'Pass `format=csv` for the same report as a file. The conversion is generic — it reads the',
+    'column `kind` and nothing else — so every report exports without its own code. Money and',
+    'quantity columns are converted to rupees and units there, since a spreadsheet is read by a',
+    'person rather than by a client that knows the scales.',
+    '',
+    'Not every report is in every plan, and some are withheld from a cashier whatever the plan',
+    'says. `GET /v1/reports` reports both per report, so the client can show an upsell instead of',
+    'discovering a 402 after the user has picked a date range.',
+  ].join(String.fromCharCode(10)),
   security: accessTokenSecurity,
-  request: { params: reportIdParams, query: reportParamsQuery },
+  request: {
+    params: reportIdParams,
+    query: reportParamsQuery.extend({ format: z.enum(['json', 'csv']).optional() }),
+  },
   responses: {
-    200: jsonResponse('Rendered report.', dataEnvelope(reportResultSchema)),
+    200: {
+      description: 'Rendered report, as JSON or as a CSV attachment.',
+      content: {
+        'application/json': { schema: dataEnvelope(reportResultSchema) },
+        'text/csv': { schema: z.string() },
+      },
+    },
     ...errorResponses(402),
   },
 });

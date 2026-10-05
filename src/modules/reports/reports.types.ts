@@ -18,7 +18,22 @@ export interface ReportColumn {
 }
 
 export type FilterName =
-  'outletId' | 'from' | 'to' | 'customerId' | 'categoryId' | 'itemId' | 'mode' | 'limit';
+  | 'outletId'
+  | 'from'
+  | 'to'
+  | 'customerId'
+  | 'categoryId'
+  | 'itemId'
+  | 'mode'
+  | 'limit'
+  | 'supplierId'
+  /** A GST registration. Filing is per GSTIN, so compliance reports scope by it. */
+  | 'gstin'
+  | 'userId'
+  | 'counterId'
+  | 'priceListId'
+  | 'hsnCode'
+  | 'taxRatePercent';
 
 /** Which outlets the caller may see, resolved once by the kernel. */
 export interface ReportScope {
@@ -38,6 +53,13 @@ export interface ReportParams {
   readonly categoryId: string | undefined;
   readonly itemId: string | undefined;
   readonly mode: string | undefined;
+  readonly supplierId: string | undefined;
+  readonly gstin: string | undefined;
+  readonly userId: string | undefined;
+  readonly counterId: string | undefined;
+  readonly priceListId: string | undefined;
+  readonly hsnCode: string | undefined;
+  readonly taxRatePercent: number | undefined;
   readonly limit: number;
   /** The tenant's timezone, for reports that group by business day. */
   readonly timezone: string;

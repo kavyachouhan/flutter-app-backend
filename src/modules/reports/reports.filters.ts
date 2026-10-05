@@ -14,6 +14,13 @@ export const reportParamsQuery = z.object({
   categoryId: z.string().uuid().optional(),
   itemId: z.string().uuid().optional(),
   mode: nonEmpty.optional(),
+  supplierId: z.string().uuid().optional(),
+  gstin: nonEmpty.optional(),
+  userId: z.string().uuid().optional(),
+  counterId: z.string().uuid().optional(),
+  priceListId: z.string().uuid().optional(),
+  hsnCode: nonEmpty.optional(),
+  taxRatePercent: z.coerce.number().nonnegative().optional(),
   limit: z.coerce.number().int().positive().optional(),
 });
 export type ReportParamsQuery = z.infer<typeof reportParamsQuery>;
@@ -69,6 +76,13 @@ export function resolveReportParams(
     categoryId: query.categoryId,
     itemId: query.itemId,
     mode: query.mode,
+    supplierId: query.supplierId,
+    gstin: query.gstin,
+    userId: query.userId,
+    counterId: query.counterId,
+    priceListId: query.priceListId,
+    hsnCode: query.hsnCode,
+    taxRatePercent: query.taxRatePercent,
     limit: Math.min(query.limit ?? env.REPORT_MAX_ROWS, env.REPORT_MAX_ROWS),
     timezone,
   };
@@ -87,6 +101,24 @@ export function outletScope(p: Params, alias: string, params: ReportParams): str
   const requested = p.add(params.scope.outletId ?? null);
   return `(${permitted}::uuid[] IS NULL OR ${alias}.outlet_id = ANY(${permitted}::uuid[]))
       AND (${requested}::uuid IS NULL OR ${alias}.outlet_id = ${requested}::uuid)`;
+}
+
+/**
+ * The GSTIN boundary, for the compliance group.
+ *
+ * Filing is per registration, not per business: a shop trading in two states
+ * holds a GSTIN per state and files separately for each. Reading a GST report
+ * across both would merge two registrations into one wrong figure, so these
+ * reports scope by the GSTIN snapshotted on the document — the only value that
+ * stays right after a registration changes.
+ *
+ * With no GSTIN named, every document the business issued is in scope, which
+ * is correct for a single-registration shop and obvious enough to spot for one
+ * with two.
+ */
+export function gstinScope(p: Params, alias: string, params: ReportParams): string {
+  const gstin = p.add(params.gstin ?? null);
+  return `(${gstin}::text IS NULL OR ${alias}.supplier_gstin = ${gstin}::text)`;
 }
 
 /** A half-open window on a `timestamptz` column, in the shop's own day. */
