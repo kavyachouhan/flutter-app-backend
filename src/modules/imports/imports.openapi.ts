@@ -95,9 +95,7 @@ registry.registerPath({
     201: jsonResponse(
       'Upload the file to `uploadUrl`, then call ingest.',
       dataEnvelope(
-        z.object({
-          id: uuid,
-          kind: z.string(),
+        importProgress.extend({
           objectKey: z.string(),
           uploadUrl: z.string().url(),
           expiresAt: timestamp,

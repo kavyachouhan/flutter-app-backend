@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 
 export const IMPORT_KINDS = ['items'] as const;
@@ -10,6 +11,7 @@ export const IMPORT_KINDS = ['items'] as const;
  * never leave `ingested`.
  */
 export const createImportBody = z.object({
+  id: clientId.optional(),
   kind: z.enum(IMPORT_KINDS),
   contentType: z.enum([
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
