@@ -352,8 +352,8 @@ async function runOperation(
     const appError = isAppError(error)
       ? error
       : new AppError(500, ErrorCode.INTERNAL, 'An unexpected error occurred.', { cause: error });
-    if (!isAppError(error))
-      log.error({ err: error, opId: op.opId, type: op.type }, 'Sync op crashed');
+    if (!isAppError(error) || error.statusCode >= 500)
+      log.error({ err: error, opId: op.opId, type: op.type }, 'Sync op failed');
     return {
       ...base,
       status: 'rejected',
