@@ -101,8 +101,8 @@ export async function createImport(body: CreateImportBody) {
   // spent waiting rather than working.
   const upload = await signUpload('import', body.contentType, body.sizeBytes);
 
-  const id = randomUUID();
-  await withTransaction(async (tx) => {
+  const id = body.id ?? randomUUID();
+  const createdJob = await withTransaction(async (tx) => {
     await importsRepository.insertJob(tx, {
       id,
       kind: body.kind,
@@ -110,9 +110,10 @@ export async function createImport(body: CreateImportBody) {
       originalFilename: body.originalFilename ?? null,
       createdBy: auth.userId,
     });
+    return loadJob(tx, id);
   });
 
-  return { id, kind: body.kind, ...upload };
+  return { ...progressOf(createdJob), ...upload };
 }
 
 // ---------------------------------------------------------------------------
