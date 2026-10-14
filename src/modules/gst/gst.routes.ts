@@ -79,7 +79,7 @@ gstRouter.get(
     const result = await exportService.exportPeriod(params.id, query.format);
     // Signed here rather than in the service, so the service stays testable
     // without a storage round trip — as with the spreadsheet exporter.
-    const link = await signDownload(result.objectKey);
+    const link = await signDownload(result.objectKey, result.filename);
     res.json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
   },
 );

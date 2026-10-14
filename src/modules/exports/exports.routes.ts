@@ -20,7 +20,7 @@ exportsRouter.post('/', requirePermission('reports:read'), validate(create), asy
   const result = await exportsService.createExport(body);
   // Signed here rather than in the service so the service stays testable
   // without a storage round trip.
-  const link = await signDownload(result.objectKey);
+  const link = await signDownload(result.objectKey, result.filename);
   res.status(201).json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
 });
 

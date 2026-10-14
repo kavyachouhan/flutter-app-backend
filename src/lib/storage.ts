@@ -222,7 +222,10 @@ export async function signUpload(
 }
 
 /** A short-lived read URL. The caller must have checked the key's ownership. */
-export async function signDownload(objectKey: string): Promise<SignedDownload> {
+export async function signDownload(
+  objectKey: string,
+  downloadFilename?: string,
+): Promise<SignedDownload> {
   assertKeyBelongsToTenant(objectKey);
 
   const response = await call(
@@ -230,15 +233,23 @@ export async function signDownload(objectKey: string): Promise<SignedDownload> {
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ expiresIn: env.STORAGE_DOWNLOAD_URL_TTL_SECONDS }),
+      body: JSON.stringify({
+        expiresIn: env.STORAGE_DOWNLOAD_URL_TTL_SECONDS,
+        ...(downloadFilename ? { download: downloadFilename } : {}),
+      }),
     },
   );
 
   const body = (await response.json()) as { signedURL?: string };
   if (!body.signedURL) throw new DependencyError('object storage');
 
+  let url = `${storageBase()}${body.signedURL.startsWith('/') ? '' : '/'}${body.signedURL}`;
+  if (downloadFilename && !url.includes('download=')) {
+    url += `${url.includes('?') ? '&' : '?'}download=${encodeURIComponent(downloadFilename)}`;
+  }
+
   return {
-    url: `${storageBase()}${body.signedURL.startsWith('/') ? '' : '/'}${body.signedURL}`,
+    url,
     expiresAt: expiryFrom(env.STORAGE_DOWNLOAD_URL_TTL_SECONDS),
   };
 }
