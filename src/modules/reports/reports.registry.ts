@@ -92,8 +92,8 @@ const datetime = (key: string, label: string): ReportColumn => ({
 export const REPORTS: readonly ReportDefinition[] = [
   {
     id: 'day-book',
-    title: 'Day book',
-    description: 'Every sale, return, collection and expense, in the order it happened.',
+    title: 'Day Book',
+    description: 'All transactions for the day: sales, returns, payments and expenses in order.',
     group: 'sales',
     filters: ['outletId', 'from', 'to', 'limit'],
     columns: [
@@ -108,8 +108,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'sales-summary',
-    title: 'Sales summary',
-    description: 'Turnover, tax, discount and returns for each day.',
+    title: 'Sales Summary',
+    description: 'Daily totals: sales, GST, discounts and returns.',
     group: 'sales',
     filters: ['outletId', 'from', 'to'],
     columns: [
@@ -126,8 +126,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'item-wise-sales',
-    title: 'Item-wise sales',
-    description: 'What sold, and what it earned. Best sellers first.',
+    title: 'Sales by Product',
+    description: 'See which products sold and how much each earned. Best sellers shown first.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'categoryId', 'itemId', 'limit'],
@@ -144,8 +144,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'category-wise-sales',
-    title: 'Category-wise sales',
-    description: 'Which parts of the shop earn their shelf space.',
+    title: 'Sales by Category',
+    description: 'Total sales broken down by product category.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to'],
@@ -160,8 +160,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'payment-mode-split',
-    title: 'Payment mode split',
-    description: 'Cash, card, UPI and the rest, net of refunds.',
+    title: 'Payments by Mode',
+    description: 'How much was collected via Cash, UPI, Card and Bank Transfer.',
     group: 'money',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to'],
@@ -177,8 +177,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'bill-register',
-    title: 'Bill register',
-    description: 'Every invoice issued, including voided ones, for reconciliation.',
+    title: 'All Bills',
+    description: 'Complete list of all bills issued, including cancelled ones.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'customerId', 'limit'],
@@ -196,8 +196,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'current-stock',
-    title: 'Current stock',
-    description: 'What is on the shelf, and what it is worth at cost.',
+    title: 'Current Stock',
+    description: 'Current stock levels and their value at purchase cost.',
     group: 'inventory',
     filters: ['outletId', 'categoryId', 'limit'],
     columns: [
@@ -213,8 +213,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'low-stock',
-    title: 'Low stock',
-    description: 'Items at or below their reorder level. The buying list.',
+    title: 'Low Stock Alert',
+    description: 'Products at or below reorder level - your restocking list.',
     group: 'inventory',
     filters: ['outletId', 'limit'],
     columns: [
@@ -229,9 +229,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'stock-movement',
-    title: 'Fast and dead stock',
-    description:
-      'Units sold against units still on the shelf. Stock with no sales is money standing still.',
+    title: 'Fast & Slow-Moving Stock',
+    description: 'Compare what sold fast vs what is sitting on the shelf.',
     group: 'inventory',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'limit'],
@@ -247,8 +246,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'customer-outstanding',
-    title: 'Customer outstanding',
-    description: 'Who owes money, with a 30/60/90 day ageing split.',
+    title: 'Customer Dues',
+    description: 'Which customers owe you money, aged by 30/60/90 days.',
     group: 'customers',
     filters: ['customerId', 'limit'],
     columns: [
@@ -265,8 +264,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'khata-statement',
-    title: 'Khata statement',
-    description: 'One customer’s account, as it would be handed over.',
+    title: 'Khata Statement',
+    description: 'Full account history for a single customer.',
     group: 'customers',
     feature: 'reports.all',
     filters: ['customerId', 'from', 'to', 'limit'],
@@ -282,8 +281,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'expense-summary',
-    title: 'Expense summary',
-    description: 'Where the money went, by category.',
+    title: 'Expense Summary',
+    description: 'Total expenses grouped by category.',
     group: 'money',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'categoryId'],
@@ -297,9 +296,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'daily-pnl',
-    title: 'Daily profit and loss',
+    title: 'Daily Profit & Loss',
     description:
-      'Sales less cost of goods and expenses, per day. Cost is the moving average in force when each sale was made, recorded on the line at the time. Lines sold before purchase bills existed fall back to the item’s current purchase price; “Cost basis” reads Estimated on any day where that happened.',
+      'Daily net profit after cost of goods and expenses.',
     group: 'money',
     feature: 'reports.all',
     // A cashier may run the day book; they may not see the shop's margin.
@@ -320,9 +319,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   // --- P1: who sold it, and what they gave away ----------------------------
   {
     id: 'cashier-wise-sales',
-    title: 'Cashier-wise sales',
+    title: 'Sales by Staff',
     description:
-      'Takings per person, with what they discounted and how many sales they voided. Voids count against whoever voided them, not whoever billed them — a cashier voiding their own sales is the pattern worth seeing.',
+      'Sales, discounts and voids per staff member.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'userId', 'limit'],
@@ -341,8 +340,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'counter-wise-sales',
-    title: 'Counter-wise sales',
-    description: 'Takings per till, to see which counter is carrying the shop.',
+    title: 'Sales by Counter',
+    description: 'Sales broken down by billing counter.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'counterId', 'limit'],
@@ -358,9 +357,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'hourly-sales-heatmap',
-    title: 'Hourly sales heatmap',
+    title: 'Peak Hours Report',
     description:
-      'Sales by day of week and hour, in the shop’s own timezone, so staffing can follow the rush. Read from when each bill was issued rather than when it was uploaded, so an offline bill still reports the hour it was actually made.',
+      'See which days and hours are busiest - plan staffing accordingly.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'limit'],
@@ -376,9 +375,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'discount-audit',
-    title: 'Discount audit',
-    description:
-      'Every bill that gave money away, who billed it and who authorised the discount. A row with a discount and no approver is one nobody signed off, which is what this report is for.',
+    title: 'Discount Audit',
+    description: 'All bills with discounts - who gave them and who approved them.',
     group: 'sales',
     feature: 'discount_rules',
     permission: 'reports:financial',
@@ -400,9 +398,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'returns-and-voids',
-    title: 'Returns and voids',
-    description:
-      'Everything that was undone, by whom and why. Both in one view because they are the same suspicion from two directions: a void erases a sale before it settles, a return reverses one after.',
+    title: 'Returns & Cancelled Bills',
+    description: 'All sales returns and cancelled bills - who did it and why.',
     group: 'sales',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'limit'],
@@ -423,9 +420,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   // --- P1: margin ----------------------------------------------------------
   {
     id: 'gross-margin-by-item',
-    title: 'Gross margin by item',
+    title: 'Profit by Product',
     description:
-      'What each item earns after what it cost. Cost is the moving average snapshotted on the line when it sold, never today’s buying price — otherwise margin restates itself every time a supplier raises a price. “No cost” counts lines with no cost recorded; margin over those is not yet an answer.',
+      'Profit margin for each product after subtracting purchase cost.',
     group: 'sales',
     feature: 'reports.all',
     permission: 'reports:financial',
@@ -444,8 +441,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gross-margin-by-category',
-    title: 'Gross margin by category',
-    description: 'The same margin, grouped where buying decisions are actually made.',
+    title: 'Profit by Category',
+    description: 'Profit margin grouped by product category.',
     group: 'sales',
     feature: 'reports.all',
     permission: 'reports:financial',
@@ -466,9 +463,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   // --- P1: inventory -------------------------------------------------------
   {
     id: 'stock-valuation',
-    title: 'Stock valuation',
-    description:
-      'What the stock on hand is worth at cost, with retail value alongside. At cost, because valuing stock at what you hope to sell it for overstates the asset and no lender will accept it. An item with stock and no cost shows a blank value rather than being left out.',
+    title: 'Stock Valuation',
+    description: 'Current stock value at purchase cost and at selling price.',
     group: 'inventory',
     feature: 'reports.all',
     permission: 'reports:financial',
@@ -488,9 +484,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'stock-ledger',
-    title: 'Stock ledger (per item)',
-    description:
-      'Every movement of one item with a running balance, so a discrepancy can be traced to the entry that caused it. The balance is summed from the ledger rather than read from the stock balance, so the two disagreeing becomes visible instead of being papered over.',
+    title: 'Stock History (per Product)',
+    description: 'Complete movement history for a product with a running stock balance.',
     group: 'inventory',
     feature: 'reports.all',
     filters: ['outletId', 'from', 'to', 'itemId', 'limit'],
@@ -511,9 +506,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   // --- P1: buying side and cash -------------------------------------------
   {
     id: 'purchase-register',
-    title: 'Purchase register',
+    title: 'All Supplier Bills',
     description:
-      'Every bill entered, with the supplier’s own number and GSTIN. The register GSTR-2B reconciliation runs against, and the one to check before filing.',
+      'Complete list of all bills received from suppliers.',
     group: 'money',
     feature: 'purchases',
     permission: 'reports:financial',
@@ -536,9 +531,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'supplier-wise-purchases',
-    title: 'Supplier-wise purchases',
-    description:
-      'What the shop buys from each supplier, what it sends back, and what it still owes them. A supplier with heavy returns and a large balance is a conversation waiting to happen.',
+    title: 'Purchases by Supplier',
+    description: 'Total purchases, returns and outstanding balance per supplier.',
     group: 'money',
     feature: 'purchases',
     permission: 'reports:financial',
@@ -559,9 +553,8 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'purchase-order-status',
-    title: 'Purchase order status',
-    description:
-      'What has been ordered against what has arrived. An order part-received and then forgotten is stock the shop thinks is coming and money a supplier thinks is committed, and nothing else shows it.',
+    title: 'Purchase Order Status',
+    description: 'Status of all purchase orders - ordered, partially received, or completed.',
     group: 'money',
     feature: 'purchases',
     filters: ['outletId', 'from', 'to', 'supplierId', 'limit'],
@@ -581,9 +574,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'payables-ageing',
-    title: 'Payables ageing',
+    title: 'Overdue Supplier Payments',
     description:
-      'What the shop owes, bucketed by how overdue. Not split by outlet: a supplier is owed by the business, and four partial balances are not something any supplier would recognise.',
+      'Amount owed to each supplier, aged by 30/60/90 days overdue.',
     group: 'money',
     feature: 'purchases',
     permission: 'reports:financial',
@@ -603,9 +596,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'receivables-ageing',
-    title: 'Receivables ageing',
+    title: 'Overdue Customer Dues',
     description:
-      'What customers owe, bucketed by age. Read beside payables ageing to answer whether what is coming in covers what is going out.',
+      'Amount owed by each customer, aged by 30/60/90 days.',
     group: 'customers',
     feature: 'reports.all',
     permission: 'reports:financial',
@@ -626,9 +619,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'cash-flow',
-    title: 'Cash flow',
+    title: 'Cash Flow',
     description:
-      'Money in and money out per day, from payments and expenses rather than from invoices — a sale billed to a customer’s khata moves no money, and counting it would say the shop is solvent when it is not.',
+      'Daily money in and out - actual cash received and paid, not billed amounts.',
     group: 'money',
     feature: 'reports.all',
     permission: 'reports:financial',
@@ -645,9 +638,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'price-change-history',
-    title: 'Price change history',
+    title: 'Price Change History',
     description:
-      'Every price edit and bulk revision, with who made it. Read from the audit trail, which has recorded price changes since the beginning — a second store of the same fact could only disagree with it.',
+      'Log of all price changes - who changed them and when.',
     group: 'money',
     feature: 'price_lists',
     permission: 'reports:financial',
@@ -671,9 +664,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   // not move once filed.
   {
     id: 'gstr1-b2b',
-    title: 'GSTR-1: B2B (table 4)',
+    title: 'GSTR-1: Business Sales (B2B)',
     description:
-      'Supplies to registered buyers, invoice by invoice. The buyer’s input tax credit depends on their invoice appearing here exactly as they hold it, which makes this the table most worth checking before filing.',
+      'GST sales to registered businesses - the B2B table for GSTR-1 filing.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'gstin', 'limit'],
@@ -696,9 +689,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr1-b2c',
-    title: 'GSTR-1: B2C large and small (tables 5 and 7)',
+    title: 'GSTR-1: Consumer Sales (B2C)',
     description:
-      'Supplies to unregistered buyers. An inter-state sale above ₹2.5 lakh is reported individually; everything else is a rate-wise total per place of supply, because the portal will not take a row per corner-shop sale. The Table column says which.',
+      'GST sales to consumers and unregistered buyers for GSTR-1 filing.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'gstin', 'limit'],
@@ -719,9 +712,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr1-credit-debit-notes',
-    title: 'GSTR-1: credit and debit notes (table 9B)',
+    title: 'GSTR-1: Credit & Debit Notes',
     description:
-      'Credit notes against registered and unregistered buyers, with the original invoice number — which is what makes a note matchable to the supply it reverses. An empty Against column is itself the finding: such a note cannot be filed.',
+      'Sales returns and adjustments to report in GSTR-1.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'gstin', 'limit'],
@@ -745,9 +738,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr1-hsn-summary',
-    title: 'GSTR-1: HSN summary (table 12)',
+    title: 'GSTR-1: HSN Summary',
     description:
-      'Turnover by HSN and rate, net of returns. Lines with no HSN appear as UNCLASSIFIED rather than being dropped: the table has to account for every rupee declared above it, and a silent omission is both a filing error and invisible.',
+      'Sales totals grouped by HSN code, required for GSTR-1 table 12.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'gstin', 'hsnCode', 'limit'],
@@ -766,9 +759,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr1-nil-exempt',
-    title: 'GSTR-1: nil-rated, exempt and non-GST (table 8)',
+    title: 'GSTR-1: Nil/Exempt Sales',
     description:
-      'The table that could not be produced before supplies carried a classification. A 0% line is not evidence of anything on its own — it may be a taxable good notified at 0%, exempt, nil-rated, or outside GST — and the form reports the four separately.',
+      'Sales of nil-rated, exempt and non-GST goods for GSTR-1 table 8.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'gstin', 'limit'],
@@ -781,9 +774,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr1-documents-issued',
-    title: 'GSTR-1: documents issued (table 13)',
+    title: 'GSTR-1: Bills Issued',
     description:
-      'The number range each series issued and how many were cancelled. A gap has to be declared rather than quietly skipped, which is why this reads the series alongside the documents — an unused number has no document to count.',
+      'Range of bill numbers issued and cancelled, for GSTR-1 table 13.',
     group: 'compliance',
     feature: 'gst_workings',
     filters: ['from', 'to', 'limit'],
@@ -800,9 +793,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr3b-summary',
-    title: 'GSTR-3B summary',
+    title: 'GSTR-3B Summary',
     description:
-      'The summary return’s own lines: outward supply split by classification, the self-assessed liability on inward reverse-charge supplies, and input tax credit split the four ways table 4 requires.',
+      'Summary of outward supplies, ITC and tax payable for GSTR-3B.',
     group: 'compliance',
     feature: 'gst_workings',
     permission: 'reports:financial',
@@ -820,9 +813,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'gstr2b-reconciliation',
-    title: 'GSTR-2B reconciliation',
+    title: 'GSTR-2B Reconciliation',
     description:
-      'What each reconciliation found. “Missing in 2B” is the column that matters: those are bills the shop has paid tax on that no supplier has reported, so the credit cannot be claimed until they file. Credit at risk is that total.',
+      'Matches your purchase bills against the GSTR-2B supplier statement.',
     group: 'compliance',
     feature: 'gst_workings',
     permission: 'reports:financial',
@@ -845,9 +838,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'itc-register',
-    title: 'Input tax credit register',
+    title: 'GST Credit (ITC) Register',
     description:
-      'Every credit the shop has claimed or could claim, and whether a GSTR-2B row supports it. A “no” in the In 2B column is credit paid for and not yet reported by the supplier.',
+      'Complete list of GST credit available, claimed and blocked on purchases.',
     group: 'compliance',
     feature: 'gst_workings',
     permission: 'reports:financial',
@@ -874,9 +867,9 @@ export const REPORTS: readonly ReportDefinition[] = [
   },
   {
     id: 'composition-turnover',
-    title: 'CMP-08: composition turnover',
+    title: 'CMP-08: Composition Turnover',
     description:
-      'Turnover net of returns and the flat tax on it, per day. A composition dealer charges no tax to customers but still owes a percentage of turnover, and nothing else in the system computed it. Shown at the rate configured now; a prepared CMP-08 keeps the rate it was prepared at.',
+      'Daily turnover and flat tax payable for composition scheme dealers.',
     group: 'compliance',
     feature: 'gst_workings',
     permission: 'reports:financial',
