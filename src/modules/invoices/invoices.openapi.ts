@@ -22,6 +22,7 @@ import {
   timestamp,
   uuid,
 } from '../../openapi/registry.js';
+import { termsSnapshot } from '../terms/terms.openapi.js';
 import {
   createInvoiceBody,
   discount,
@@ -169,6 +170,8 @@ export const invoiceSchema = registry.register(
     taxSummary: z.array(taxRateSummarySchema),
     hsnSummary: z.array(hsnSummarySchema),
     notes: z.string().nullable(),
+    termsId: uuid.nullable(),
+    termsSnapshot: termsSnapshot.nullable(),
     status: documentStatusSchema,
     issuedAt: timestamp,
     issuedBy: uuid,

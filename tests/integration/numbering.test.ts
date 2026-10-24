@@ -6,7 +6,7 @@
  * whatever the application does. Concurrency is the only way to exercise it.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { closeOwnerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import { createSeries, leaseBlock } from './setup/fixtures.js';
 import { data } from './setup/body.js';
@@ -16,7 +16,6 @@ describe('document numbering', () => {
   let t: TenantFixture;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Numbering Shop' });
   });
 

@@ -13,6 +13,7 @@ import {
   timestamp,
   uuid,
 } from '../../openapi/registry.js';
+import { termsSnapshot } from '../terms/terms.openapi.js';
 import {
   cancelPurchaseOrderBody,
   createPurchaseBillBody,
@@ -73,6 +74,8 @@ const bill = registry.register(
     outstanding: paise,
     freightAmount: paise,
     landedCostBasis: z.enum(['value', 'quantity', 'none']),
+    termsId: uuid.nullable(),
+    termsSnapshot: termsSnapshot.nullable(),
     status: z.enum(['issued', 'void']),
     receivedAt: timestamp,
     lines: z.array(billLine),
@@ -213,6 +216,8 @@ const order = registry.register(
     status: z.enum(['draft', 'sent', 'partial', 'received', 'cancelled']),
     estimatedTotal: paise,
     notes: z.string().nullable(),
+    termsId: uuid.nullable(),
+    termsSnapshot: termsSnapshot.nullable(),
     lines: z
       .array(
         z.object({

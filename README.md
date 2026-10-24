@@ -121,11 +121,11 @@ Not yet: OpenAPI docs, sync push/pull, credit notes, expenses and day close, rep
 
 `npm test` runs the unit suite: pure functions only, configured from `tests/fixtures/env.ts`, no database, no network. It includes `tests/contracts/contracts.test.ts`, which re-evaluates every committed contract vector and fails if the engine has drifted from the files the Dart port is tested against.
 
-`npm run test:integration` runs the suite in `tests/integration` against a real database, driving `createApp()` over HTTP as the unprivileged app role — so RLS, the immutability triggers and the numbering exclusion constraint are exercised rather than assumed. It needs `TEST_DATABASE_URL` and `TEST_DATABASE_MIGRATION_URL`; opting in is explicit because **the suite truncates every table between files**. Point it at a dedicated test database only. Apply migrations first with `npm run migrate`.
+`npm run test:integration` runs the suite in `tests/integration` against a real database, driving `createApp()` over HTTP as the unprivileged app role — so RLS, the immutability triggers and the numbering exclusion constraint are exercised rather than assumed. It needs `TEST_DATABASE_URL` and `TEST_DATABASE_MIGRATION_URL`; opting in is explicit because **the suite writes test tenants and rows into that database** (it no longer truncates anything, so rows accumulate). Point it at a dedicated test database only. Apply migrations first with `npm run migrate`.
 
 Two rules the harness depends on, both learned the hard way:
 
-- Integration tests are excluded from `vitest.config.ts`. Without that they match its `tests/**` glob, and importing their harness replaces `DATABASE_URL` with the live test database — so `npm test` would connect to it and truncate it.
+- Integration tests are excluded from `vitest.config.ts`. Without that they match its `tests/**` glob, and importing their harness replaces `DATABASE_URL` with the live test database — so `npm test` would connect to it and write test data into it.
 - Tenant context in a test is set **per transaction**, never per session. On a transaction-mode pooler a `SET` outlives the client that issued it: the backend returns to the pool with `app.tenant_id` still attached and the next connection inherits it. This was observed, not theorised.
 
 ### Entitlements

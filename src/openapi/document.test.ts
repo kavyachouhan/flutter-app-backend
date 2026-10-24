@@ -63,6 +63,12 @@ describe('openapi document', () => {
     }
   });
 
+  it('documents terms and conditions', () => {
+    for (const path of ['/v1/terms', '/v1/terms/{id}']) {
+      expect(document.paths?.[path], path).toBeDefined();
+    }
+  });
+
   it('documents the purchase side', () => {
     for (const path of [
       '/v1/suppliers',

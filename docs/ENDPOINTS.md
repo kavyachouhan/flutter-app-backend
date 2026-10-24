@@ -259,6 +259,37 @@ back in `errors` with their names. Permission `catalogue:read`, entitlement
 
 ---
 
+## Terms & Conditions — tag `Terms & Conditions`
+
+Reusable terms a shop attaches to a sale, purchase bill or purchase order.
+Each entry has a `title`, a `description` and `applicableFor` (any of `sale`,
+`sale_order`, `purchase`, `purchase_order`).
+
+### `GET /v1/terms`
+
+**What** Saved terms, by title. `?applicableFor=sale` returns only entries
+that may be attached to that document type. Permission `terms:read`.
+
+### `POST /v1/terms`
+
+**What** Adds terms. Client-generated `id`, so a retry returns the existing
+record. Permission `terms:write`.
+
+### `GET /v1/terms/:id` · `PATCH /v1/terms/:id` · `DELETE /v1/terms/:id`
+
+**What** Read, update or soft-delete one entry. Permission `terms:read` /
+`terms:write`.
+
+### Attaching terms to a document
+
+`POST /v1/invoices`, `/v1/purchase-bills` and `/v1/purchase-orders` accept an
+optional `termsId`. The terms must exist and be applicable to that document
+type (otherwise `422`). The document stores the reference **and** a
+`termsSnapshot` (`{title, description}`), so editing or deleting the entry
+later never changes an issued document. An invoice prints its snapshot in
+place of the shop-wide default terms lines. Omitting `termsId` keeps the
+previous behaviour.
+
 ## Suppliers — tag `Suppliers`
 
 > **Sign convention.** `balance` positive means **the shop owes the

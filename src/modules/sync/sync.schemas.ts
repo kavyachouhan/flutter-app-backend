@@ -19,6 +19,7 @@ import {
   voidExpenseBody,
 } from '../operations/operations.schemas.js';
 import { createAdjustmentBody } from '../stock/stock.schemas.js';
+import { createTermsBody, updateTermsBody } from '../terms/terms.schemas.js';
 
 export const pullQuery = z.object({
   /** The highest serverSeq the device has applied; 0 on first sync. */
@@ -51,6 +52,9 @@ export const OPERATION_PAYLOADS = {
   'item.update': update(updateItemBody),
   'category.create': createCategoryBody,
   'category.update': update(updateCategoryBody),
+  'terms.create': createTermsBody,
+  'terms.update': update(updateTermsBody),
+  'terms.delete': withId({}),
   'stock.adjust': createAdjustmentBody,
   'held_bill.upsert': upsertHeldBillBody,
   'held_bill.release': z.object({ id: z.string().uuid(), ...releaseHeldBillBody.shape }),

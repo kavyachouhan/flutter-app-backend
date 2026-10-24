@@ -85,6 +85,8 @@ export const createInvoiceBody = z.object({
   /** Paid at billing. Whatever is left of the total goes to the customer's khata. */
   payments: z.array(tender).optional(),
   notes: nonEmpty.optional(),
+  /** A saved T&C; its text is snapshotted onto the invoice when issued. */
+  termsId: z.string().uuid().nullable().optional(),
   /** Values for the tenant's user-defined fields (PO no, vehicle no...); write-once. */
   customFields: z.record(z.string()).optional(),
   /**

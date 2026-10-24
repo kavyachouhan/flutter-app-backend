@@ -48,6 +48,7 @@ import {
   suppliersRepository,
   type NewSupplierLedgerEntry,
 } from '../suppliers/suppliers.repository.js';
+import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { allocateNumber } from './numbering.js';
 import { ordersRepository } from './orders.repository.js';
@@ -186,6 +187,8 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       itcEligible,
     });
 
+    const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase');
+
     await purchasesRepository.insertBill(tx, {
       id: body.id,
       outletId: body.outletId,
@@ -211,6 +214,8 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       otherChargesAmount: body.otherChargesAmount,
       landedCostBasis: body.landedCostBasis,
       notes: body.notes ?? null,
+      termsId: terms?.termsId ?? null,
+      termsSnapshot: terms?.snapshot ?? null,
       receivedAt: body.receivedAt,
       createdBy: auth.userId,
       itcCategory,

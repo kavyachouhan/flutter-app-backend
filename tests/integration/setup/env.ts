@@ -7,9 +7,8 @@
  * one source of truth for the ~97 variables src/config/env.ts requires.
  *
  * Opting in is deliberate. TEST_DATABASE_URL and TEST_DATABASE_MIGRATION_URL
- * must be set explicitly, because this suite TRUNCATES every table between
- * files. It must not be possible to point it at a database by accident, and
- * reusing DATABASE_URL would make exactly that a one-typo mistake.
+ * must be set explicitly. The suite no longer truncates anything, but it still
+ * writes test tenants and rows, so point it at a dedicated test database.
  */
 import { testEnv } from '../../fixtures/env.js';
 
@@ -29,7 +28,7 @@ function required(name: string): string {
     throw new Error(
       `${name} is required to run integration tests.\n` +
         'Add it to .env.development (or export it) pointing at a DEDICATED test\n' +
-        'database. The suite truncates every table, so never point it at a\n' +
+        'database. The suite writes test tenants and rows, so never point it at a\n' +
         'database whose contents you want to keep.',
     );
   }

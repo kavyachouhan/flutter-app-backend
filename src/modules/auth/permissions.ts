@@ -31,6 +31,8 @@ export const PERMISSIONS = [
   'credit_notes:void',
   'suppliers:read',
   'suppliers:write',
+  'terms:read',
+  'terms:write',
   'purchases:read',
   'purchases:create',
   'purchases:void',
@@ -92,6 +94,8 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'catalogue:read',
     'customers:read',
     'customers:write',
+    // A cashier picks a saved T&C at the till; managing the list is withheld.
+    'terms:read',
     'invoices:read',
     'invoices:create',
     'payments:read',
