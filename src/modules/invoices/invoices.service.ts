@@ -32,6 +32,7 @@ import { discountsRepository } from '../price-lists/discounts.repository.js';
 import { effectivePolicyFor, resolveLinePrices } from '../price-lists/price-lists.service.js';
 import { costOfGoodsSold } from '../../domain/costing/moving-average.js';
 import { stockRepository } from '../stock/stock.repository.js';
+import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
 import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js';
@@ -295,6 +296,8 @@ export async function createInvoice(body: CreateInvoiceBody) {
       env.DOCUMENT_NUMBER_MAX_LENGTH,
     );
 
+    const terms = await resolveTermsForDocument(tx, body.termsId, 'sale');
+
     await invoicesRepository.insertHeader(tx, {
       id: body.id,
       outletId: body.outletId,
@@ -317,6 +320,8 @@ export async function createInvoice(body: CreateInvoiceBody) {
       billDiscount: body.billDiscount ?? null,
       additionalCharges: body.additionalCharges ?? [],
       notes: body.notes ?? null,
+      termsId: terms?.termsId ?? null,
+      termsSnapshot: terms?.snapshot ?? null,
       customFields: body.customFields ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,

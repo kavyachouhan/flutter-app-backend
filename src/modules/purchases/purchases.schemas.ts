@@ -83,6 +83,8 @@ export const createPurchaseBillBody = z.object({
   otherChargesAmount: paise.default(0),
   landedCostBasis: z.enum(['value', 'quantity', 'none']).default('value'),
   notes: nonEmpty.optional(),
+  /** A saved T&C; its text is snapshotted onto the bill when issued. */
+  termsId: z.string().uuid().nullable().optional(),
   receivedAt: timestamp,
   /** Payment made at the time of the bill, if any. */
   paidAmount: paise.default(0),
@@ -143,6 +145,8 @@ export const createPurchaseOrderBody = z.object({
   documentDate: isoDate,
   expectedDate: isoDate.optional(),
   notes: nonEmpty.max(500).optional(),
+  /** A saved T&C; its text is snapshotted onto the order when created. */
+  termsId: z.string().uuid().nullable().optional(),
   lines: z
     .array(
       z.object({

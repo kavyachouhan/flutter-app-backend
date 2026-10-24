@@ -1,5 +1,7 @@
 import type { Tx } from '../../db/tx.js';
+import { jsonParam } from '../../db/sql.js';
 import type { Cursor } from '../../lib/pagination.js';
+import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
 export interface PurchaseOrderRow {
   id: string;
@@ -12,6 +14,8 @@ export interface PurchaseOrderRow {
   status: 'draft' | 'sent' | 'partial' | 'received' | 'cancelled';
   estimatedTotal: number;
   notes: string | null;
+  termsId: string | null;
+  termsSnapshot: TermsSnapshot | null;
   createdAt: Date;
 }
 
@@ -38,6 +42,8 @@ export interface NewPurchaseOrder {
   expectedDate: string | null;
   estimatedTotal: number;
   notes: string | null;
+  termsId: string | null;
+  termsSnapshot: TermsSnapshot | null;
   createdBy: string;
 }
 
@@ -55,7 +61,8 @@ const ORDER_COLUMNS = `
   po.id, po.outlet_id AS "outletId", po.supplier_id AS "supplierId", s.name AS "supplierName",
   po.document_number AS "documentNumber", po.document_date AS "documentDate",
   po.expected_date AS "expectedDate", po.status, po.estimated_total AS "estimatedTotal",
-  po.notes, po.created_at AS "createdAt"`;
+  po.notes, po.terms_id AS "termsId", po.terms_snapshot AS "termsSnapshot",
+  po.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
   id, line_no AS "lineNo", item_id AS "itemId", item_name AS "itemName", unit,
@@ -91,8 +98,8 @@ export const ordersRepository = {
     await tx.query(
       `INSERT INTO purchase_orders (id, tenant_id, outlet_id, supplier_id, series_id, sequence_no,
          document_number, document_date, fy_start_year, expected_date, status, estimated_total,
-         notes, created_by)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, 'sent', $10, $11, $12)`,
+         notes, created_by, terms_id, terms_snapshot)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, 'sent', $10, $11, $12, $13, $14)`,
       [
         o.id,
         o.outletId,
@@ -106,6 +113,8 @@ export const ordersRepository = {
         o.estimatedTotal,
         o.notes,
         o.createdBy,
+        o.termsId,
+        jsonParam(o.termsSnapshot),
       ],
     );
   },

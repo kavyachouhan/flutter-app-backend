@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { closeOwnerClient, ownerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient, ownerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import { createItem, createSeries, invoicePayload, leaseBlock } from './setup/fixtures.js';
 import { data, rows } from './setup/body.js';
@@ -18,7 +18,6 @@ describe('M1 hardening', () => {
   let t: TenantFixture;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Hardening Shop' });
   });
 

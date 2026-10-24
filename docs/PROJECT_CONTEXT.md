@@ -722,7 +722,7 @@ Migrations applied: `0001_foundation` · `0002_tenancy` ·
 1. `JWT_SECRET` is a placeholder in `.env.development`; production boot is
    blocked until it is replaced.
 2. Development and integration tests still share one Supabase project, and the
-   integration suite **truncates every table**. Split them before this database
+   integration suite writes test tenants and rows into it (it no longer truncates). Split them before this database
    holds anything worth keeping.
 3. CI secrets are not configured, so the `integration` job cannot pass.
 4. No Dart parity test against the contract vectors yet — the most valuable test
@@ -746,7 +746,7 @@ npm run format:check         # CI gate
 npm run migrate              # apply pending migrations
 npm run migrate:status
 npm run db:bootstrap         # create the app role, revoke Data API grants
-npm run test:integration     # against TEST_DATABASE_URL — TRUNCATES IT
+npm run test:integration     # against TEST_DATABASE_URL — adds test tenants/rows, never truncates
 npm run contracts:generate   # rewrite contracts/*.json after an engine change
 ```
 

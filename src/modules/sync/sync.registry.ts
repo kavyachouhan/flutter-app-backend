@@ -66,6 +66,7 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   table('items', ['id'], true, ['item.create', 'item.update']),
   table('item_barcodes', ['id'], true, ['item.create', 'item.update']),
   table('customers', ['id'], true, ['customer.create', 'customer.update']),
+  table('terms_conditions', ['id'], true, ['terms.create', 'terms.update', 'terms.delete']),
   table('customer_balances', ['customer_id'], false),
   table('document_series', ['id'], true),
   table('invoices', ['id'], false, ['invoice.create', 'invoice.void', 'invoice.printed']),

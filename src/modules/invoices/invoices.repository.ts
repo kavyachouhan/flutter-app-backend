@@ -7,6 +7,7 @@ import type {
   TaxInvoiceResult,
 } from '../../domain/tax/types.js';
 import type { Cursor } from '../../lib/pagination.js';
+import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
 export interface InvoiceItemRow {
   id: string;
@@ -39,6 +40,8 @@ export interface InvoiceHeaderInsert {
   billDiscount: Discount | null;
   additionalCharges: readonly AdditionalCharge[];
   notes: string | null;
+  termsId: string | null;
+  termsSnapshot: TermsSnapshot | null;
   customFields: Record<string, string> | null;
   issuedAt: string;
   issuedBy: string;
@@ -125,6 +128,7 @@ const HEADER_COLUMNS = `
   i.issued_at AS "issuedAt", i.issued_by AS "issuedBy", i.void_reason AS "voidReason", i.voided_at AS "voidedAt",
   i.voided_by AS "voidedBy", i.print_count AS "printCount", i.printed_at AS "printedAt", i.created_at AS "createdAt",
   i.custom_fields AS "customFields", i.is_reverse_charge AS "isReverseCharge",
+  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot",
   ${AMOUNT_PAID} AS "amountPaid"`;
 
 const LINE_COLUMNS = `
@@ -173,7 +177,7 @@ export const invoicesRepository = {
          gross_amount, line_discount_total, bill_discount, bill_discount_amount, taxable_amount,
          total_cgst, total_sgst, total_igst, total_cess, total_tax, taxable_charges, non_taxable_charges,
          additional_charges, sub_total, round_off, grand_total, tax_summary, hsn_summary, notes, status,
-         issued_at, issued_by, custom_fields, is_reverse_charge)
+         issued_at, issued_by, custom_fields, is_reverse_charge, terms_id, terms_snapshot)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -181,7 +185,7 @@ export const invoicesRepository = {
          $20, $21, $22, $23, $24,
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
-         $39, $40, $41, $42)`,
+         $39, $40, $41, $42, $43, $44)`,
       [
         h.id,
         h.outletId,
@@ -225,6 +229,8 @@ export const invoicesRepository = {
         h.issuedBy,
         jsonParam(h.customFields),
         t.isReverseCharge,
+        h.termsId,
+        jsonParam(h.termsSnapshot),
       ],
     );
   },

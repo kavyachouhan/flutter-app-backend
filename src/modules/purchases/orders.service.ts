@@ -16,6 +16,7 @@ import { assertFeature } from '../entitlements/entitlements.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { suppliersRepository } from '../suppliers/suppliers.repository.js';
+import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { allocateNumber } from './numbering.js';
 import { ordersRepository, type PurchaseOrderRow } from './orders.repository.js';
@@ -67,6 +68,8 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
       0,
     );
 
+    const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase_order');
+
     await ordersRepository.insert(tx, {
       id: body.id,
       outletId: body.outletId,
@@ -79,6 +82,8 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
       expectedDate: body.expectedDate ?? null,
       estimatedTotal,
       notes: body.notes ?? null,
+      termsId: terms?.termsId ?? null,
+      termsSnapshot: terms?.snapshot ?? null,
       createdBy: auth.userId,
     });
 

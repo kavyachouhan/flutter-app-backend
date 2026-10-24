@@ -11,7 +11,7 @@
  * database, which is precisely why it cannot be a unit test.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { closeOwnerClient, ownerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient, ownerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import { createItem } from './setup/fixtures.js';
 import { closePool } from '../../src/db/pool.js';
@@ -20,7 +20,6 @@ describe('server_seq sequencing', () => {
   let t: TenantFixture;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Sync Shop' });
   });
 

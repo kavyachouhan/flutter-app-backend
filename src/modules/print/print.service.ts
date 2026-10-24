@@ -117,6 +117,22 @@ function foldProfiles(rows: readonly PrintProfileRow[]): ResolvedProfile {
 // compiler points here rather than at thirty scattered strings.
 // ---------------------------------------------------------------------------
 
+/**
+ * A document issued with a saved T&C prints the text it was issued with, in
+ * place of the shop-wide default lines; one issued without keeps the default.
+ */
+function withDocumentTerms(
+  profile: PrintProfile,
+  snapshot: { description: string } | null | undefined,
+): PrintProfile {
+  if (!snapshot) return profile;
+  const lines = snapshot.description
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return lines.length > 0 ? { ...profile, termsLines: lines } : profile;
+}
+
 interface DocumentPrintHeader {
   readonly id: string;
   readonly outletId: string;
@@ -149,6 +165,7 @@ interface InvoicePrintHeader extends DocumentPrintHeader {
   readonly taxableCharges: number;
   readonly nonTaxableCharges: number;
   readonly amountPaid: number;
+  readonly termsSnapshot: { readonly description: string } | null;
 }
 
 interface CreditNotePrintHeader extends DocumentPrintHeader {
@@ -296,7 +313,7 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
       taxMode: header.taxMode,
       isInterState: header.supplyType === 'inter_state',
       business: buildBusiness(outlet, tenant),
-      profile: resolved.profile,
+      profile: withDocumentTerms(resolved.profile, header.termsSnapshot),
       customer: await loadCustomer(
         tx,
         header.customerId,
