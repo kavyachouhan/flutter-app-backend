@@ -1,5 +1,5 @@
 import type { Tx } from '../../db/tx.js';
-import { jsonParam } from '../../db/sql.js';
+import { jsonParam, likeContains } from '../../db/sql.js';
 import type { LandedCostBasis } from '../../domain/costing/landed-cost.js';
 import type {
   Discount,
@@ -185,6 +185,7 @@ export interface PurchaseBillFilter {
   supplierId: string | undefined;
   outletId: string | undefined;
   unpaidOnly: boolean;
+  q: string | undefined;
 }
 
 export const purchasesRepository = {
@@ -350,6 +351,8 @@ export const purchasesRepository = {
          AND ($6::uuid[] IS NULL OR pb.outlet_id = ANY($6::uuid[]))
          AND (NOT $7::boolean OR (pb.status = 'issued' AND pb.grand_total > ${AMOUNT_PAID} + ${RETURNED}))
          AND ($8::date IS NULL OR (pb.document_date, pb.id) < ($8::date, $9::uuid))
+         AND ($11::text IS NULL OR pb.document_number ILIKE $11 OR pb.supplier_invoice_no ILIKE $11
+              OR s.name ILIKE $11)
        ORDER BY pb.document_date DESC, pb.id DESC
        LIMIT $10`,
       [
@@ -363,6 +366,7 @@ export const purchasesRepository = {
         cursor ? String(cursor.k) : null,
         cursor?.id ?? null,
         limit + 1,
+        filter.q ? likeContains(filter.q) : null,
       ],
     );
   },

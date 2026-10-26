@@ -31,6 +31,10 @@ import { toSeriesFormat } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
+import {
+  reapplyFulfilmentForCreditNote,
+  reverseFulfilmentForCreditNote,
+} from '../sales-orders/sales-orders.service.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import {
@@ -312,6 +316,12 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       );
     }
 
+    // Goods taken back from an invoice that fulfilled a sales order are owed to the
+    // customer again, so the order re-opens for them.
+    if (invoice.salesOrderId) {
+      await reverseFulfilmentForCreditNote(tx, invoice.salesOrderId, body.id);
+    }
+
     if (paysOut && refundAmount > 0) {
       await paymentsRepository.insertRefund(tx, {
         id: body.refundPaymentId ?? body.id,
@@ -417,6 +427,11 @@ export async function voidCreditNote(id: string, reason: string) {
     if (header.status === 'void') return { note: await loadCreditNote(tx, id), voided: false };
 
     await creditNotesRepository.markVoid(tx, id, reason, auth.userId);
+    // The return never happened, so what it handed back counts as delivered again.
+    const original = await invoicesRepository.findHeader(tx, header.originalInvoiceId);
+    if (original?.salesOrderId) {
+      await reapplyFulfilmentForCreditNote(tx, original.salesOrderId, id);
+    }
     if (header.restock) {
       await stockRepository.reverseEntries(tx, {
         referenceType: 'credit_note',

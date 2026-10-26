@@ -83,6 +83,7 @@ export const PLANS = {
       // "Full inventory" on the price list: buying as well as selling, and the
       // pricing and bulk tools that go with running a real catalogue.
       'purchases',
+      'sales_orders',
       'price_lists',
       'discount_rules',
       'bulk_edit',

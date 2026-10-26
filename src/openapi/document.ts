@@ -25,6 +25,7 @@ import '../modules/credit-notes/credit-notes.openapi.js';
 import '../modules/suppliers/suppliers.openapi.js';
 import '../modules/terms/terms.openapi.js';
 import '../modules/purchases/purchases.openapi.js';
+import '../modules/sales-orders/sales-orders.openapi.js';
 import '../modules/debit-notes/debit-notes.openapi.js';
 import '../modules/price-lists/price-lists.openapi.js';
 import '../modules/gst/gst.openapi.js';
@@ -85,6 +86,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
       {
         name: 'Purchases',
         description: 'Purchase orders, supplier bills, payments, and what stock really cost.',
+      },
+      {
+        name: 'Sales orders',
+        description: 'Customer orders, advances, and fulfilment through invoices.',
       },
       { name: 'Debit notes', description: 'Returns and corrections against a purchase bill.' },
       {

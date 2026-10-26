@@ -11,10 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { TaxInvoiceResult } from '../../src/domain/tax/types.js';
 import {
+  buildAccessVectors,
   buildNumberingVectors,
   buildTaxVectors,
   evaluateNumberingCase,
   evaluateTaxCase,
+  type AccessVectorsFile,
   type NumberingVectorsFile,
   type TaxVectorsFile,
 } from './build.js';
@@ -72,5 +74,22 @@ describe('numbering contract vectors', () => {
 
   it('is byte-for-byte what the generator would write now', () => {
     expect(buildNumberingVectors()).toEqual(file);
+  });
+});
+
+describe('access contract vectors', () => {
+  const file = load<AccessVectorsFile>('access-vectors.json');
+
+  it('is byte-for-byte what the generator would write now', () => {
+    // Fails when a permission, role grant, plan feature or document type changes without
+    // `npm run contracts:generate` and a matching change in the app.
+    expect(buildAccessVectors()).toEqual(file);
+  });
+
+  it('gives the owner every permission and holds no unknown ones', () => {
+    expect(file.roles.owner).toEqual(file.permissions);
+    for (const granted of Object.values(file.roles)) {
+      for (const permission of granted) expect(file.permissions).toContain(permission);
+    }
   });
 });

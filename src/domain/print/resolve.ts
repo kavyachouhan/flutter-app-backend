@@ -125,6 +125,8 @@ export interface ResolveInput {
   readonly copyIndex?: number;
   /** Shown on a credit note so the original can be found. */
   readonly originalDocumentNumber?: string;
+  /** When a sales order is due, shown next to its date. */
+  readonly dueDate?: string | null;
   readonly cashierName?: string | null;
   readonly counterName?: string | null;
   readonly notes?: string | null;
@@ -150,6 +152,8 @@ function titleFor(kind: PrintDocumentKind, mode: TaxMode): string {
   if (kind === 'credit_note') return 'CREDIT NOTE';
   if (kind === 'payment_receipt') return 'RECEIPT';
   if (kind === 'estimate') return 'ESTIMATE';
+  // An order is a promise to supply, not a supply: it is never a tax invoice, whatever the tax mode.
+  if (kind === 'sales_order') return 'SALE ORDER';
   return mode === 'gst' ? 'TAX INVOICE' : 'BILL OF SUPPLY';
 }
 
@@ -165,6 +169,9 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   ];
   if (input.originalDocumentNumber) {
     meta.push({ label: 'Against invoice', value: input.originalDocumentNumber });
+  }
+  if (input.dueDate) {
+    meta.push({ label: 'Due date', value: formatDocumentDate(input.dueDate, input.timezone) });
   }
   if (input.counterName) meta.push({ label: 'Counter', value: input.counterName });
   if (input.cashierName) meta.push({ label: 'Billed by', value: input.cashierName });
@@ -222,7 +229,10 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   });
 
   const tenders: PrintAmountRow[] = input.tenders.map((tender) => ({
-    label: TENDER_LABELS[tender.mode] ?? tender.mode,
+    label:
+      input.kind === 'sales_order'
+        ? `Advance paid (${TENDER_LABELS[tender.mode] ?? tender.mode})`
+        : (TENDER_LABELS[tender.mode] ?? tender.mode),
     amount: money(tender.amount),
     paise: tender.amount,
   }));
@@ -247,7 +257,12 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   const outstanding = t.grandTotal - t.amountPaid;
   if (outstanding > 0) {
     tenders.push({
-      label: input.kind === 'credit_note' ? 'Credited to khata' : 'Balance on khata',
+      label:
+        input.kind === 'credit_note'
+          ? 'Credited to khata'
+          : input.kind === 'sales_order'
+            ? 'Balance due'
+            : 'Balance on khata',
       amount: money(outstanding),
       emphasis: true,
       paise: outstanding,
@@ -328,6 +343,8 @@ function labelForNumber(kind: PrintDocumentKind): string {
       return 'Receipt no.';
     case 'estimate':
       return 'Estimate no.';
+    case 'sales_order':
+      return 'Order no.';
     default:
       return 'Invoice no.';
   }

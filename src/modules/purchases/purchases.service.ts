@@ -452,6 +452,7 @@ export async function listPurchaseBills(query: ListPurchaseBillsQuery) {
         supplierId: query.supplierId,
         outletId: query.outletId,
         unpaidOnly: query.unpaidOnly ?? false,
+        q: query.q,
       },
       accessibleOutletIds(),
       page.limit,

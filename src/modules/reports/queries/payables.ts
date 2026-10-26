@@ -102,7 +102,8 @@ export async function purchaseOrderStatus(tx: Tx, params: ReportParams): Promise
     FROM purchase_orders po
     JOIN suppliers s ON s.id = po.supplier_id
     LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id
-    WHERE ${outletScope(p, 'po', params)}
+    WHERE po.deleted_at IS NULL
+      AND ${outletScope(p, 'po', params)}
       AND ${dateRange(p, 'po.document_date', params)}
       AND (${supplierId}::uuid IS NULL OR po.supplier_id = ${supplierId}::uuid)
     GROUP BY po.id, po.document_number, po.document_date, s.name, po.status,

@@ -113,7 +113,7 @@ you were given, and treat it as opaque — it encodes the server's sort key.
 
 `GET /auth/me` returns the member's `permissions` array. Hide actions the user
 lacks; the server enforces them regardless. Roles are `owner`, `manager`,
-`cashier`, `accountant`, `viewer`, and there are 37 permissions
+`cashier`, `accountant`, `viewer`, and there are 61 permissions
 (`src/modules/auth/permissions.ts` is the list).
 
 ### 3.6 Warnings versus errors
