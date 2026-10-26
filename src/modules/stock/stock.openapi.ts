@@ -18,7 +18,13 @@ export const stockBalanceSchema = registry.register(
     itemId: uuid,
     itemName: z.string(),
     unit: z.string(),
-    quantity,
+    quantity: quantity.openapi({ description: 'On the shelf, from the stock ledger.' }),
+    reserved: quantity.openapi({
+      description: 'Promised to open sales orders. Stays on the shelf until invoiced.',
+    }),
+    available: z.number().int().openapi({
+      description: 'What a new sale may take: quantity less reserved. Negative means oversold.',
+    }),
     reorderLevel: quantity.nullable(),
     updatedAt: timestamp,
   }),

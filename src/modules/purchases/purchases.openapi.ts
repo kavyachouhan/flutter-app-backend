@@ -22,6 +22,7 @@ import {
   listPurchaseBillsQuery,
   listPurchaseOrdersQuery,
   listSupplierPaymentsQuery,
+  updatePurchaseOrderBody,
   voidPurchaseBillBody,
   voidSupplierPaymentBody,
 } from './purchases.schemas.js';
@@ -266,6 +267,32 @@ registry.registerPath({
   security: accessTokenSecurity,
   request: { params: z.object({ id: uuid }) },
   responses: { 200: jsonResponse('Order.', dataEnvelope(order)), ...errorResponses() },
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/v1/purchase-orders/{id}',
+  tags: ['Purchases'],
+  summary: 'Edit a purchase order',
+  description:
+    'Replaces the header and lines in one transaction. A line that has received goods keeps its item, cannot be removed and cannot drop below the received quantity; the supplier is fixed once anything has been received. Refused once the order is cancelled or fully received.',
+  security: accessTokenSecurity,
+  request: {
+    params: z.object({ id: uuid }),
+    body: { content: { 'application/json': { schema: updatePurchaseOrderBody } } },
+  },
+  responses: { 200: jsonResponse('Updated.', dataEnvelope(order)), ...errorResponses(422) },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/v1/purchase-orders/{id}',
+  tags: ['Purchases'],
+  summary: 'Delete a purchase order',
+  description: 'Refused once anything has been received against it.',
+  security: accessTokenSecurity,
+  request: { params: z.object({ id: uuid }) },
+  responses: { 204: { description: 'Deleted.' }, ...errorResponses(422) },
 });
 
 registry.registerPath({

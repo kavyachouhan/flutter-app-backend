@@ -29,6 +29,8 @@ import { creditNotesRepository } from '../credit-notes/credit-notes.repository.j
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository, type OutletRow } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { salesOrdersRepository } from '../sales-orders/sales-orders.repository.js';
+import { assertFeature } from '../entitlements/entitlements.js';
 import { tenantsRepository, type TenantRow } from '../tenants/tenants.repository.js';
 import { resolveCustomFields } from './custom-fields.js';
 import {
@@ -361,6 +363,90 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
       notes: header.notes,
     };
 
+    return resolvePrintDocument(input);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sales order
+// ---------------------------------------------------------------------------
+
+/**
+ * A sale order, ready to print or share. It reads the same way a bill does so the customer
+ * recognises it, but it is titled SALE ORDER and carries the advance and what is still due
+ * rather than tenders: nothing has been supplied yet.
+ */
+export function buildSaleOrderPayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'sales_orders');
+    const order = await salesOrdersRepository.find(tx, id);
+    if (!order) throw new NotFoundError('Sales order');
+    assertOutletAccess(order.outletId);
+
+    const [tenant, outlet, profiles, lines, advance] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, order.outletId),
+      printRepository.findProfilesForOutlet(tx, order.outletId),
+      salesOrdersRepository.findLines(tx, id),
+      salesOrdersRepository.advanceState(tx, id),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+
+    const customFields = await resolveCustomFields(tx, 'sales_order', order.customFields);
+    const held = Math.max(0, advance.taken - advance.refunded);
+
+    const input: ResolveInput = {
+      kind: 'sales_order',
+      documentNumber: order.documentNumber,
+      documentDate: String(order.documentDate),
+      dueDate: order.dueDate === null ? null : String(order.dueDate),
+      issuedAt: order.createdAt,
+      taxMode: order.taxMode as TaxMode,
+      isInterState: order.supplyType !== 'intra_state',
+      business: buildBusiness(outlet, tenant),
+      profile: withDocumentTerms(resolved.profile, order.termsSnapshot),
+      customer: await loadCustomer(tx, order.customerId, order.customerName, null),
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: line.lineDiscount + line.billDiscountShare,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: order.grossAmount,
+        totalDiscount: order.lineDiscountTotal + order.billDiscountAmount,
+        taxableAmount: order.taxableAmount,
+        totalCgst: order.totalCgst,
+        totalSgst: order.totalSgst,
+        totalIgst: order.totalIgst,
+        totalCess: order.totalCess,
+        charges: order.taxableCharges + order.nonTaxableCharges,
+        roundOff: order.roundOff,
+        grandTotal: order.grandTotal,
+        amountPaid: held,
+      },
+      taxRows: toTaxRows(order.taxSummary),
+      tenders:
+        held > 0 && order.paymentMode
+          ? [{ mode: order.paymentMode, amount: held, tenderedAmount: null }]
+          : [],
+      customFields,
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      notes: order.notes,
+    };
     return resolvePrintDocument(input);
   });
 }

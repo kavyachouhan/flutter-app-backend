@@ -154,7 +154,14 @@ export const creditNotesRepository = {
   },
 
   /** Lines of an invoice with the quantity already returned, locked against concurrent returns. */
-  soldLines(tx: Tx, invoiceId: string, forUpdate = false): Promise<SoldLineRow[]> {
+  /**
+   * The invoice's lines with what has already been returned on each.
+   *
+   * Never `FOR UPDATE OF l`: invoice_lines is immutable, so the runtime role has no
+   * UPDATE privilege on it and a row lock is refused. The caller locks the invoice
+   * header instead, which serialises two returns of the same invoice just as well.
+   */
+  soldLines(tx: Tx, invoiceId: string, _lockedByHeader = false): Promise<SoldLineRow[]> {
     return tx.many<SoldLineRow>(
       `SELECT l.id, l.invoice_id AS "invoiceId", l.line_no AS "lineNo", l.item_id AS "itemId", l.item_name AS "itemName",
               l.hsn_code AS "hsnCode", l.unit, l.quantity, l.unit_price AS "unitPrice", l.line_discount AS "lineDiscount",
@@ -165,8 +172,33 @@ export const creditNotesRepository = {
                         WHERE cl.invoice_line_id = l.id AND c.status = 'issued'), 0) AS "returnedQuantity"
        FROM invoice_lines l LEFT JOIN items i ON i.id = l.item_id
        WHERE l.invoice_id = $1
-       ORDER BY l.line_no
-       ${forUpdate ? 'FOR UPDATE OF l' : ''}`,
+       ORDER BY l.line_no`,
+      [invoiceId],
+    );
+  },
+
+  /** True while any credit note against the invoice still stands. */
+  async hasIssuedForInvoice(tx: Tx, invoiceId: string): Promise<boolean> {
+    const row = await tx.one<{ found: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM credit_notes
+                      WHERE original_invoice_id = $1 AND status = 'issued') AS found`,
+      [invoiceId],
+    );
+    return row?.found ?? false;
+  },
+
+  /** The credit notes against an invoice, oldest first, for the invoice's detail view. */
+  listForInvoice(tx: Tx, invoiceId: string) {
+    return tx.many<{
+      id: string;
+      documentNumber: string;
+      documentDate: string;
+      grandTotal: number;
+      status: string;
+    }>(
+      `SELECT id, document_number AS "documentNumber", document_date AS "documentDate",
+              grand_total AS "grandTotal", status
+       FROM credit_notes WHERE original_invoice_id = $1 ORDER BY issued_at, id`,
       [invoiceId],
     );
   },

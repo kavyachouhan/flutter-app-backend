@@ -35,6 +35,7 @@ import {
   purchaseOrdersRouter,
   supplierPaymentsRouter,
 } from './modules/purchases/purchases.routes.js';
+import { salesOrdersRouter } from './modules/sales-orders/sales-orders.routes.js';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
 import { termsRouter } from './modules/terms/terms.routes.js';
 import { customFieldsRouter, printProfilesRouter } from './modules/print/print.routes.js';
@@ -86,6 +87,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/terms', termsRouter);
   tenantScoped.use('/purchase-bills', purchaseBillsRouter);
   tenantScoped.use('/purchase-orders', purchaseOrdersRouter);
+  tenantScoped.use('/sales-orders', salesOrdersRouter);
   tenantScoped.use('/supplier-payments', supplierPaymentsRouter);
   tenantScoped.use('/debit-notes', debitNotesRouter);
   tenantScoped.use('/price-lists', priceListsRouter);

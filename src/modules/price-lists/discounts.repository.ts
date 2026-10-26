@@ -55,6 +55,8 @@ export interface NewDiscountApproval {
   id: string;
   outletId: string;
   invoiceId: string | null;
+  /** The sales order the discount was approved on; never set together with `invoiceId`. */
+  salesOrderId?: string | null;
   invoiceLineId: string | null;
   breachKind: string;
   requestedValue: number;
@@ -136,8 +138,8 @@ export const discountsRepository = {
     await tx.query(
       `INSERT INTO discount_approvals (id, tenant_id, outlet_id, invoice_id, invoice_line_id,
          breach_kind, requested_value, allowed_value, requested_by, approved_by, approver_role,
-         reason, approved_at)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         reason, approved_at, sales_order_id)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         a.id,
         a.outletId,
@@ -151,8 +153,18 @@ export const discountsRepository = {
         a.approverRole,
         a.reason,
         a.approvedAt,
+        a.salesOrderId ?? null,
       ],
     );
+  },
+
+  /** The kinds of breach already approved on an order, so its invoices need not ask again. */
+  async approvedKindsForOrder(tx: Tx, salesOrderId: string): Promise<Set<string>> {
+    const rows = await tx.many<{ kind: string }>(
+      'SELECT DISTINCT breach_kind AS kind FROM discount_approvals WHERE sales_order_id = $1',
+      [salesOrderId],
+    );
+    return new Set(rows.map((r) => r.kind));
   },
 
   listApprovals(

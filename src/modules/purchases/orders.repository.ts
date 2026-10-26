@@ -1,5 +1,5 @@
 import type { Tx } from '../../db/tx.js';
-import { jsonParam } from '../../db/sql.js';
+import { jsonParam, likeContains } from '../../db/sql.js';
 import type { Cursor } from '../../lib/pagination.js';
 import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
@@ -82,7 +82,7 @@ export const ordersRepository = {
     return tx.one<PurchaseOrderRow>(
       `SELECT ${ORDER_COLUMNS} FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
-       WHERE po.id = $1 ${forUpdate ? 'FOR UPDATE OF po' : ''}`,
+       WHERE po.id = $1 AND po.deleted_at IS NULL ${forUpdate ? 'FOR UPDATE OF po' : ''}`,
       [id],
     );
   },
@@ -143,6 +143,7 @@ export const ordersRepository = {
       outletId: string | undefined;
       status: string | undefined;
       openOnly: boolean;
+      q: string | undefined;
     },
     restrictTo: readonly string[] | null,
     limit: number,
@@ -151,12 +152,14 @@ export const ordersRepository = {
     return tx.many<PurchaseOrderRow>(
       `SELECT ${ORDER_COLUMNS} FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
-       WHERE ($1::uuid IS NULL OR po.supplier_id = $1)
+       WHERE po.deleted_at IS NULL
+         AND ($1::uuid IS NULL OR po.supplier_id = $1)
          AND ($2::uuid IS NULL OR po.outlet_id = $2)
          AND ($3::text IS NULL OR po.status = $3)
          AND (NOT $4::boolean OR po.status IN ('draft', 'sent', 'partial'))
          AND ($5::uuid[] IS NULL OR po.outlet_id = ANY($5::uuid[]))
          AND ($6::date IS NULL OR (po.document_date, po.id) < ($6::date, $7::uuid))
+         AND ($9::text IS NULL OR po.document_number ILIKE $9 OR s.name ILIKE $9)
        ORDER BY po.document_date DESC, po.id DESC
        LIMIT $8`,
       [
@@ -168,6 +171,7 @@ export const ordersRepository = {
         cursor ? String(cursor.k) : null,
         cursor?.id ?? null,
         limit + 1,
+        filter.q ? likeContains(filter.q) : null,
       ],
     );
   },
@@ -238,6 +242,68 @@ export const ordersRepository = {
        WHERE po.id = $1`,
       [orderId],
     );
+  },
+
+  async updateHeader(
+    tx: Tx,
+    orderId: string,
+    o: {
+      supplierId: string;
+      documentDate: string;
+      expectedDate: string | null;
+      estimatedTotal: number;
+      notes: string | null;
+      termsId: string | null;
+      termsSnapshot: TermsSnapshot | null;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `UPDATE purchase_orders
+       SET supplier_id = $2, document_date = $3, expected_date = $4, estimated_total = $5,
+           notes = $6, terms_id = $7, terms_snapshot = $8
+       WHERE id = $1`,
+      [
+        orderId,
+        o.supplierId,
+        o.documentDate,
+        o.expectedDate,
+        o.estimatedTotal,
+        o.notes,
+        o.termsId,
+        jsonParam(o.termsSnapshot),
+      ],
+    );
+  },
+
+  /** Rewrites lines already on the order; `quantity_received` is never touched. */
+  async updateLines(
+    tx: Tx,
+    orderId: string,
+    lines: readonly NewPurchaseOrderLine[],
+  ): Promise<void> {
+    if (lines.length === 0) return;
+    await tx.query(
+      `UPDATE purchase_order_lines t
+       SET line_no = l."lineNo", item_id = l."itemId", item_name = l."itemName", unit = l.unit,
+           quantity_ordered = l."quantityOrdered", expected_unit_cost = l."expectedUnitCost"
+       FROM jsonb_to_recordset($2::jsonb) AS l(
+         id uuid, "lineNo" int, "itemId" uuid, "itemName" text, unit text,
+         "quantityOrdered" bigint, "expectedUnitCost" bigint)
+       WHERE t.purchase_order_id = $1 AND t.id = l.id`,
+      [orderId, JSON.stringify(lines)],
+    );
+  },
+
+  async deleteLines(tx: Tx, orderId: string, lineIds: readonly string[]): Promise<void> {
+    if (lineIds.length === 0) return;
+    await tx.query(
+      'DELETE FROM purchase_order_lines WHERE purchase_order_id = $1 AND id = ANY($2::uuid[])',
+      [orderId, [...lineIds]],
+    );
+  },
+
+  async softDelete(tx: Tx, orderId: string): Promise<void> {
+    await tx.query('UPDATE purchase_orders SET deleted_at = now() WHERE id = $1', [orderId]);
   },
 
   async cancel(tx: Tx, orderId: string, reason: string): Promise<void> {

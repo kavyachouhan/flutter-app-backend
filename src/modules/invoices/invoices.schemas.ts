@@ -36,13 +36,15 @@ const line = z
     cessRatePercent: z.number().nonnegative().optional(),
     /** Omitted, the item's own classification applies, then `taxable`. */
     supplyCategory: supplyCategory.optional(),
+    /** The sales order line this invoice line fulfils; needs `salesOrderId` on the invoice. */
+    salesOrderLineId: z.string().uuid().optional(),
   })
   .refine((l) => l.itemId || l.itemName, {
     message: 'itemName is required without itemId',
     path: ['itemName'],
   });
 
-const additionalCharge = z.object({
+export const additionalCharge = z.object({
   id: nonEmpty,
   label: nonEmpty,
   amount: paise,
@@ -69,6 +71,15 @@ export const createInvoiceBody = z.object({
   documentDate: isoDate,
   issuedAt: timestamp,
   customerId: z.string().uuid().nullable().optional(),
+  /** Fulfils (part of) this sales order; lines name which order lines they cover. */
+  salesOrderId: z.string().uuid().optional(),
+  /**
+   * Replaces this invoice. The original must already be fully credited: an
+   * amendment is a credit note for the whole of it plus this new invoice.
+   */
+  amendsInvoiceId: z.string().uuid().optional(),
+  /** Why the bill discount was given, kept with the document. */
+  billDiscountReason: nonEmpty.max(280).optional(),
   placeOfSupplyStateCode: stateCode.optional(),
   /**
    * Declares an export or SEZ supply, which no state code implies. Omitted,

@@ -24,12 +24,13 @@ import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type SeriesRow } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 
-export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order';
+export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order';
 
 const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   purchase_bill: 'PB',
   debit_note: 'DN',
   purchase_order: 'PO',
+  sales_order: 'SO',
 };
 
 async function ensureSeries(

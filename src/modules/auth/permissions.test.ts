@@ -26,6 +26,29 @@ describe('permissions', () => {
     expect(hasPermission('viewer', 'audit:read')).toBe(false);
   });
 
+  it('keeps editing and deleting a sales order with the owner', () => {
+    for (const p of ['sales_orders:update', 'sales_orders:delete'] as const) {
+      expect(hasPermission('owner', p)).toBe(true);
+      expect(hasPermission('manager', p)).toBe(false);
+      expect(hasPermission('cashier', p)).toBe(false);
+    }
+  });
+
+  it('lets a manager cancel or close an order, but not a cashier', () => {
+    expect(hasPermission('owner', 'sales_orders:cancel')).toBe(true);
+    expect(hasPermission('manager', 'sales_orders:cancel')).toBe(true);
+    expect(hasPermission('cashier', 'sales_orders:cancel')).toBe(false);
+  });
+
+  it('lets a cashier take and read orders, and everyone read-only roles read them', () => {
+    expect(hasPermission('cashier', 'sales_orders:create')).toBe(true);
+    expect(hasPermission('cashier', 'sales_orders:read')).toBe(true);
+    for (const role of ['accountant', 'viewer'] as const) {
+      expect(hasPermission(role, 'sales_orders:read')).toBe(true);
+      expect(hasPermission(role, 'sales_orders:create')).toBe(false);
+    }
+  });
+
   it('only lets an owner assign or modify the owner role', () => {
     for (const actor of ROLES) {
       expect(canManageRole(actor, 'owner')).toBe(actor === 'owner');

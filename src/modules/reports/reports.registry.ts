@@ -54,6 +54,7 @@ import {
   dayBook,
   itemWiseSales,
   paymentModeSplit,
+  saleOrderStatus,
   salesSummary,
 } from './queries/sales.js';
 import type { ReportColumn, ReportDefinition } from './reports.types.js';
@@ -205,6 +206,8 @@ export const REPORTS: readonly ReportDefinition[] = [
       text('category', 'Category', true),
       text('unit', 'Unit', true),
       qty('quantity', 'On hand'),
+      qty('reserved', 'Reserved', false),
+      qty('available', 'Available', false),
       money('unitCost', 'Cost', false),
       money('salePrice', 'Price', false),
       money('stockValue', 'Value'),
@@ -214,13 +217,16 @@ export const REPORTS: readonly ReportDefinition[] = [
   {
     id: 'low-stock',
     title: 'Low Stock Alert',
-    description: 'Products at or below reorder level - your restocking list.',
+    description:
+      'Products at or below reorder level, counting only stock not promised to open sales orders - your restocking list.',
     group: 'inventory',
     filters: ['outletId', 'limit'],
     columns: [
       text('itemName', 'Item'),
       text('category', 'Category', true),
       qty('quantity', 'On hand'),
+      qty('reserved', 'Reserved', false),
+      qty('available', 'Available', false),
       qty('reorderLevel', 'Reorder at', false),
       qty('shortfall', 'Short by'),
       money('unitCost', 'Cost', false),
@@ -571,6 +577,30 @@ export const REPORTS: readonly ReportDefinition[] = [
       qty('pendingQuantity', 'Pending'),
     ],
     run: purchaseOrderStatus,
+  },
+  {
+    id: 'sale-order-status',
+    title: 'Sales Order Status',
+    description:
+      'What customers have ordered, how much has been invoiced, what they paid in advance and what is late.',
+    group: 'sales',
+    feature: 'sales_orders',
+    filters: ['outletId', 'from', 'to', 'customerId', 'limit'],
+    columns: [
+      text('orderNumber', 'Order'),
+      date('orderDate', 'Ordered'),
+      text('customerName', 'Customer'),
+      text('status', 'Status'),
+      date('dueDate', 'Due'),
+      count('daysLate', 'Days late'),
+      money('orderValue', 'Value'),
+      money('advancePaid', 'Advance', false),
+      money('balanceDue', 'Balance due'),
+      qty('orderedQuantity', 'Ordered', false),
+      qty('invoicedQuantity', 'Invoiced', false),
+      qty('pendingQuantity', 'Pending'),
+    ],
+    run: saleOrderStatus,
   },
   {
     id: 'payables-ageing',

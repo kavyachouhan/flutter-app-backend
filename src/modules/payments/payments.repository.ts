@@ -5,7 +5,7 @@ export interface PaymentRow {
   id: string;
   outletId: string;
   customerId: string | null;
-  kind: 'invoice_tender' | 'receipt' | 'refund';
+  kind: 'invoice_tender' | 'receipt' | 'refund' | 'order_advance';
   mode: string;
   amount: number;
   tenderedAmount: number | null;
@@ -105,6 +105,61 @@ export const paymentsRepository = {
       `INSERT INTO payments (id, tenant_id, outlet_id, customer_id, kind, mode, amount, reference, received_at, received_by, status)
        VALUES ($1, app.current_tenant_id(), $2, $3, 'receipt', $4, $5, $6, $7, $8, 'issued')`,
       [p.id, p.outletId, p.customerId, p.mode, p.amount, p.reference, p.receivedAt, p.receivedBy],
+    );
+  },
+
+  /** Money taken up front against a sales order. Always has a customer to hold the credit. */
+  async insertOrderAdvance(
+    tx: Tx,
+    p: {
+      id: string;
+      outletId: string;
+      customerId: string;
+      salesOrderId: string;
+      mode: string;
+      amount: number;
+      receivedAt: string;
+      receivedBy: string;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO payments (id, tenant_id, outlet_id, customer_id, sales_order_id, kind, mode, amount,
+         received_at, received_by, status)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, 'order_advance', $5, $6, $7, $8, 'issued')`,
+      [p.id, p.outletId, p.customerId, p.salesOrderId, p.mode, p.amount, p.receivedAt, p.receivedBy],
+    );
+  },
+
+  /** Money paid back out of an order's advance when the order is cancelled, closed or deleted. */
+  async insertOrderRefund(
+    tx: Tx,
+    p: {
+      id: string;
+      outletId: string;
+      customerId: string;
+      salesOrderId: string;
+      mode: string;
+      amount: number;
+      reference: string | null;
+      receivedAt: string;
+      receivedBy: string;
+    },
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO payments (id, tenant_id, outlet_id, customer_id, sales_order_id, kind, mode, amount,
+         reference, received_at, received_by, status)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, 'refund', $5, $6, $7, $8, $9, 'issued')`,
+      [
+        p.id,
+        p.outletId,
+        p.customerId,
+        p.salesOrderId,
+        p.mode,
+        p.amount,
+        p.reference,
+        p.receivedAt,
+        p.receivedBy,
+      ],
     );
   },
 

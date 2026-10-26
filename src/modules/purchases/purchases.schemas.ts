@@ -99,6 +99,8 @@ export const listPurchaseBillsQuery = pageQuery.extend({
   supplierId: z.string().uuid().optional(),
   outletId: z.string().uuid().optional(),
   unpaidOnly: booleanQuery.optional(),
+  /** Matches our bill number, the supplier's invoice number or the supplier's name. */
+  q: nonEmpty.max(80).optional(),
 });
 export type ListPurchaseBillsQuery = z.infer<typeof listPurchaseBillsQuery>;
 
@@ -163,11 +165,17 @@ export const createPurchaseOrderBody = z.object({
 });
 export type CreatePurchaseOrderBody = z.infer<typeof createPurchaseOrderBody>;
 
-export const listPurchaseOrdersQuery = pageQuery.extend({
+/** An edit replaces the order's header and lines, so it takes the create shape without the id. */
+export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({ id: true });
+export type UpdatePurchaseOrderBody = z.infer<typeof updatePurchaseOrderBody>;
+
+export const listPurchaseOrdersQuery =pageQuery.extend({
   supplierId: z.string().uuid().optional(),
   outletId: z.string().uuid().optional(),
   status: z.enum(['draft', 'sent', 'partial', 'received', 'cancelled']).optional(),
   openOnly: booleanQuery.optional(),
+  /** Matches the order number or the supplier's name. */
+  q: nonEmpty.max(80).optional(),
 });
 export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
 

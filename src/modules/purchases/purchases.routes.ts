@@ -13,6 +13,7 @@ import {
   listPurchaseBillsQuery,
   listPurchaseOrdersQuery,
   listSupplierPaymentsQuery,
+  updatePurchaseOrderBody,
   voidPurchaseBillBody,
   voidSupplierPaymentBody,
 } from './purchases.schemas.js';
@@ -113,6 +114,28 @@ purchaseOrdersRouter.get(
   async (req, res) => {
     const { params } = validated<typeof byId>(req);
     res.json({ data: await orders.getPurchaseOrder(params.id) });
+  },
+);
+
+const updateOrder = { params: idParams, body: updatePurchaseOrderBody };
+purchaseOrdersRouter.put(
+  '/:id',
+  requirePermission('purchases:create'),
+  validate(updateOrder),
+  async (req, res) => {
+    const { params, body } = validated<typeof updateOrder>(req);
+    res.json({ data: await orders.updatePurchaseOrder(params.id, body) });
+  },
+);
+
+purchaseOrdersRouter.delete(
+  '/:id',
+  requirePermission('purchases:void'),
+  validate(byId),
+  async (req, res) => {
+    const { params } = validated<typeof byId>(req);
+    await orders.deletePurchaseOrder(params.id);
+    res.status(204).end();
   },
 );
 

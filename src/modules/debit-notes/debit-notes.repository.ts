@@ -118,10 +118,12 @@ export const debitNotesRepository = {
   /**
    * Bill lines with the quantity already returned on issued debit notes.
    *
-   * Locked when a return is being written, so two debit notes raised at the
-   * same time cannot both pass the "not more than was bought" check.
+   * Two debit notes raised at the same time must not both pass the "not more than was
+   * bought" check. That is guaranteed by the caller locking the bill header, not by a
+   * lock on these rows: purchase_bill_lines is immutable, so the runtime role has no
+   * UPDATE privilege on it and `FOR UPDATE OF l` is refused.
    */
-  returnableLines(tx: Tx, billId: string, forUpdate = false): Promise<ReturnableLineRow[]> {
+  returnableLines(tx: Tx, billId: string, _lockedByHeader = false): Promise<ReturnableLineRow[]> {
     return tx.many<ReturnableLineRow>(
       `SELECT l.id, l.line_no AS "lineNo", l.item_id AS "itemId", l.item_name AS "itemName",
               l.hsn_code AS "hsnCode", l.unit, l.quantity, l.unit_price AS "unitPrice",
@@ -133,8 +135,7 @@ export const debitNotesRepository = {
                 AS "returnedQuantity"
        FROM purchase_bill_lines l
        WHERE l.purchase_bill_id = $1
-       ORDER BY l.line_no
-       ${forUpdate ? 'FOR UPDATE OF l' : ''}`,
+       ORDER BY l.line_no`,
       [billId],
     );
   },
