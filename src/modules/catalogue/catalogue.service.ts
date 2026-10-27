@@ -17,6 +17,7 @@ import type {
 const PRICE_FIELDS = [
   'salePrice',
   'mrp',
+  'discountPercent',
   'purchasePrice',
   'taxRatePercent',
   'cessRatePercent',
@@ -147,6 +148,7 @@ export function createItem(body: CreateItemBody) {
       unit: body.unit,
       mrp: body.mrp ?? null,
       salePrice: body.salePrice,
+      discountPercent: body.discountPercent ?? null,
       purchasePrice: body.purchasePrice ?? null,
       pricesIncludeTax: body.pricesIncludeTax ?? settings.defaultPricesIncludeTax,
       trackStock,

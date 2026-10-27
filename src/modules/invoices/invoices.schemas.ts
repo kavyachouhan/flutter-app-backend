@@ -36,6 +36,12 @@ const line = z
     cessRatePercent: z.number().nonnegative().optional(),
     /** Omitted, the item's own classification applies, then `taxable`. */
     supplyCategory: supplyCategory.optional(),
+    /**
+     * This line bills goods a delivery challan already dispatched: its
+     * stock moved at the challan, not here, and the challan line's own
+     * billed-so-far quantity is checked and updated against it.
+     */
+    deliveryChallanLineId: z.string().uuid().optional(),
     /** The sales order line this invoice line fulfils; needs `salesOrderId` on the invoice. */
     salesOrderLineId: z.string().uuid().optional(),
   })

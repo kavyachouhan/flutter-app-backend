@@ -36,6 +36,9 @@ export const PERMISSIONS = [
   'purchases:read',
   'purchases:create',
   'purchases:void',
+  'delivery_challans:read',
+  'delivery_challans:create',
+  'delivery_challans:void',
   'sales_orders:read',
   'sales_orders:create',
   'sales_orders:update',
@@ -110,6 +113,8 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'terms:read',
     'invoices:read',
     'invoices:create',
+    'delivery_challans:read',
+    'delivery_challans:create',
     // Takes orders and advances at the counter; changing or deleting one is
     // withheld because that reverses a payment.
     'sales_orders:read',

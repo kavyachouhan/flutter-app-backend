@@ -23,6 +23,8 @@ import { paymentsRepository } from '../payments/payments.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
 import { purchasesRepository } from '../purchases/purchases.repository.js';
 import { costOfGoodsSold } from '../../domain/costing/moving-average.js';
+import { assertChallanLinesFit } from '../delivery-challans/delivery-challans.service.js';
+import { deliveryChallansRepository } from '../delivery-challans/delivery-challans.repository.js';
 import { discountsRepository } from '../price-lists/discounts.repository.js';
 import { resolveLinePrices } from '../price-lists/price-lists.service.js';
 import { stockRepository } from '../stock/stock.repository.js';
@@ -379,15 +381,20 @@ export async function createInvoice(body: CreateInvoiceBody) {
         // discount report must read what was true at the sale.
         priceListId: expectedPrices.get(l.id)?.priceListId ?? null,
         priceSource: expectedPrices.get(l.id)?.source ?? null,
+        deliveryChallanLineId: l.deliveryChallanLineId ?? null,
         salesOrderLineId: l.salesOrderLineId ?? null,
       };
     });
     await invoicesRepository.insertLines(tx, body.id, body.outletId, body.documentDate, lineRows);
     if (body.salesOrderId) await applyFulfilment(tx, body.salesOrderId, fulfilments);
 
+    // A line billing a delivery challan already moved this stock when the
+    // challan was created — moving it again here would double-count it.
     const stockLines = body.lines.flatMap((l) => {
       const item = itemFor(l.itemId);
-      return item?.trackStock ? [{ itemId: item.id, quantity: l.quantity }] : [];
+      return item?.trackStock && !l.deliveryChallanLineId
+        ? [{ itemId: item.id, quantity: l.quantity }]
+        : [];
     });
     if (stockLines.length > 0) {
       await stockRepository.insertEntries(
@@ -443,6 +450,26 @@ export async function createInvoice(body: CreateInvoiceBody) {
         body.outletId,
         stockLines.map((s) => ({ itemId: s.itemId, quantityDelta: -s.quantity })),
       );
+    }
+
+    // Lines that bill a delivery challan: checked and recorded against the
+    // challan's own lines (its stock already moved, so this only tracks how
+    // much of it has been billed), with the challan's lines locked so two
+    // invoices converting it at once cannot together over-bill it.
+    const challanLines = body.lines.flatMap((l) =>
+      l.deliveryChallanLineId
+        ? [{ lineId: l.deliveryChallanLineId, itemId: l.itemId ?? null, quantity: l.quantity }]
+        : [],
+    );
+    if (challanLines.length > 0) {
+      const challanIds = await assertChallanLinesFit(tx, challanLines);
+      await deliveryChallansRepository.applyInvoiced(
+        tx,
+        challanLines.map((c) => ({ lineId: c.lineId, quantity: c.quantity })),
+      );
+      for (const challanId of challanIds) {
+        await deliveryChallansRepository.refreshStatus(tx, challanId);
+      }
     }
 
     if (tenders.length > 0) {
@@ -627,6 +654,28 @@ export async function voidInvoice(id: string, reason: string) {
       reversalType: 'sale_void',
       userId: auth.userId,
     });
+
+    // Lines that billed a delivery challan: give back what this invoice
+    // claimed, so the challan can be billed again (or fully, by another
+    // invoice) instead of staying stuck thinking it is partly or fully
+    // invoiced by an invoice that no longer counts.
+    const voidedLines = await invoicesRepository.findLines(tx, id);
+    const challanReversals = voidedLines.flatMap((l) =>
+      l.deliveryChallanLineId
+        ? [{ lineId: l.deliveryChallanLineId, quantity: -l.quantity }]
+        : [],
+    );
+    if (challanReversals.length > 0) {
+      const touched = await deliveryChallansRepository.lockLinesByIds(
+        tx,
+        challanReversals.map((c) => c.lineId),
+      );
+      await deliveryChallansRepository.applyInvoiced(tx, challanReversals);
+      for (const challanId of new Set(touched.map((l) => l.deliveryChallanId))) {
+        await deliveryChallansRepository.refreshStatus(tx, challanId);
+      }
+    }
+
     const voidedTenders = await paymentsRepository.voidTendersForInvoice(
       tx,
       id,

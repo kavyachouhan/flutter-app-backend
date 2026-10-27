@@ -32,6 +32,12 @@ const itemFields = {
   unit: nonEmpty,
   mrp: paise.nullable().optional(),
   salePrice: paise,
+  /**
+   * The discount to apply off sale price by default — a starting point for
+   * billing, not something billing is forced to use; a till can still
+   * override or clear it on any one sale.
+   */
+  discountPercent: z.number().min(0).max(100).nullable().optional(),
   purchasePrice: paise.nullable().optional(),
   pricesIncludeTax: z.boolean().optional(),
   trackStock: z.boolean().optional(),

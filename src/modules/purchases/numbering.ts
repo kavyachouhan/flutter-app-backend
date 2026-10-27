@@ -2,8 +2,9 @@
  * Numbering for documents the shop keys in rather than issues from a till.
  *
  * Sales invoices lease blocks to devices so a till can number a bill
- * offline. Purchases, debit notes and purchase orders are entered on a
- * connected screen, so they take their number from the series directly.
+ * offline. Purchases, debit notes, purchase orders and delivery challans are
+ * entered on a connected screen, so they take their number from the series
+ * directly.
  *
  * A series is provisioned on first use. Requiring a shopkeeper to configure
  * numbering before they can enter their first purchase bill would be a
@@ -24,12 +25,13 @@ import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type SeriesRow } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 
-export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order';
+export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order' | 'delivery_challan';
 
 const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   purchase_bill: 'PB',
   debit_note: 'DN',
   purchase_order: 'PO',
+  delivery_challan: 'DC',
   sales_order: 'SO',
 };
 

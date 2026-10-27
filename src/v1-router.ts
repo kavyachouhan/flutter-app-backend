@@ -22,6 +22,7 @@ import { exportsRouter, labelsRouter } from './modules/exports/exports.routes.js
 import { importsRouter } from './modules/imports/imports.routes.js';
 import { invoicesRouter } from './modules/invoices/invoices.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
+import { deliveryChallansRouter } from './modules/delivery-challans/delivery-challans.routes.js';
 import { numberingRouter } from './modules/numbering/numbering.routes.js';
 import {
   dayCloseRouter,
@@ -87,6 +88,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/terms', termsRouter);
   tenantScoped.use('/purchase-bills', purchaseBillsRouter);
   tenantScoped.use('/purchase-orders', purchaseOrdersRouter);
+  tenantScoped.use('/delivery-challans', deliveryChallansRouter);
   tenantScoped.use('/sales-orders', salesOrdersRouter);
   tenantScoped.use('/supplier-payments', supplierPaymentsRouter);
   tenantScoped.use('/debit-notes', debitNotesRouter);

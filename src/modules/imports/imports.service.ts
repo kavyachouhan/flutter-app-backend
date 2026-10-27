@@ -578,6 +578,9 @@ async function writeRow(
       unit: (values['unit'] as string | null) ?? 'pcs',
       mrp: (values['mrp'] as number | null) ?? null,
       salePrice: (values['salePrice'] as number | null) ?? 0,
+      // The spreadsheet has no column for it; an import never sets a
+      // default discount.
+      discountPercent: null,
       purchasePrice: (values['purchasePrice'] as number | null) ?? null,
       pricesIncludeTax: true,
       trackStock: (values['trackStock'] as boolean | null) ?? true,
