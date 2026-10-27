@@ -136,6 +136,8 @@ export interface InvoiceLineSpec {
   quantity: number;
   unitPrice: number;
   taxRatePercent: number;
+  /** Bills a delivery-challan line instead of moving stock again. */
+  deliveryChallanLineId?: string;
 }
 
 /**
@@ -190,6 +192,9 @@ export function invoicePayload(t: TenantFixture, options: IssueInvoiceOptions) {
       quantity: line.quantity,
       unitPrice: line.unitPrice,
       taxRatePercent: line.taxRatePercent,
+      ...(line.deliveryChallanLineId
+        ? { deliveryChallanLineId: line.deliveryChallanLineId }
+        : {}),
     })),
     ...(options.payments ? { payments: options.payments } : {}),
     expectedTotals: options.totalsOverride ?? expectedTotals(options.lines),

@@ -74,7 +74,12 @@ export interface InvoiceLineInsert {
    * than as pure profit.
    */
   cogsAmount: number | null;
+  /** Set when this line bills goods a delivery challan already dispatched. */
+  deliveryChallanLineId: string | null;
 }
+
+/** Same shape as [InvoiceLineInsert], read back — what `findLines` returns. */
+export type InvoiceLineRow = InvoiceLineInsert;
 
 export interface InvoiceHeaderRow {
   id: string;
@@ -133,7 +138,8 @@ const LINE_COLUMNS = `
   bill_discount_share AS "billDiscountShare", taxable_amount AS "taxableAmount", tax_rate_percent AS "taxRatePercent",
   cess_rate_percent AS "cessRatePercent", cgst, sgst, igst, cess, line_total AS "lineTotal",
   cogs_amount AS "cogsAmount", supply_category AS "supplyCategory",
-  price_list_id AS "priceListId", price_source AS "priceSource"`;
+  price_list_id AS "priceListId", price_source AS "priceSource",
+  delivery_challan_line_id AS "deliveryChallanLineId"`;
 
 export interface InvoiceListFilter {
   from: string | undefined;
@@ -246,18 +252,18 @@ export const invoicesRepository = {
       `INSERT INTO invoice_lines (id, tenant_id, invoice_id, outlet_id, document_date, line_no, item_id, item_name,
          hsn_code, unit, quantity, unit_price, discount, gross_amount, line_discount, bill_discount_share,
          taxable_amount, tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total, cogs_amount,
-         supply_category, price_list_id, price_source)
+         supply_category, price_list_id, price_source, delivery_challan_line_id)
        SELECT l.id, app.current_tenant_id(), $1, $2, $3, l."lineNo", l."itemId", l."itemName",
               l."hsnCode", l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount", l."lineDiscount",
               l."billDiscountShare", l."taxableAmount", l."taxRatePercent", l."cessRatePercent", l.cgst, l.sgst,
               l.igst, l.cess, l."lineTotal", l."cogsAmount", l."supplyCategory",
-              l."priceListId", l."priceSource"
+              l."priceListId", l."priceSource", l."deliveryChallanLineId"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "lineNo" int, "itemId" uuid, "itemName" text, "hsnCode" text, unit text, quantity bigint,
          "unitPrice" bigint, discount jsonb, "grossAmount" bigint, "lineDiscount" bigint, "billDiscountShare" bigint,
          "taxableAmount" bigint, "taxRatePercent" numeric, "cessRatePercent" numeric, cgst bigint, sgst bigint,
          igst bigint, cess bigint, "lineTotal" bigint, "cogsAmount" bigint, "supplyCategory" text,
-         "priceListId" uuid, "priceSource" text)`,
+         "priceListId" uuid, "priceSource" text, "deliveryChallanLineId" uuid)`,
       [invoiceId, outletId, documentDate, JSON.stringify(lines)],
     );
   },
@@ -270,7 +276,7 @@ export const invoicesRepository = {
   },
 
   findLines(tx: Tx, invoiceId: string) {
-    return tx.many(
+    return tx.many<InvoiceLineRow>(
       `SELECT ${LINE_COLUMNS} FROM invoice_lines WHERE invoice_id = $1 ORDER BY line_no`,
       [invoiceId],
     );

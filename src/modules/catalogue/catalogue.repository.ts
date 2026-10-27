@@ -24,6 +24,7 @@ export interface ItemRow {
   unit: string;
   mrp: number | null;
   salePrice: number;
+  discountPercent: number | null;
   purchasePrice: number | null;
   pricesIncludeTax: boolean;
   trackStock: boolean;
@@ -43,7 +44,8 @@ const CATEGORY_COLUMNS =
 const ITEM_COLUMNS = `
   i.id, i.category_id AS "categoryId", i.item_type AS "itemType", i.name, i.code, i.aliases,
   i.hsn_code AS "hsnCode", i.tax_rate_percent AS "taxRatePercent", i.cess_rate_percent AS "cessRatePercent",
-  i.unit, i.mrp, i.sale_price AS "salePrice", i.purchase_price AS "purchasePrice",
+  i.unit, i.mrp, i.sale_price AS "salePrice", i.discount_percent AS "discountPercent",
+  i.purchase_price AS "purchasePrice",
   i.prices_include_tax AS "pricesIncludeTax", i.track_stock AS "trackStock", i.reorder_level AS "reorderLevel",
   i.supply_category AS "supplyCategory",
   i.is_active AS "isActive", i.created_at AS "createdAt", i.updated_at AS "updatedAt",
@@ -64,6 +66,7 @@ const ITEM_UPDATABLE = {
   unit: 'unit',
   mrp: 'mrp',
   salePrice: 'sale_price',
+  discountPercent: 'discount_percent',
   purchasePrice: 'purchase_price',
   pricesIncludeTax: 'prices_include_tax',
   trackStock: 'track_stock',
@@ -186,9 +189,9 @@ export const catalogueRepository = {
   async insertItem(tx: Tx, item: NewItem): Promise<void> {
     await tx.query(
       `INSERT INTO items (id, tenant_id, category_id, item_type, name, code, aliases, hsn_code, tax_rate_percent,
-         cess_rate_percent, unit, mrp, sale_price, purchase_price, prices_include_tax, track_stock, reorder_level,
-         supply_category, is_active)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+         cess_rate_percent, unit, mrp, sale_price, discount_percent, purchase_price, prices_include_tax, track_stock,
+         reorder_level, supply_category, is_active)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
       [
         item.id,
         item.categoryId,
@@ -202,6 +205,7 @@ export const catalogueRepository = {
         item.unit,
         item.mrp,
         item.salePrice,
+        item.discountPercent,
         item.purchasePrice,
         item.pricesIncludeTax,
         item.trackStock,
