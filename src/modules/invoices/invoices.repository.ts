@@ -153,7 +153,7 @@ const LINE_COLUMNS = `
   cess_rate_percent AS "cessRatePercent", cgst, sgst, igst, cess, line_total AS "lineTotal",
   cogs_amount AS "cogsAmount", supply_category AS "supplyCategory",
   price_list_id AS "priceListId", price_source AS "priceSource",
-  delivery_challan_line_id AS "deliveryChallanLineId"`;
+  delivery_challan_line_id AS "deliveryChallanLineId",
   sales_order_line_id AS "salesOrderLineId"`;
 
 export interface InvoiceListFilter {
