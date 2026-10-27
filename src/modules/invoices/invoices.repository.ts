@@ -7,6 +7,7 @@ import type {
   TaxInvoiceResult,
 } from '../../domain/tax/types.js';
 import type { Cursor } from '../../lib/pagination.js';
+import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
 export interface InvoiceItemRow {
   id: string;
@@ -39,7 +40,13 @@ export interface InvoiceHeaderInsert {
   billDiscount: Discount | null;
   additionalCharges: readonly AdditionalCharge[];
   notes: string | null;
+  termsId: string | null;
+  termsSnapshot: TermsSnapshot | null;
   customFields: Record<string, string> | null;
+  salesOrderId: string | null;
+  /** The invoice this one replaces; it has been fully credited. */
+  amendsInvoiceId: string | null;
+  billDiscountReason: string | null;
   issuedAt: string;
   issuedBy: string;
 }
@@ -68,6 +75,7 @@ export interface InvoiceLineInsert {
   supplyCategory: SupplyCategory;
   priceListId: string | null;
   priceSource: 'price_list_item' | 'price_list_rule' | 'item' | null;
+  salesOrderLineId: string | null;
   /**
    * Moving-average cost at the moment of sale. Null when the item has never
    * been purchased through the system, so margin reads as unknown rather
@@ -95,6 +103,8 @@ export interface InvoiceHeaderRow {
   grandTotal: number;
   status: 'issued' | 'void';
   amountPaid: number;
+  salesOrderId: string | null;
+  amendsInvoiceId: string | null;
   [column: string]: unknown;
 }
 
@@ -130,6 +140,10 @@ const HEADER_COLUMNS = `
   i.issued_at AS "issuedAt", i.issued_by AS "issuedBy", i.void_reason AS "voidReason", i.voided_at AS "voidedAt",
   i.voided_by AS "voidedBy", i.print_count AS "printCount", i.printed_at AS "printedAt", i.created_at AS "createdAt",
   i.custom_fields AS "customFields", i.is_reverse_charge AS "isReverseCharge",
+  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId",
+  i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
+  (SELECT r.id FROM invoices r WHERE r.amends_invoice_id = i.id AND r.status = 'issued' LIMIT 1)
+    AS "amendedByInvoiceId",
   ${AMOUNT_PAID} AS "amountPaid"`;
 
 const LINE_COLUMNS = `
@@ -140,6 +154,7 @@ const LINE_COLUMNS = `
   cogs_amount AS "cogsAmount", supply_category AS "supplyCategory",
   price_list_id AS "priceListId", price_source AS "priceSource",
   delivery_challan_line_id AS "deliveryChallanLineId"`;
+  sales_order_line_id AS "salesOrderLineId"`;
 
 export interface InvoiceListFilter {
   from: string | undefined;
@@ -179,7 +194,8 @@ export const invoicesRepository = {
          gross_amount, line_discount_total, bill_discount, bill_discount_amount, taxable_amount,
          total_cgst, total_sgst, total_igst, total_cess, total_tax, taxable_charges, non_taxable_charges,
          additional_charges, sub_total, round_off, grand_total, tax_summary, hsn_summary, notes, status,
-         issued_at, issued_by, custom_fields, is_reverse_charge)
+         issued_at, issued_by, custom_fields, is_reverse_charge, terms_id, terms_snapshot, sales_order_id,
+         amends_invoice_id, bill_discount_reason)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -187,7 +203,7 @@ export const invoicesRepository = {
          $20, $21, $22, $23, $24,
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
-         $39, $40, $41, $42)`,
+         $39, $40, $41, $42, $43, $44, $45, $46, $47)`,
       [
         h.id,
         h.outletId,
@@ -231,6 +247,11 @@ export const invoicesRepository = {
         h.issuedBy,
         jsonParam(h.customFields),
         t.isReverseCharge,
+        h.termsId,
+        jsonParam(h.termsSnapshot),
+        h.salesOrderId,
+        h.amendsInvoiceId,
+        h.billDiscountReason,
       ],
     );
   },
@@ -252,18 +273,18 @@ export const invoicesRepository = {
       `INSERT INTO invoice_lines (id, tenant_id, invoice_id, outlet_id, document_date, line_no, item_id, item_name,
          hsn_code, unit, quantity, unit_price, discount, gross_amount, line_discount, bill_discount_share,
          taxable_amount, tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total, cogs_amount,
-         supply_category, price_list_id, price_source, delivery_challan_line_id)
+         supply_category, price_list_id, price_source, sales_order_line_id, delivery_challan_line_id)
        SELECT l.id, app.current_tenant_id(), $1, $2, $3, l."lineNo", l."itemId", l."itemName",
               l."hsnCode", l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount", l."lineDiscount",
               l."billDiscountShare", l."taxableAmount", l."taxRatePercent", l."cessRatePercent", l.cgst, l.sgst,
               l.igst, l.cess, l."lineTotal", l."cogsAmount", l."supplyCategory",
-              l."priceListId", l."priceSource", l."deliveryChallanLineId"
+              l."priceListId", l."priceSource", l."salesOrderLineId", l."deliveryChallanLineId"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "lineNo" int, "itemId" uuid, "itemName" text, "hsnCode" text, unit text, quantity bigint,
          "unitPrice" bigint, discount jsonb, "grossAmount" bigint, "lineDiscount" bigint, "billDiscountShare" bigint,
          "taxableAmount" bigint, "taxRatePercent" numeric, "cessRatePercent" numeric, cgst bigint, sgst bigint,
          igst bigint, cess bigint, "lineTotal" bigint, "cogsAmount" bigint, "supplyCategory" text,
-         "priceListId" uuid, "priceSource" text, "deliveryChallanLineId" uuid)`,
+         "priceListId" uuid, "priceSource" text, "salesOrderLineId" uuid, "deliveryChallanLineId" uuid)`,
       [invoiceId, outletId, documentDate, JSON.stringify(lines)],
     );
   },

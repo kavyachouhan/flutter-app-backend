@@ -16,6 +16,7 @@ import {
   ConflictError,
   ErrorCode,
   ForbiddenError,
+  NotFoundError,
   ValidationError,
   isAppError,
   type ErrorCodeValue,
@@ -33,6 +34,7 @@ import * as operationsService from '../operations/operations.service.js';
 import { topUpLeasesForDevice } from '../numbering/numbering.service.js';
 import * as paymentsService from '../payments/payments.service.js';
 import * as stockService from '../stock/stock.service.js';
+import * as termsService from '../terms/terms.service.js';
 import { SYNC_TABLES } from './sync.registry.js';
 import { syncRepository, type ChangeRow } from './sync.repository.js';
 import {
@@ -181,6 +183,9 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'item.update': 'catalogue:write',
   'category.create': 'catalogue:write',
   'category.update': 'catalogue:write',
+  'terms.create': 'terms:write',
+  'terms.update': 'terms:write',
+  'terms.delete': 'terms:write',
   'stock.adjust': 'stock:adjust',
   'held_bill.upsert': 'invoices:create',
   'held_bill.release': 'invoices:create',
@@ -198,6 +203,9 @@ const OPERATION_TABLE: Partial<Record<OperationType, string>> = {
   'item.update': 'items',
   'category.create': 'categories',
   'category.update': 'categories',
+  'terms.create': 'terms_conditions',
+  'terms.update': 'terms_conditions',
+  'terms.delete': 'terms_conditions',
   'stock.adjust': 'stock_ledger_entries',
   'held_bill.upsert': 'held_bills',
   'expense.create': 'expenses',
@@ -283,6 +291,24 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
     case 'category.update': {
       const p = payload as Payload<'category.update'>;
       await catalogueService.updateCategory(p.id, p.patch);
+      return { id: p.id };
+    }
+    case 'terms.create': {
+      const p = payload as Payload<'terms.create'>;
+      await termsService.createTerms(p);
+      return { id: p.id };
+    }
+    case 'terms.update': {
+      const p = payload as Payload<'terms.update'>;
+      await termsService.updateTerms(p.id, p.patch);
+      return { id: p.id };
+    }
+    case 'terms.delete': {
+      const p = payload as Payload<'terms.delete'>;
+      // A retried delete finds it already gone; that is the outcome asked for.
+      await termsService.deleteTerms(p.id).catch((error: unknown) => {
+        if (!(error instanceof NotFoundError)) throw error;
+      });
       return { id: p.id };
     }
     case 'stock.adjust': {

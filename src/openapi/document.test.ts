@@ -35,6 +35,7 @@ describe('openapi document', () => {
       '/v1/invoices/{id}/print-payload',
       '/v1/credit-notes/{id}/print-payload',
       '/v1/payments/{id}/print-payload',
+      '/v1/sales-orders/{id}/print-payload',
       '/v1/print-profiles',
       '/v1/custom-fields',
     ]) {
@@ -59,6 +60,12 @@ describe('openapi document', () => {
 
   it('documents exports and barcode labels', () => {
     for (const path of ['/v1/exports', '/v1/labels/templates', '/v1/labels/payload']) {
+      expect(document.paths?.[path], path).toBeDefined();
+    }
+  });
+
+  it('documents terms and conditions', () => {
+    for (const path of ['/v1/terms', '/v1/terms/{id}']) {
       expect(document.paths?.[path], path).toBeDefined();
     }
   });

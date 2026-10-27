@@ -4,7 +4,7 @@
  * Tests themselves go through the API, which connects as the unprivileged app
  * role — that is the whole point, since RLS only proves anything against a
  * role that cannot bypass it. This module is the deliberate exception: only
- * setup and teardown use the owner connection, to truncate and to inspect
+ * setup and teardown use the owner connection, to inspect
  * catalog state the API does not expose.
  */
 import pg from 'pg';
@@ -75,20 +75,4 @@ export async function assertSchemaReady(): Promise<void> {
       `Role ${integrationEnv.appRoleName} bypasses RLS; isolation tests would pass falsely.`,
     );
   }
-}
-
-/**
- * Wipes every tenant table. app.schema_migrations is left alone (it is the
- * schema, not data); app.tenant_sync_counters is reset so server_seq starts
- * from a known point in every file.
- */
-export async function truncateAll(): Promise<void> {
-  const c = await ownerClient();
-  const { rows } = await c.query<{ list: string | null }>(
-    `SELECT string_agg(format('%I.%I', schemaname, tablename), ', ') AS list
-     FROM pg_tables WHERE schemaname = 'public'`,
-  );
-  const list = rows[0]?.list;
-  if (list) await c.query(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
-  await c.query('TRUNCATE app.tenant_sync_counters');
 }

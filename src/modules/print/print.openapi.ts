@@ -45,7 +45,7 @@ export const printDocumentSchema = registry.register(
   'PrintDocument',
   z
     .object({
-      kind: z.enum(['invoice', 'credit_note', 'payment_receipt', 'estimate']),
+      kind: z.enum(['invoice', 'credit_note', 'payment_receipt', 'estimate', 'sales_order']),
       title: z.string().openapi({ description: '"TAX INVOICE", "BILL OF SUPPLY", "CREDIT NOTE".' }),
       business: z.object({
         name: z.string(),
@@ -179,6 +179,7 @@ for (const [path, tag, summary] of [
   ['/v1/invoices/{id}/print-payload', 'Invoices', 'Printable invoice'],
   ['/v1/credit-notes/{id}/print-payload', 'Credit notes', 'Printable credit note'],
   ['/v1/payments/{id}/print-payload', 'Payments', 'Printable receipt'],
+  ['/v1/sales-orders/{id}/print-payload', 'Sales orders', 'Printable sale order'],
 ] as const) {
   registry.registerPath({
     method: 'get',

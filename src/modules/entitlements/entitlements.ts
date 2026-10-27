@@ -17,6 +17,7 @@ export const FEATURES = [
   'reports.all',
   'credit_notes',
   'purchases',
+  'sales_orders',
   'price_lists',
   'discount_rules',
   'gst_workings',

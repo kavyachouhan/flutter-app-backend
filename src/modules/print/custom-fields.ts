@@ -15,7 +15,7 @@ import type { PrintField } from '../../domain/print/types.js';
 import { ErrorCode, ValidationError } from '../../lib/errors.js';
 import { printRepository, type CustomFieldDefinitionRow } from './print.repository.js';
 
-export type CustomFieldDocumentType = 'invoice' | 'credit_note' | 'estimate';
+export type CustomFieldDocumentType = 'invoice' | 'credit_note' | 'estimate' | 'sales_order';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 

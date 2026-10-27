@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
+import { reconcileReservations } from '../sales-orders/sales-orders.service.js';
 import * as stockService from './stock.service.js';
 import { createAdjustmentBody, ledgerQuery, listBalancesQuery } from './stock.schemas.js';
 
@@ -31,5 +33,21 @@ stockRouter.post(
   async (req, res) => {
     const { body } = validated<typeof adjust>(req);
     res.status(201).json({ data: await stockService.createAdjustment(body) });
+  },
+);
+
+// Checks the reserved column against the open sales orders' lines, and can rewrite it.
+// The incremental path keeps them equal; this is how that is proven, and the repair if a
+// bug ever let them part. Gated like the orders it audits.
+const reconcile = {
+  body: z.object({ outletId: z.string().uuid().optional(), repair: z.boolean().default(false) }),
+};
+stockRouter.post(
+  '/reservations/reconcile',
+  requirePermission('stock:adjust'),
+  validate(reconcile),
+  async (req, res) => {
+    const { body } = validated<typeof reconcile>(req);
+    res.json({ data: await reconcileReservations(body) });
   },
 );

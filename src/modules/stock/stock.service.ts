@@ -65,6 +65,18 @@ export function createAdjustment(body: CreateAdjustmentBody) {
         },
       );
     }
+    // Stock promised to open orders is not free to write off either, unless the shop
+    // has said it may go negative. Counting more in is always fine.
+    if (!settings.allowNegativeStock && body.quantityDelta < 0) {
+      const { reserved } = await stockRepository.levelFor(tx, body.outletId, body.itemId);
+      if (current + body.quantityDelta < reserved) {
+        throw new UnprocessableError(
+          'This adjustment would take stock below what open sales orders have reserved.',
+          ErrorCode.INSUFFICIENT_STOCK,
+          { details: { current, reserved, quantityDelta: body.quantityDelta } },
+        );
+      }
+    }
 
     await stockRepository.insertEntries(tx, [
       {

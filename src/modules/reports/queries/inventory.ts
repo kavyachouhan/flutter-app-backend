@@ -16,6 +16,8 @@ export async function currentStock(tx: Tx, params: ReportParams): Promise<Report
            COALESCE(c.name, 'Uncategorised') AS "category",
            i.unit,
            COALESCE(sb.quantity, 0) AS "quantity",
+           COALESCE(sb.reserved, 0) AS "reserved",
+           COALESCE(sb.quantity, 0) - COALESCE(sb.reserved, 0) AS "available",
            i.purchase_price AS "unitCost",
            i.sale_price AS "salePrice",
            (COALESCE(sb.quantity, 0) * COALESCE(i.purchase_price, 0) / 1000)::bigint AS "stockValue",
@@ -30,7 +32,11 @@ export async function currentStock(tx: Tx, params: ReportParams): Promise<Report
   return tx.many(sql, p.all);
 }
 
-/** Items at or below their reorder level; the buying list. */
+/**
+ * Items at or below their reorder level; the buying list. Measured on what can still
+ * be sold (on hand less what open sales orders have reserved): stock promised to a
+ * customer is not stock to sell, so it counts toward needing more.
+ */
 export async function lowStock(tx: Tx, params: ReportParams): Promise<ReportRow[]> {
   const p = new Params();
   const sql = `
@@ -38,16 +44,18 @@ export async function lowStock(tx: Tx, params: ReportParams): Promise<ReportRow[
            COALESCE(c.name, 'Uncategorised') AS "category",
            i.unit,
            COALESCE(sb.quantity, 0) AS "quantity",
+           COALESCE(sb.reserved, 0) AS "reserved",
+           COALESCE(sb.quantity, 0) - COALESCE(sb.reserved, 0) AS "available",
            i.reorder_level AS "reorderLevel",
-           (i.reorder_level - COALESCE(sb.quantity, 0)) AS "shortfall",
+           (i.reorder_level - (COALESCE(sb.quantity, 0) - COALESCE(sb.reserved, 0))) AS "shortfall",
            i.purchase_price AS "unitCost"
     FROM items i
     LEFT JOIN stock_balances sb ON sb.item_id = i.id AND ${outletScope(p, 'sb', params)}
     LEFT JOIN categories c ON c.id = i.category_id
     WHERE i.deleted_at IS NULL AND i.track_stock AND i.is_active
       AND i.reorder_level IS NOT NULL
-      AND COALESCE(sb.quantity, 0) <= i.reorder_level
-    ORDER BY (i.reorder_level - COALESCE(sb.quantity, 0)) DESC, i.name
+      AND COALESCE(sb.quantity, 0) - COALESCE(sb.reserved, 0) <= i.reorder_level
+    ORDER BY (i.reorder_level - (COALESCE(sb.quantity, 0) - COALESCE(sb.reserved, 0))) DESC, i.name
     LIMIT ${p.add(params.limit)}`;
   return tx.many(sql, p.all);
 }

@@ -31,7 +31,14 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('storage');
 
-export const OBJECT_KINDS = ['logo', 'signature', 'receipt', 'import', 'export'] as const;
+export const OBJECT_KINDS = [
+  'logo',
+  'signature',
+  'receipt',
+  'order_attachment',
+  'import',
+  'export',
+] as const;
 export type ObjectKind = (typeof OBJECT_KINDS)[number];
 
 interface KindPolicy {
@@ -65,6 +72,12 @@ const POLICIES: Readonly<Record<ObjectKind, KindPolicy>> = {
   logo: { types: IMAGE_TYPES, maxBytes: 2 * MB, clientSignable: true },
   signature: { types: IMAGE_TYPES, maxBytes: 1 * MB, clientSignable: true },
   receipt: {
+    types: { ...IMAGE_TYPES, 'application/pdf': 'pdf' },
+    maxBytes: 5 * MB,
+    clientSignable: true,
+  },
+  // A photo or PDF attached to a sales order. Same policy as a receipt.
+  order_attachment: {
     types: { ...IMAGE_TYPES, 'application/pdf': 'pdf' },
     maxBytes: 5 * MB,
     clientSignable: true,

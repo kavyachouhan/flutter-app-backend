@@ -259,6 +259,37 @@ back in `errors` with their names. Permission `catalogue:read`, entitlement
 
 ---
 
+## Terms & Conditions — tag `Terms & Conditions`
+
+Reusable terms a shop attaches to a sale, purchase bill or purchase order.
+Each entry has a `title`, a `description` and `applicableFor` (any of `sale`,
+`sale_order`, `purchase`, `purchase_order`).
+
+### `GET /v1/terms`
+
+**What** Saved terms, by title. `?applicableFor=sale` returns only entries
+that may be attached to that document type. Permission `terms:read`.
+
+### `POST /v1/terms`
+
+**What** Adds terms. Client-generated `id`, so a retry returns the existing
+record. Permission `terms:write`.
+
+### `GET /v1/terms/:id` · `PATCH /v1/terms/:id` · `DELETE /v1/terms/:id`
+
+**What** Read, update or soft-delete one entry. Permission `terms:read` /
+`terms:write`.
+
+### Attaching terms to a document
+
+`POST /v1/invoices`, `/v1/purchase-bills` and `/v1/purchase-orders` accept an
+optional `termsId`. The terms must exist and be applicable to that document
+type (otherwise `422`). The document stores the reference **and** a
+`termsSnapshot` (`{title, description}`), so editing or deleting the entry
+later never changes an issued document. An invoice prints its snapshot in
+place of the shop-wide default terms lines. Omitting `termsId` keeps the
+previous behaviour.
+
 ## Suppliers — tag `Suppliers`
 
 > **Sign convention.** `balance` positive means **the shop owes the
@@ -408,6 +439,110 @@ goods. Permission `purchases:read`.
 are real, and an order marked cancelled while its lines show receipts would
 misdescribe what happened. Leave it partial instead. Permission
 `purchases:create`.
+
+### `PUT /v1/purchase-orders/:id`
+
+**What** Edits an order: replaces its header and lines in one transaction.
+**How** Lines are matched by `id`. A line that has received goods keeps its
+item, cannot be removed and cannot drop below what was received; the supplier is
+fixed once anything has arrived. Refused once the order is cancelled or fully
+received. Permission `purchases:create`.
+
+### `DELETE /v1/purchase-orders/:id`
+
+**What** Deletes an order (soft: its number stays accounted for). `204`.
+**How** Refused once anything has been received. Permission `purchases:void`.
+
+## Sales orders
+
+An order moves no stock and issues no GST document. It is fulfilled by raising
+invoices against it (`salesOrderId` on `POST /v1/invoices`, and
+`salesOrderLineId` on each line it covers). Two facts are kept apart:
+**fulfilment** (`open` → `partial` → `closed`, derived from the lines) and
+**payment** (the advance, a real `payments` row of kind `order_advance` plus a
+khata credit). Taking an advance never changes the status.
+
+### `POST /v1/sales-orders`
+
+**What** Takes a sales order. `201`, or `200` with `replayed: true` when the
+client `id` was already used.
+**How** Numbered from an auto-provisioned `SO` series. Totals come from the same
+tax engine as invoices and must match `expectedTotals` (`TOTALS_MISMATCH`).
+`customerId` or `customerName` is required; an advance needs a saved customer, a
+`paymentMode`, and may not exceed the total (`OVERPAYMENT`). An order may have no
+`lines` and a typed `manualTotal`, but not both. `termsId` is snapshotted
+(applicable to `sale_order`). `attachments` are `order_attachment` upload keys
+and must belong to the caller's business. Permission `sales_orders:create`.
+
+### `GET /v1/sales-orders`
+
+**What** Orders, newest first. `?status=all|open|partial|closed`, `customerId`,
+`outletId`. Permission `sales_orders:read`.
+
+### `GET /v1/sales-orders/summary`
+
+**What** `{ all, open, partial, closed }` counts, behind the list's filter chips.
+
+### `GET /v1/sales-orders/:id`
+
+**What** One order with per-line `quantity`, `quantityFulfilled` and
+`quantityPending`, `advanceAmount` and `balanceDue`.
+
+### `PUT /v1/sales-orders/:id`
+
+**What** Edits an order, replacing header and lines atomically. A changed
+advance voids the old payment and writes a new one, with matching khata entries.
+**How** A line already invoiced keeps its item, cannot be removed and cannot drop
+below the invoiced quantity (`FULFILMENT_EXCEEDS_ORDER`); the customer is fixed
+once invoiced. Refused when closed or cancelled (`SALES_ORDER_CLOSED`).
+A closed order can be edited (adding quantity or a line re-opens it). Edit is
+owner-only: managers and cashiers do not hold `sales_orders:update`.
+Permission `sales_orders:update`.
+
+### `DELETE /v1/sales-orders/:id`
+
+**What** Deletes an order. An advance not yet used on an invoice is refunded
+first (`?refundMode=` one of khata, cash, upi, card, bank_transfer, cheque,
+wallet; default the mode it was taken by). `204`, or `200` with the refund when
+there was one.
+**How** Refused once anything has been invoiced. Owner-only: permission
+`sales_orders:delete`.
+
+### `POST /v1/sales-orders/:id/cancel` and `/close`
+
+**What** Cancel (refused once invoiced) or close by hand (short-shipped). Body
+`{reason, refundMode?}` / `{refundMode?}`. The unused advance is refunded in the
+chosen mode, atomically with the status change; `khata` leaves it as customer
+credit. Cancel defaults to the original mode, close defaults to `khata`. The
+response carries `refund` when money moved. Open stock reservations are released.
+Permission `sales_orders:cancel` (owner and manager, not cashier).
+
+### `GET /v1/sales-orders/:id/print-payload`
+
+**What** The order formatted for print or share, like the invoice payload.
+Permission `sales_orders:read`.
+
+### Stock reservation
+
+Open and partial orders reserve their pending catalogue quantity
+(`stock_balances.reserved`; available = quantity - reserved). Custom lines never
+reserve. An order above available stock returns a `RESERVATION_SHORTFALL`
+warning, and is refused (`INSUFFICIENT_STOCK`) only when the business has
+`allow_negative_stock` off. Other invoices warn with `RESERVED_STOCK`.
+`POST /v1/stock/reservations/reconcile` recomputes the projection from the orders.
+
+### Amending an invoice
+
+An invoice is amended by a full credit note plus a replacement invoice that
+carries `amendsInvoiceId`. The server accepts the replacement only when the
+original is fully credited, not already replaced, and has no additional charges.
+Fulfilment on the order is reversed by the credit note and re-applied by the
+replacement.
+
+### Plan gating
+
+Sales orders are the `sales_orders` plan feature (Standard, Pro, Trial); other
+plans receive `402 FEATURE_NOT_IN_PLAN`, including on an invoice with `salesOrderId`.
 
 ### `POST /v1/supplier-payments`
 

@@ -31,12 +31,20 @@ export const PERMISSIONS = [
   'credit_notes:void',
   'suppliers:read',
   'suppliers:write',
+  'terms:read',
+  'terms:write',
   'purchases:read',
   'purchases:create',
   'purchases:void',
   'delivery_challans:read',
   'delivery_challans:create',
   'delivery_challans:void',
+  'sales_orders:read',
+  'sales_orders:create',
+  'sales_orders:update',
+  // Cancelling or closing an order refunds its advance, which is money out.
+  'sales_orders:cancel',
+  'sales_orders:delete',
   'debit_notes:read',
   'debit_notes:create',
   'debit_notes:void',
@@ -85,7 +93,13 @@ const READ_ONLY: Permission[] = PERMISSIONS.filter((p) => p.endsWith(':read'));
 
 const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
   owner: new Set(PERMISSIONS),
-  manager: new Set(PERMISSIONS.filter((p) => p !== 'tenant:manage')),
+  // A manager runs the shop day to day, so they can cancel or close an order (and
+  // refund its advance), but editing or deleting a taken order is the owner's call.
+  manager: new Set(
+    PERMISSIONS.filter(
+      (p) => p !== 'tenant:manage' && p !== 'sales_orders:update' && p !== 'sales_orders:delete',
+    ),
+  ),
   // No purchasing: a cashier who can enter a purchase bill can inflate stock
   // and create a payable, neither of which is a till function. They also do
   // not get suppliers:read, because the supplier ledger is what the shop
@@ -95,10 +109,16 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'catalogue:read',
     'customers:read',
     'customers:write',
+    // A cashier picks a saved T&C at the till; managing the list is withheld.
+    'terms:read',
     'invoices:read',
     'invoices:create',
     'delivery_challans:read',
     'delivery_challans:create',
+    // Takes orders and advances at the counter; changing or deleting one is
+    // withheld because that reverses a payment.
+    'sales_orders:read',
+    'sales_orders:create',
     'payments:read',
     'payments:create',
     'credit_notes:read',

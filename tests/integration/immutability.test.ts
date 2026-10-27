@@ -10,7 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
-import { closeOwnerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient } from './setup/database.js';
 import { integrationEnv } from './setup/env.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import {
@@ -66,7 +66,6 @@ describe('immutability and append-only contracts', () => {
   let client: pg.Client;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Immutable Shop' });
     series = await createSeries(t, { prefix: 'IMM' });
     const block = await leaseBlock(t, series.id, 5);

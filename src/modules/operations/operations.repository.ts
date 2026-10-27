@@ -509,11 +509,14 @@ export const operationsRepository = {
       params,
     );
 
+    // Its own parameter list: an expense belongs to the outlet, not a counter, and Postgres
+    // refuses a statement that is handed a parameter it never mentions ("could not determine
+    // data type of parameter $2"), which made the whole expected-cash figure a 500.
     const expenses = await tx.one<{ cashExpenses: number }>(
       `SELECT COALESCE(SUM(amount), 0)::bigint AS "cashExpenses" FROM expenses
        WHERE outlet_id = $1 AND status = 'issued' AND mode = 'cash'
-         AND spent_at >= $3 AND spent_at < $4`,
-      params,
+         AND spent_at >= $2 AND spent_at < $3`,
+      [scope.outletId, scope.from, scope.to],
     );
 
     const byMode: Record<string, number> = {};
@@ -525,7 +528,9 @@ export const operationsRepository = {
       byMode[row.mode] = (byMode[row.mode] ?? 0) + signed;
       if (row.mode === 'cash') {
         if (row.kind === 'invoice_tender') cashSales += row.total;
-        else if (row.kind === 'receipt') cashReceipts += row.total;
+        // An advance on a sales order is cash taken into the drawer, exactly like a
+        // receipt against the khata. Only a refund takes cash out.
+        else if (row.kind === 'receipt' || row.kind === 'order_advance') cashReceipts += row.total;
         else cashRefunds += row.total;
       }
     }

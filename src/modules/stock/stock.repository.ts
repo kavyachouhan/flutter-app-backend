@@ -50,7 +50,12 @@ export interface BalanceRow {
   itemId: string;
   itemName: string;
   unit: string;
+  /** Physical stock on the shelf, from the ledger. */
   quantity: number;
+  /** Promised to open sales orders. Stays on the shelf until the invoice takes it out. */
+  reserved: number;
+  /** What a new sale may take: quantity less reserved. Never below the figure shown as on hand. */
+  available: number;
   reorderLevel: number | null;
   updatedAt: Date;
 }
@@ -110,6 +115,107 @@ export const stockRepository = {
     );
   },
 
+  /**
+   * Moves the reserved quantity of one item by [delta]. Called only by the
+   * sales-order service, which computes the delta from the order's own lines, so
+   * the column is always the sum of what open orders still owe.
+   *
+   * Clamped at zero rather than allowed to fail: a CHECK violation here would make
+   * an order impossible to save or cancel, and the reconciliation check is what
+   * catches a column that has drifted.
+   */
+  async adjustReserved(
+    tx: Tx,
+    outletId: string,
+    itemId: string,
+    delta: number,
+  ): Promise<void> {
+    await tx.query(
+      `INSERT INTO stock_balances AS b (tenant_id, outlet_id, item_id, quantity, reserved)
+       VALUES (app.current_tenant_id(), $1, $2, 0, GREATEST(0, $3::bigint))
+       ON CONFLICT (tenant_id, outlet_id, item_id)
+       DO UPDATE SET reserved = GREATEST(0, b.reserved + $3::bigint)`,
+      [outletId, itemId, delta],
+    );
+  },
+
+  /** Items that are promised for more than is on the shelf, among [itemIds]. */
+  findReservedShortfalls(tx: Tx, outletId: string, itemIds: readonly string[]) {
+    return tx.many<{ itemId: string; onHand: number; reserved: number }>(
+      `SELECT item_id AS "itemId", quantity AS "onHand", reserved FROM stock_balances
+       WHERE outlet_id = $1 AND item_id = ANY($2::uuid[]) AND quantity - reserved < 0`,
+      [outletId, [...new Set(itemIds)]],
+    );
+  },
+
+  /** What the order lines say should be reserved, to check the column against. */
+  expectedReserved(tx: Tx, outletId: string | null) {
+    return tx.many<{ outletId: string; itemId: string; reserved: number }>(
+      `SELECT so.outlet_id AS "outletId", l.item_id AS "itemId",
+              SUM(GREATEST(0, l.quantity - l.quantity_fulfilled))::bigint AS reserved
+       FROM sales_order_lines l
+       JOIN sales_orders so ON so.id = l.sales_order_id
+       JOIN items i ON i.id = l.item_id
+       WHERE so.deleted_at IS NULL AND so.status IN ('open', 'partial') AND i.track_stock
+         AND ($1::uuid IS NULL OR so.outlet_id = $1)
+       GROUP BY so.outlet_id, l.item_id
+       HAVING SUM(GREATEST(0, l.quantity - l.quantity_fulfilled)) > 0`,
+      [outletId],
+    );
+  },
+
+  /** The reserved column as stored, for rows that carry any reservation. */
+  storedReserved(tx: Tx, outletId: string | null) {
+    return tx.many<{ outletId: string; itemId: string; reserved: number }>(
+      `SELECT outlet_id AS "outletId", item_id AS "itemId", reserved FROM stock_balances
+       WHERE reserved > 0 AND ($1::uuid IS NULL OR outlet_id = $1)`,
+      [outletId],
+    );
+  },
+
+  /**
+   * Rewrites the column from the order lines. A repair, never part of a request:
+   * the incremental path is the source of truth day to day.
+   */
+  async repairReserved(tx: Tx, outletId: string | null): Promise<void> {
+    await tx.query(
+      `UPDATE stock_balances SET reserved = 0
+       WHERE reserved > 0 AND ($1::uuid IS NULL OR outlet_id = $1)`,
+      [outletId],
+    );
+    await tx.query(
+      `INSERT INTO stock_balances AS b (tenant_id, outlet_id, item_id, quantity, reserved)
+       SELECT app.current_tenant_id(), e."outletId", e."itemId", 0, e.reserved
+       FROM (
+         SELECT so.outlet_id AS "outletId", l.item_id AS "itemId",
+                SUM(GREATEST(0, l.quantity - l.quantity_fulfilled))::bigint AS reserved
+         FROM sales_order_lines l
+         JOIN sales_orders so ON so.id = l.sales_order_id
+         JOIN items i ON i.id = l.item_id
+         WHERE so.deleted_at IS NULL AND so.status IN ('open', 'partial') AND i.track_stock
+           AND ($1::uuid IS NULL OR so.outlet_id = $1)
+         GROUP BY so.outlet_id, l.item_id
+         HAVING SUM(GREATEST(0, l.quantity - l.quantity_fulfilled)) > 0
+       ) e
+       ON CONFLICT (tenant_id, outlet_id, item_id) DO UPDATE SET reserved = EXCLUDED.reserved`,
+      [outletId],
+    );
+  },
+
+  /** On-hand and reserved quantity for one item at one outlet. */
+  async levelFor(
+    tx: Tx,
+    outletId: string,
+    itemId: string,
+  ): Promise<{ onHand: number; reserved: number }> {
+    const row = await tx.one<{ onHand: number; reserved: number }>(
+      `SELECT quantity AS "onHand", reserved FROM stock_balances
+       WHERE outlet_id = $1 AND item_id = $2`,
+      [outletId, itemId],
+    );
+    return row ?? { onHand: 0, reserved: 0 };
+  },
+
   findEntry(tx: Tx, id: string): Promise<StockEntryRow | undefined> {
     return tx.one<StockEntryRow>(
       `SELECT ${ENTRY_COLUMNS} FROM stock_ledger_entries WHERE id = $1`,
@@ -140,13 +246,16 @@ export const stockRepository = {
     cursor: Cursor | undefined,
   ): Promise<BalanceRow[]> {
     return tx.many<BalanceRow>(
-      `SELECT sb.item_id AS "itemId", i.name AS "itemName", i.unit, sb.quantity, i.reorder_level AS "reorderLevel",
+      `SELECT sb.item_id AS "itemId", i.name AS "itemName", i.unit, sb.quantity, sb.reserved,
+              sb.quantity - sb.reserved AS available, i.reorder_level AS "reorderLevel",
               sb.updated_at AS "updatedAt"
        FROM stock_balances sb JOIN items i ON i.id = sb.item_id
        WHERE sb.outlet_id = $1
          AND i.deleted_at IS NULL
          AND ($2::uuid IS NULL OR sb.item_id = $2)
-         AND (NOT $3::boolean OR (i.reorder_level IS NOT NULL AND sb.quantity <= i.reorder_level))
+         -- Low stock is measured on what can still be sold, not what is on the shelf.
+         AND (NOT $3::boolean OR (i.reorder_level IS NOT NULL
+                                  AND sb.quantity - sb.reserved <= i.reorder_level))
          AND ($4::text IS NULL OR (i.name, i.id) > ($4::text, $5::uuid))
        ORDER BY i.name, i.id
        LIMIT $6`,

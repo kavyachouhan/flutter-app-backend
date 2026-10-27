@@ -5,6 +5,10 @@
  * never disagree about what a vector means.
  */
 import { isAppError } from '../../src/lib/errors.js';
+import { PERMISSIONS, ROLES, permissionsFor, type Role } from '../../src/modules/auth/permissions.js';
+import { FEATURES } from '../../src/modules/entitlements/entitlements.js';
+import { PLANS, PLAN_CODES } from '../../src/modules/entitlements/plans.js';
+import { DOCUMENT_TYPES } from '../../src/modules/numbering/numbering.schemas.js';
 import {
   financialYearOf,
   formatDocumentNumber,
@@ -135,4 +139,43 @@ export function buildNumberingVectors(): NumberingVectorsFile {
     ],
     cases: numberingCases().map((c) => ({ ...c, expected: evaluateNumberingCase(c) })),
   });
+}
+
+
+/**
+ * Who may do what, which plan grants which feature, and which document types a series
+ * can be for. The app keeps its own copies of these lists (it has to hide a button
+ * before the server would refuse it), so they are published here and the app's test
+ * compares: a permission added on one side and not the other fails a build instead of
+ * silently never showing, or never being refused.
+ */
+export interface AccessVectorsFile {
+  readonly contract: 'access';
+  readonly version: 1;
+  readonly notes: readonly string[];
+  readonly permissions: readonly string[];
+  readonly roles: Readonly<Record<Role, readonly string[]>>;
+  readonly features: readonly string[];
+  readonly plans: Readonly<Record<string, readonly string[]>>;
+  readonly documentTypes: readonly string[];
+}
+
+export function buildAccessVectors(): AccessVectorsFile {
+  return {
+    contract: 'access',
+    version: 1,
+    notes: [
+      'permissions is the full list, in the server order; roles maps each role to what it holds.',
+      "plans lists the feature keys each plan is seeded with; '*' grants every feature.",
+      'documentTypes are the values a numbering series can have.',
+    ],
+    permissions: [...PERMISSIONS],
+    roles: Object.fromEntries(ROLES.map((role) => [role, permissionsFor(role)])) as unknown as Record<
+      Role,
+      readonly string[]
+    >,
+    features: [...FEATURES],
+    plans: Object.fromEntries(PLAN_CODES.map((code) => [code, [...PLANS[code].features]])),
+    documentTypes: [...DOCUMENT_TYPES],
+  };
 }

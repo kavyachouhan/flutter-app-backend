@@ -113,7 +113,7 @@ you were given, and treat it as opaque — it encodes the server's sort key.
 
 `GET /auth/me` returns the member's `permissions` array. Hide actions the user
 lacks; the server enforces them regardless. Roles are `owner`, `manager`,
-`cashier`, `accountant`, `viewer`, and there are 37 permissions
+`cashier`, `accountant`, `viewer`, and there are 61 permissions
 (`src/modules/auth/permissions.ts` is the list).
 
 ### 3.6 Warnings versus errors
@@ -722,7 +722,7 @@ Migrations applied: `0001_foundation` · `0002_tenancy` ·
 1. `JWT_SECRET` is a placeholder in `.env.development`; production boot is
    blocked until it is replaced.
 2. Development and integration tests still share one Supabase project, and the
-   integration suite **truncates every table**. Split them before this database
+   integration suite writes test tenants and rows into it (it no longer truncates). Split them before this database
    holds anything worth keeping.
 3. CI secrets are not configured, so the `integration` job cannot pass.
 4. No Dart parity test against the contract vectors yet — the most valuable test
@@ -746,7 +746,7 @@ npm run format:check         # CI gate
 npm run migrate              # apply pending migrations
 npm run migrate:status
 npm run db:bootstrap         # create the app role, revoke Data API grants
-npm run test:integration     # against TEST_DATABASE_URL — TRUNCATES IT
+npm run test:integration     # against TEST_DATABASE_URL — adds test tenants/rows, never truncates
 npm run contracts:generate   # rewrite contracts/*.json after an engine change
 ```
 

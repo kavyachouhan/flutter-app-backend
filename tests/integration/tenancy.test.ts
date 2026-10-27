@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { closeOwnerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient } from './setup/database.js';
 import { createTenant, app, type TenantFixture } from './setup/tenant.js';
 import { data, rows } from './setup/body.js';
 import request from 'supertest';
@@ -18,7 +18,6 @@ describe('tenant isolation', () => {
   let itemAId: string;
 
   beforeAll(async () => {
-    await truncateAll();
     a = await createTenant({ name: 'Shop A', stateCode: '27' });
     b = await createTenant({ name: 'Shop B', stateCode: '29', gstin: '29AAAPA1234A1Z5' });
 

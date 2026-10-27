@@ -12,7 +12,12 @@
  *    forever.
  */
 
-export type PrintDocumentKind = 'invoice' | 'credit_note' | 'payment_receipt' | 'estimate';
+export type PrintDocumentKind =
+  | 'invoice'
+  | 'credit_note'
+  | 'payment_receipt'
+  | 'estimate'
+  | 'sales_order';
 
 export interface PrintField {
   readonly label: string;

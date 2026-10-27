@@ -63,6 +63,22 @@ export const ErrorCode = {
   RECEIPT_EXCEEDS_ORDER: 'RECEIPT_EXCEEDS_ORDER',
   /** The purchase order is cancelled or already fully received. */
   PURCHASE_ORDER_CLOSED: 'PURCHASE_ORDER_CLOSED',
+  /** The invoice would take a sales order line past the quantity ordered. */
+  FULFILMENT_EXCEEDS_ORDER: 'FULFILMENT_EXCEEDS_ORDER',
+  /** The sales order is cancelled, closed or deleted, so it cannot be changed or invoiced. */
+  SALES_ORDER_CLOSED: 'SALES_ORDER_CLOSED',
+  /** A line already invoiced keeps the item, price, tax and discount it was invoiced at. */
+  ORDER_LINE_INVOICED: 'ORDER_LINE_INVOICED',
+  /** The advance has been applied to an invoice or refunded, so its amount is fixed. */
+  ADVANCE_LOCKED: 'ADVANCE_LOCKED',
+  /** The invoice has credit notes against it; void those first, or amend instead. */
+  INVOICE_HAS_CREDIT_NOTES: 'INVOICE_HAS_CREDIT_NOTES',
+  /** A replacement invoice needs the original fully credited and not already replaced. */
+  AMENDMENT_NOT_ALLOWED: 'AMENDMENT_NOT_ALLOWED',
+  /** A bill discount larger than the amount it is taken from. */
+  DISCOUNT_EXCEEDS_TOTAL: 'DISCOUNT_EXCEEDS_TOTAL',
+  /** A discount over the shop's policy without an approval. */
+  DISCOUNT_CAP_EXCEEDED: 'DISCOUNT_CAP_EXCEEDED',
   /** More units returned than remain unreturned on the purchase bill line. */
   RETURN_EXCEEDS_BILL: 'RETURN_EXCEEDS_BILL',
   /** The purchase bill is void and cannot be returned against or paid. */
@@ -124,6 +140,10 @@ export const WarningCode = {
    * the list may have moved since the sale.
    */
   PRICE_LIST_MISMATCH: 'PRICE_LIST_MISMATCH',
+  /** An order asks for more stock than is available (on hand less reserved). */
+  RESERVATION_SHORTFALL: 'RESERVATION_SHORTFALL',
+  /** A sale takes stock that open sales orders have reserved. */
+  RESERVED_STOCK: 'RESERVED_STOCK',
 } as const;
 
 export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];

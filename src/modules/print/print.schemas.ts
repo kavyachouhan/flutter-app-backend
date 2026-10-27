@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { TEMPLATE_KEYS } from '../../domain/print/templates.js';
 import { booleanQuery, nonEmpty } from '../../lib/validators.js';
 
-export const CUSTOM_FIELD_DOCUMENT_TYPES = ['invoice', 'credit_note', 'estimate'] as const;
+export const CUSTOM_FIELD_DOCUMENT_TYPES = [
+  'invoice',
+  'credit_note',
+  'estimate',
+  'sales_order',
+] as const;
 export const CUSTOM_FIELD_DATA_TYPES = ['text', 'number', 'date', 'boolean'] as const;
 
 /**

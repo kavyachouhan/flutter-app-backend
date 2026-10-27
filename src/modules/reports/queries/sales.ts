@@ -129,7 +129,7 @@ export async function paymentModeSplit(tx: Tx, params: ReportParams): Promise<Re
   const sql = `
     SELECT pm.mode,
            SUM(CASE WHEN pm.kind = 'invoice_tender' THEN pm.amount ELSE 0 END)::bigint AS "atBilling",
-           SUM(CASE WHEN pm.kind = 'receipt' THEN pm.amount ELSE 0 END)::bigint AS "collections",
+           SUM(CASE WHEN pm.kind IN ('receipt', 'order_advance') THEN pm.amount ELSE 0 END)::bigint AS "collections",
            SUM(CASE WHEN pm.kind = 'refund' THEN pm.amount ELSE 0 END)::bigint AS "refunds",
            SUM(CASE WHEN pm.kind = 'refund' THEN -pm.amount ELSE pm.amount END)::bigint AS "net",
            count(*)::int AS "txnCount"
@@ -171,6 +171,22 @@ export async function dayBook(tx: Tx, params: ReportParams): Promise<ReportRow[]
         AND pm.status = 'issued' AND pm.kind = 'receipt'
 
       UNION ALL
+      SELECT pm.received_at, 'Advance', COALESCE(pm.reference, pm.mode), COALESCE(cu.name, '-'),
+             pm.amount, 0::bigint, pm.status
+      FROM payments pm LEFT JOIN customers cu ON cu.id = pm.customer_id
+      WHERE ${outletScope(p, 'pm', params)} AND ${instantRange(p, 'pm.received_at', params)}
+        AND pm.status = 'issued' AND pm.kind = 'order_advance'
+
+      UNION ALL
+      -- Only refunds of a sales-order advance: refunds against a credit note are
+      -- already shown as that return's outflow above.
+      SELECT pm.received_at, 'Advance refund', pm.mode, COALESCE(cu.name, '-'),
+             0::bigint, pm.amount, pm.status
+      FROM payments pm LEFT JOIN customers cu ON cu.id = pm.customer_id
+      WHERE ${outletScope(p, 'pm', params)} AND ${instantRange(p, 'pm.received_at', params)}
+        AND pm.status = 'issued' AND pm.kind = 'refund' AND pm.sales_order_id IS NOT NULL
+
+      UNION ALL
       SELECT e.spent_at, 'Expense', COALESCE(e.reference, ec.name, 'Expense'),
              COALESCE(e.vendor_name, '-'), 0::bigint, e.amount, e.status
       FROM expenses e LEFT JOIN expense_categories ec ON ec.id = e.category_id
@@ -178,6 +194,42 @@ export async function dayBook(tx: Tx, params: ReportParams): Promise<ReportRow[]
         AND e.status = 'issued'
     ) entries
     ORDER BY "at"
+    LIMIT ${p.add(params.limit)}`;
+  return tx.many(sql, p.all);
+}
+
+/**
+ * Sales order status: what customers have ordered, how much has been invoiced, what they have
+ * paid in advance, and what is late.
+ *
+ * The open end of the order-to-invoice loop. An order part-delivered and then forgotten is a
+ * customer waiting and stock held back from other buyers, and nothing else shows it.
+ * Cancelled orders are left out: they are not owed to anyone.
+ */
+export async function saleOrderStatus(tx: Tx, params: ReportParams): Promise<ReportRow[]> {
+  const p = new Params();
+  const customerId = p.add(params.customerId ?? null);
+  const sql = `
+    SELECT so.document_number AS "orderNumber", so.document_date AS "orderDate",
+           COALESCE(so.customer_name, 'Walk-in') AS "customerName", so.status,
+           so.due_date AS "dueDate",
+           CASE WHEN so.due_date IS NULL OR so.status IN ('closed', 'cancelled') THEN NULL
+                ELSE GREATEST(0, CURRENT_DATE - so.due_date) END AS "daysLate",
+           so.grand_total AS "orderValue",
+           so.advance_amount - so.advance_refunded AS "advancePaid",
+           GREATEST(0, so.grand_total - (so.advance_amount - so.advance_refunded)) AS "balanceDue",
+           COALESCE(SUM(l.quantity), 0)::bigint AS "orderedQuantity",
+           COALESCE(SUM(l.quantity_fulfilled), 0)::bigint AS "invoicedQuantity",
+           COALESCE(SUM(l.quantity - l.quantity_fulfilled), 0)::bigint AS "pendingQuantity"
+    FROM sales_orders so
+    LEFT JOIN sales_order_lines l ON l.sales_order_id = so.id
+    WHERE so.deleted_at IS NULL AND so.status <> 'cancelled'
+      AND ${outletScope(p, 'so', params)}
+      AND ${dateRange(p, 'so.document_date', params)}
+      AND (${customerId}::uuid IS NULL OR so.customer_id = ${customerId}::uuid)
+    GROUP BY so.id, so.document_number, so.document_date, so.customer_name, so.status, so.due_date,
+             so.grand_total, so.advance_amount, so.advance_refunded
+    ORDER BY so.document_date DESC, so.document_number DESC
     LIMIT ${p.add(params.limit)}`;
   return tx.many(sql, p.all);
 }

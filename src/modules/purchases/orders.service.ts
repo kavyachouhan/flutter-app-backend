@@ -8,7 +8,7 @@
  */
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { requireAuthContext } from '../../lib/context.js';
-import { ErrorCode, NotFoundError, UnprocessableError } from '../../lib/errors.js';
+import { ErrorCode, NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
@@ -16,10 +16,15 @@ import { assertFeature } from '../entitlements/entitlements.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { suppliersRepository } from '../suppliers/suppliers.repository.js';
+import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { allocateNumber } from './numbering.js';
 import { ordersRepository, type PurchaseOrderRow } from './orders.repository.js';
-import type { CreatePurchaseOrderBody, ListPurchaseOrdersQuery } from './purchases.schemas.js';
+import type {
+  CreatePurchaseOrderBody,
+  ListPurchaseOrdersQuery,
+  UpdatePurchaseOrderBody,
+} from './purchases.schemas.js';
 
 async function loadOrder(tx: Tx, id: string) {
   const order = await ordersRepository.find(tx, id);
@@ -67,6 +72,8 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
       0,
     );
 
+    const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase_order');
+
     await ordersRepository.insert(tx, {
       id: body.id,
       outletId: body.outletId,
@@ -79,6 +86,8 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
       expectedDate: body.expectedDate ?? null,
       estimatedTotal,
       notes: body.notes ?? null,
+      termsId: terms?.termsId ?? null,
+      termsSnapshot: terms?.snapshot ?? null,
       createdBy: auth.userId,
     });
 
@@ -107,6 +116,164 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
   });
 }
 
+/**
+ * Edits an order, replacing its header and lines in one transaction.
+ *
+ * Lines are matched by id. A line that has received goods keeps its item,
+ * cannot be removed and cannot drop below what arrived, because a bill
+ * already refers to it. The supplier is likewise fixed once anything has been
+ * received. A cancelled or fully received order is not editable.
+ */
+export function updatePurchaseOrder(id: string, body: UpdatePurchaseOrderBody) {
+  return withTransaction(async (tx) => {
+    await assertFeature(tx, 'purchases');
+    const order = await ordersRepository.find(tx, id, true);
+    if (!order) throw new NotFoundError('Purchase order');
+    assertOutletAccess(order.outletId);
+    if (order.status === 'cancelled' || order.status === 'received') {
+      throw new UnprocessableError(
+        `This purchase order is ${order.status} and cannot be changed.`,
+        ErrorCode.PURCHASE_ORDER_CLOSED,
+      );
+    }
+    if (body.outletId !== order.outletId) {
+      throw new UnprocessableError('An order cannot be moved to another outlet.');
+    }
+    if (body.expectedDate && body.expectedDate < body.documentDate) {
+      throw new ValidationError('The expected date cannot be before the order date.', {
+        details: { field: 'expectedDate' },
+      });
+    }
+
+    const existing = new Map((await ordersRepository.lockLinesForReceipt(tx, id)).map((l) => [l.id, l]));
+    const currentLines = new Map((await ordersRepository.findLines(tx, id)).map((l) => [l.id, l]));
+    const incomingIds = new Set(body.lines.map((l) => l.id));
+    const anyReceived = [...existing.values()].some((l) => l.quantityReceived > 0);
+
+    if (anyReceived && body.supplierId !== order.supplierId) {
+      throw new UnprocessableError(
+        'The supplier cannot be changed once goods have been received.',
+        ErrorCode.PURCHASE_ORDER_CLOSED,
+      );
+    }
+    if (!(await suppliersRepository.find(tx, body.supplierId))) throw new NotFoundError('Supplier');
+
+    for (const line of existing.values()) {
+      if (line.quantityReceived > 0 && !incomingIds.has(line.id)) {
+        throw new UnprocessableError(
+          'A line that has received goods cannot be removed.',
+          ErrorCode.PURCHASE_ORDER_CLOSED,
+          { details: { lineId: line.id } },
+        );
+      }
+    }
+    for (const line of body.lines) {
+      const before = existing.get(line.id);
+      if (!before || before.quantityReceived === 0) continue;
+      if (line.quantityOrdered < before.quantityReceived) {
+        throw new UnprocessableError(
+          'The quantity cannot be less than what has already been received.',
+          ErrorCode.RECEIPT_EXCEEDS_ORDER,
+          {
+            details: {
+              lineId: line.id,
+              received: before.quantityReceived,
+              requested: line.quantityOrdered,
+            },
+          },
+        );
+      }
+      if (line.itemId !== currentLines.get(line.id)?.itemId) {
+        throw new UnprocessableError(
+          'The item on a line that has received goods cannot be changed.',
+          ErrorCode.PURCHASE_ORDER_CLOSED,
+          { details: { lineId: line.id } },
+        );
+      }
+    }
+
+    const itemIds = [...new Set(body.lines.map((l) => l.itemId))];
+    const items = new Map(
+      (await invoicesRepository.findItems(tx, itemIds)).map((item) => [item.id, item]),
+    );
+    const unknown = itemIds.filter((itemId) => !items.has(itemId));
+    if (unknown.length > 0) throw new NotFoundError('Item', { details: { itemIds: unknown } });
+
+    const estimatedTotal = body.lines.reduce(
+      (sum, l) => sum + Math.round((l.expectedUnitCost * l.quantityOrdered) / 1000),
+      0,
+    );
+    const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase_order');
+
+    const rows = body.lines.map((line, index) => ({
+      id: line.id,
+      lineNo: index + 1,
+      itemId: line.itemId,
+      itemName: line.itemName ?? items.get(line.itemId)?.name ?? '',
+      unit: line.unit ?? items.get(line.itemId)?.unit ?? null,
+      quantityOrdered: line.quantityOrdered,
+      expectedUnitCost: line.expectedUnitCost,
+    }));
+
+    await ordersRepository.updateHeader(tx, id, {
+      supplierId: body.supplierId,
+      documentDate: body.documentDate,
+      expectedDate: body.expectedDate ?? null,
+      estimatedTotal,
+      notes: body.notes ?? null,
+      termsId: terms?.termsId ?? null,
+      termsSnapshot: terms?.snapshot ?? null,
+    });
+    await ordersRepository.deleteLines(
+      tx,
+      id,
+      [...existing.keys()].filter((lineId) => !incomingIds.has(lineId)),
+    );
+    await ordersRepository.updateLines(tx, id, rows.filter((r) => existing.has(r.id)));
+    await ordersRepository.insertLines(tx, id, rows.filter((r) => !existing.has(r.id)));
+    await ordersRepository.refreshStatus(tx, id);
+
+    await recordAudit(tx, {
+      action: 'purchase_order.updated',
+      entityType: 'purchase_order',
+      entityId: id,
+      metadata: { documentNumber: order.documentNumber, estimatedTotal },
+    });
+    return loadOrder(tx, id);
+  });
+}
+
+/**
+ * Deletes an order (soft: its number stays accounted for). Refused once goods
+ * have been received, since those bills name this order.
+ */
+export function deletePurchaseOrder(id: string) {
+  return withTransaction(async (tx) => {
+    await assertFeature(tx, 'purchases');
+    const order = await ordersRepository.find(tx, id, true);
+    if (!order) throw new NotFoundError('Purchase order');
+    assertOutletAccess(order.outletId);
+
+    const lines = await ordersRepository.findLines(tx, id);
+    const received = lines.reduce((sum, l) => sum + l.quantityReceived, 0);
+    if (received > 0) {
+      throw new UnprocessableError(
+        'Goods have already been received against this order, so it cannot be deleted.',
+        ErrorCode.PURCHASE_ORDER_CLOSED,
+        { details: { receivedQuantity: received } },
+      );
+    }
+
+    await ordersRepository.softDelete(tx, id);
+    await recordAudit(tx, {
+      action: 'purchase_order.deleted',
+      entityType: 'purchase_order',
+      entityId: id,
+      metadata: { documentNumber: order.documentNumber },
+    });
+  });
+}
+
 export function getPurchaseOrder(id: string) {
   return withReadTransaction(async (tx) => {
     const order = await loadOrder(tx, id);
@@ -126,6 +293,7 @@ export async function listPurchaseOrders(query: ListPurchaseOrdersQuery) {
         outletId: query.outletId,
         status: query.status,
         openOnly: query.openOnly ?? false,
+        q: query.q,
       },
       accessibleOutletIds(),
       page.limit,
