@@ -7,7 +7,7 @@ import {
   registry,
   timestamp,
 } from '../../openapi/registry.js';
-import { downloadUrlQuery, signUploadBody } from './uploads.schemas.js';
+import { downloadUrlQuery, downloadUrlsBody, signUploadBody } from './uploads.schemas.js';
 
 const signedUpload = registry.register(
   'SignedUpload',
@@ -38,8 +38,9 @@ registry.registerPath({
     '',
     'Content type and size are validated here, at signing time, because it is the last point the',
     'server sees the request. Limits per kind: logo 2 MB and signature 1 MB (png/jpeg/webp),',
-    'receipt 5 MB (png/jpeg/webp/pdf), import 10 MB (xlsx/csv). `export` objects are written by',
-    'the server and cannot be signed for upload.',
+    'receipt 5 MB (png/jpeg/webp/pdf), item_image and attachment_image 5 MB (png/jpeg/webp),',
+    'attachment_file 10 MB (pdf, Office documents, csv, txt, zip, gzip), import 10 MB (xlsx/csv).',
+    '`export` objects are written by the server and cannot be signed for upload.',
   ].join('\n'),
   security: accessTokenSecurity,
   request: { body: { content: { 'application/json': { schema: signUploadBody } } } },
@@ -60,6 +61,34 @@ registry.registerPath({
   request: { query: downloadUrlQuery },
   responses: {
     200: jsonResponse('Read with this URL before it expires.', dataEnvelope(signedDownload)),
+    ...errorResponses(),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/v1/uploads/urls',
+  tags: ['Uploads'],
+  summary: 'Get read URLs for up to 50 files at once',
+  description: [
+    'For lists that show a picture per row. A key belonging to another business answers 403 for the',
+    'whole call. A key whose file no longer exists comes back with `url: null`.',
+  ].join('\n'),
+  security: accessTokenSecurity,
+  request: { body: { content: { 'application/json': { schema: downloadUrlsBody } } } },
+  responses: {
+    200: jsonResponse(
+      'One entry per distinct key, in order.',
+      dataEnvelope(
+        z.array(
+          z.object({
+            key: z.string(),
+            url: z.string().url().nullable(),
+            expiresAt: timestamp.nullable(),
+          }),
+        ),
+      ),
+    ),
     ...errorResponses(),
   },
 });

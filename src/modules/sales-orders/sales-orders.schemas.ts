@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import {
@@ -37,12 +38,8 @@ const orderLine = z
     path: ['itemName'],
   });
 
-/** Object keys returned by POST /uploads/sign for kind `order_attachment`. */
-const attachment = z.object({
-  objectKey: nonEmpty.max(300),
-  kind: z.enum(['image', 'document']),
-  name: nonEmpty.max(200).optional(),
-});
+// Attachments use the shared shape in `lib/attachments.ts`: the same one every
+// other document takes, so an order's files look like a bill's.
 
 /** The order is stored whole; an edit replaces the same shape. */
 export const saleOrderBody = z.object({
@@ -77,7 +74,7 @@ export const saleOrderBody = z.object({
   notes: nonEmpty.max(1000).nullable().optional(),
   /** Values for the tenant's user-defined fields; validated against the definitions. */
   customFields: z.record(z.string()).optional(),
-  attachments: z.array(attachment).max(10).optional(),
+  attachments: attachmentsField.optional(),
   /** A saved T&C; its text is snapshotted onto the order. null clears it. */
   termsId: z.string().uuid().nullable().optional(),
   /**

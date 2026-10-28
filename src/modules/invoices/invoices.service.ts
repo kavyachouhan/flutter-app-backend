@@ -1,6 +1,7 @@
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
+import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   ErrorCode,
@@ -119,6 +120,9 @@ async function assertAmendable(tx: Tx, originalId: string): Promise<void> {
  */
 export async function createInvoice(body: CreateInvoiceBody) {
   const auth = requireAuthContext();
+  // Looks at the real files in storage, so it runs before the transaction opens:
+  // a slow storage call must not hold a database connection idle.
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   const result = await withTransaction(async (tx) => {
@@ -167,6 +171,8 @@ export async function createInvoice(body: CreateInvoiceBody) {
     // rejection naming the key, rather than an invoice that cannot be printed
     // with a proper label.
     await validateCustomFields(tx, 'invoice', body.customFields);
+    // Same moment, same reason: the keys become part of an immutable document.
+    assertAttachments(body.attachments);
 
     // Deleted items are still resolved: an item removed after an offline sale
     // must not block that sale from uploading.
@@ -338,6 +344,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       termsId: terms?.termsId ?? null,
       termsSnapshot: terms?.snapshot ?? null,
       customFields: body.customFields ?? null,
+      attachments: body.attachments ?? [],
       salesOrderId: body.salesOrderId ?? null,
       amendsInvoiceId: body.amendsInvoiceId ?? null,
       billDiscountReason: body.billDiscountReason ?? null,

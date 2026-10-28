@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import {
@@ -85,6 +86,8 @@ export const createPurchaseBillBody = z.object({
   notes: nonEmpty.optional(),
   /** A saved T&C; its text is snapshotted onto the bill when issued. */
   termsId: z.string().uuid().nullable().optional(),
+  /** Photos and documents (the supplier's bill, a delivery challan). Upload first, then list the keys. */
+  attachments: attachmentsField.optional(),
   receivedAt: timestamp,
   /** Payment made at the time of the bill, if any. */
   paidAmount: paise.default(0),
@@ -149,6 +152,8 @@ export const createPurchaseOrderBody = z.object({
   notes: nonEmpty.max(500).optional(),
   /** A saved T&C; its text is snapshotted onto the order when created. */
   termsId: z.string().uuid().nullable().optional(),
+  /** Photos and documents. The whole list is replaced when the order is edited. */
+  attachments: attachmentsField.optional(),
   lines: z
     .array(
       z.object({

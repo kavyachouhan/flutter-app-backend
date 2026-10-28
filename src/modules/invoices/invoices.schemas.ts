@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { discountApproval } from '../price-lists/price-lists.schemas.js';
@@ -106,6 +107,11 @@ export const createInvoiceBody = z.object({
   termsId: z.string().uuid().nullable().optional(),
   /** Values for the tenant's user-defined fields (PO no, vehicle no...); write-once. */
   customFields: z.record(z.string()).optional(),
+  /**
+   * Photos and documents (a signed delivery note, a PO scan). Upload each first, then list
+   * the keys here; like everything else on an issued invoice they cannot change afterwards.
+   */
+  attachments: attachmentsField.optional(),
   /**
    * Approvals for discounts that breach the shop's policy, captured at the
    * till and travelling with the document so the authority and the discount

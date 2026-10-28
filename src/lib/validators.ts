@@ -4,6 +4,16 @@ import { env } from '../config/env.js';
 
 export const nonEmpty = z.string().trim().min(1);
 
+/**
+ * A storage object key, as returned by `/uploads/sign`. Only its shape is
+ * checked here; the service also proves it sits under the caller's own tenant
+ * prefix and was signed for the right kind (see `assertKeyHasKind`).
+ */
+export const objectKey = z.string().min(1).max(512);
+
+/** The name of an icon the app bundles, e.g. `shopping-cart`. Not a path and not a URL. */
+export const iconName = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/, 'must be an icon name');
+
 export const gstin = z
   .string()
   .trim()

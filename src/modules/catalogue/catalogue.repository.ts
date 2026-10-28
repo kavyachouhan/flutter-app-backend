@@ -7,6 +7,8 @@ export interface CategoryRow {
   id: string;
   parentId: string | null;
   name: string;
+  /** Name of an icon the app ships with; null = the default. */
+  icon: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +26,8 @@ export interface ItemRow {
   unit: string;
   mrp: number | null;
   salePrice: number;
+  /** Object key of the item's photo in the storage bucket; null = no photo. */
+  imageObjectKey: string | null;
   discountPercent: number | null;
   purchasePrice: number | null;
   pricesIncludeTax: boolean;
@@ -39,12 +43,13 @@ export interface ItemRow {
 export type NewItem = Omit<ItemRow, 'barcodes' | 'createdAt' | 'updatedAt'>;
 
 const CATEGORY_COLUMNS =
-  'id, parent_id AS "parentId", name, created_at AS "createdAt", updated_at AS "updatedAt"';
+  'id, parent_id AS "parentId", name, icon, created_at AS "createdAt", updated_at AS "updatedAt"';
 
 const ITEM_COLUMNS = `
   i.id, i.category_id AS "categoryId", i.item_type AS "itemType", i.name, i.code, i.aliases,
   i.hsn_code AS "hsnCode", i.tax_rate_percent AS "taxRatePercent", i.cess_rate_percent AS "cessRatePercent",
   i.unit, i.mrp, i.sale_price AS "salePrice", i.discount_percent AS "discountPercent",
+  i.image_object_key AS "imageObjectKey",
   i.purchase_price AS "purchasePrice",
   i.prices_include_tax AS "pricesIncludeTax", i.track_stock AS "trackStock", i.reorder_level AS "reorderLevel",
   i.supply_category AS "supplyCategory",
@@ -52,7 +57,7 @@ const ITEM_COLUMNS = `
   COALESCE((SELECT array_agg(b.barcode ORDER BY b.barcode) FROM item_barcodes b
             WHERE b.item_id = i.id AND b.deleted_at IS NULL), '{}') AS barcodes`;
 
-const CATEGORY_UPDATABLE = { name: 'name', parentId: 'parent_id' } as const;
+const CATEGORY_UPDATABLE = { name: 'name', parentId: 'parent_id', icon: 'icon' } as const;
 
 const ITEM_UPDATABLE = {
   categoryId: 'category_id',
@@ -67,6 +72,7 @@ const ITEM_UPDATABLE = {
   mrp: 'mrp',
   salePrice: 'sale_price',
   discountPercent: 'discount_percent',
+  imageObjectKey: 'image_object_key',
   purchasePrice: 'purchase_price',
   pricesIncludeTax: 'prices_include_tax',
   trackStock: 'track_stock',
@@ -98,11 +104,11 @@ export const catalogueRepository = {
 
   async insertCategory(
     tx: Tx,
-    c: { id: string; name: string; parentId: string | null },
+    c: { id: string; name: string; parentId: string | null; icon: string | null },
   ): Promise<void> {
     await tx.query(
-      'INSERT INTO categories (id, tenant_id, name, parent_id) VALUES ($1, app.current_tenant_id(), $2, $3)',
-      [c.id, c.name, c.parentId],
+      'INSERT INTO categories (id, tenant_id, name, parent_id, icon) VALUES ($1, app.current_tenant_id(), $2, $3, $4)',
+      [c.id, c.name, c.parentId, c.icon],
     );
   },
 
@@ -190,8 +196,8 @@ export const catalogueRepository = {
     await tx.query(
       `INSERT INTO items (id, tenant_id, category_id, item_type, name, code, aliases, hsn_code, tax_rate_percent,
          cess_rate_percent, unit, mrp, sale_price, discount_percent, purchase_price, prices_include_tax, track_stock,
-         reorder_level, supply_category, is_active)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+         reorder_level, supply_category, is_active, image_object_key)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
       [
         item.id,
         item.categoryId,
@@ -212,6 +218,7 @@ export const catalogueRepository = {
         item.reorderLevel,
         item.supplyCategory,
         item.isActive,
+        item.imageObjectKey,
       ],
     );
   },
