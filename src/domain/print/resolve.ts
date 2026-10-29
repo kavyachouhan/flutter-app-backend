@@ -255,7 +255,8 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
     });
   }
   const outstanding = t.grandTotal - t.amountPaid;
-  if (outstanding > 0) {
+  // An estimate is an offer: nothing is owed on it yet.
+  if (outstanding > 0 && input.kind !== 'estimate') {
     tenders.push({
       label:
         input.kind === 'credit_note'

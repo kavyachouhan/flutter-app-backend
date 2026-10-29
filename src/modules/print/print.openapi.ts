@@ -180,6 +180,7 @@ for (const [path, tag, summary] of [
   ['/v1/credit-notes/{id}/print-payload', 'Credit notes', 'Printable credit note'],
   ['/v1/payments/{id}/print-payload', 'Payments', 'Printable receipt'],
   ['/v1/sales-orders/{id}/print-payload', 'Sales orders', 'Printable sale order'],
+  ['/v1/estimates/{id}/print-payload', 'Estimates', 'Printable estimate'],
 ] as const) {
   registry.registerPath({
     method: 'get',

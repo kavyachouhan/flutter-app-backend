@@ -49,6 +49,20 @@ describe('permissions', () => {
     }
   });
 
+  it('lets a cashier quote and read estimates, but not change, delete or convert them', () => {
+    expect(hasPermission('cashier', 'estimates:create')).toBe(true);
+    expect(hasPermission('cashier', 'estimates:read')).toBe(true);
+    for (const p of ['estimates:update', 'estimates:delete', 'estimates:convert'] as const) {
+      expect(hasPermission('cashier', p)).toBe(false);
+      expect(hasPermission('manager', p)).toBe(true);
+      expect(hasPermission('owner', p)).toBe(true);
+    }
+    for (const role of ['accountant', 'viewer'] as const) {
+      expect(hasPermission(role, 'estimates:read')).toBe(true);
+      expect(hasPermission(role, 'estimates:create')).toBe(false);
+    }
+  });
+
   it('only lets an owner assign or modify the owner role', () => {
     for (const actor of ROLES) {
       expect(canManageRole(actor, 'owner')).toBe(actor === 'owner');

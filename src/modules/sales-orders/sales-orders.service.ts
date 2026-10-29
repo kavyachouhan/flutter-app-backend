@@ -105,7 +105,7 @@ async function loadOrder(tx: Tx, id: string) {
 }
 
 /** A header-only order: no items, the user typed the amount. No tax is derivable from it. */
-function manualTotals(mode: TaxMode, amount: number): TaxInvoiceResult {
+export function manualTotals(mode: TaxMode, amount: number): TaxInvoiceResult {
   return {
     supplyType: 'intra_state',
     mode,
@@ -133,10 +133,7 @@ function manualTotals(mode: TaxMode, amount: number): TaxInvoiceResult {
 }
 
 interface PreparedOrder {
-  header: Omit<
-    SaleOrderHeaderUpdate,
-    'id' | 'advancePaymentId'
-  >;
+  header: Omit<SaleOrderHeaderUpdate, 'id' | 'advancePaymentId'>;
   lines: SaleOrderLineWrite[];
   customer: Awaited<ReturnType<typeof customersRepository.find>>;
   approvals: { approval: ApprovalInput; role: string }[];
@@ -609,101 +606,108 @@ export async function createSaleOrder(body: CreateSaleOrderBody) {
   const auth = requireAuthContext();
   await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
+  return withTransaction((tx) => createSaleOrderInTx(tx, body));
+}
 
-  return withTransaction(async (tx) => {
-    await assertFeature(tx, 'sales_orders');
-    if (await salesOrdersRepository.exists(tx, body.id)) {
-      const existing = await salesOrdersRepository.find(tx, body.id);
-      if (!existing) {
-        throw new UnprocessableError('That sales order was deleted.', ErrorCode.SALES_ORDER_CLOSED);
-      }
-      return { order: await loadOrder(tx, body.id), replayed: true, warnings: [] as OrderWarning[] };
+/**
+ * The create pipeline inside a transaction the caller owns, so a second document can be
+ * written in the same transaction: converting an estimate raises an order and marks the
+ * estimate converted together or not at all.
+ */
+export async function createSaleOrderInTx(
+  tx: Tx,
+  body: CreateSaleOrderBody,
+  estimateId: string | null = null,
+) {
+  const auth = requireAuthContext();
+  await assertFeature(tx, 'sales_orders');
+  if (await salesOrdersRepository.exists(tx, body.id)) {
+    const existing = await salesOrdersRepository.find(tx, body.id);
+    if (!existing) {
+      throw new UnprocessableError('That sales order was deleted.', ErrorCode.SALES_ORDER_CLOSED);
     }
+    return { order: await loadOrder(tx, body.id), replayed: true, warnings: [] as OrderWarning[] };
+  }
 
-    const prepared = await prepareOrder(tx, body);
-    const settings = await tenantsRepository.getSettings(tx);
-    const number = await allocateNumber(tx, {
+  const prepared = await prepareOrder(tx, body);
+  const settings = await tenantsRepository.getSettings(tx);
+  const number = await allocateNumber(tx, {
+    outletId: body.outletId,
+    documentType: 'sales_order',
+    documentDate: body.documentDate,
+    fyStartMonth: settings.fyStartMonth,
+  });
+
+  // The header goes in with no advance yet: the payment row points at the order,
+  // so the order must exist first. The pointer is set right after.
+  const reservation = await trackReservation(
+    tx,
+    body.id,
+    async () => {
+      await salesOrdersRepository.insertHeader(tx, {
+        ...prepared.header,
+        id: body.id,
+        seriesId: number.seriesId,
+        sequenceNo: number.sequenceNo,
+        documentNumber: number.documentNumber,
+        fyStartYear: number.fyStartYear,
+        advanceAmount: 0,
+        advancePaymentId: null,
+        estimateId,
+        createdBy: auth.userId,
+      });
+      await salesOrdersRepository.insertLines(tx, body.id, prepared.lines);
+    },
+    true,
+  );
+
+  const paymentId = await syncAdvance(
+    tx,
+    { id: body.id, documentNumber: number.documentNumber },
+    undefined,
+    {
+      amount: prepared.header.advanceAmount,
+      mode: prepared.header.paymentMode,
+      customerId: prepared.header.customerId,
       outletId: body.outletId,
-      documentType: 'sales_order',
-      documentDate: body.documentDate,
-      fyStartMonth: settings.fyStartMonth,
-    });
+    },
+  );
+  if (prepared.header.advanceAmount > 0) {
+    await salesOrdersRepository.setAdvance(tx, body.id, prepared.header.advanceAmount, paymentId);
+  }
+  await recordApprovals(tx, body.id, body.outletId, prepared.approvals);
 
-    // The header goes in with no advance yet: the payment row points at the order,
-    // so the order must exist first. The pointer is set right after.
-    const reservation = await trackReservation(
-      tx,
-      body.id,
-      async () => {
-        await salesOrdersRepository.insertHeader(tx, {
-          ...prepared.header,
-          id: body.id,
-          seriesId: number.seriesId,
-          sequenceNo: number.sequenceNo,
-          documentNumber: number.documentNumber,
-          fyStartYear: number.fyStartYear,
-          advanceAmount: 0,
-          advancePaymentId: null,
-          createdBy: auth.userId,
-        });
-        await salesOrdersRepository.insertLines(tx, body.id, prepared.lines);
-      },
-      true,
-    );
-
-    const paymentId = await syncAdvance(
-      tx,
-      { id: body.id, documentNumber: number.documentNumber },
-      undefined,
-      {
-        amount: prepared.header.advanceAmount,
-        mode: prepared.header.paymentMode,
-        customerId: prepared.header.customerId,
-        outletId: body.outletId,
-      },
-    );
-    if (prepared.header.advanceAmount > 0) {
-      await salesOrdersRepository.setAdvance(
-        tx,
-        body.id,
-        prepared.header.advanceAmount,
-        paymentId,
-      );
-    }
-    await recordApprovals(tx, body.id, body.outletId, prepared.approvals);
-
+  await recordAudit(tx, {
+    action: 'sales_order.created',
+    entityType: 'sales_order',
+    entityId: body.id,
+    metadata: {
+      documentNumber: number.documentNumber,
+      grandTotal: prepared.header.totals.grandTotal,
+      advanceAmount: prepared.header.advanceAmount,
+      customerId: prepared.header.customerId,
+    },
+  });
+  if (prepared.discounted) {
     await recordAudit(tx, {
-      action: 'sales_order.created',
+      action: 'sales_order.discounted',
       entityType: 'sales_order',
       entityId: body.id,
       metadata: {
         documentNumber: number.documentNumber,
-        grandTotal: prepared.header.totals.grandTotal,
-        advanceAmount: prepared.header.advanceAmount,
-        customerId: prepared.header.customerId,
+        lineDiscountTotal: prepared.header.totals.totalLineDiscount,
+        billDiscount: prepared.header.totals.billDiscount,
+        reason: prepared.header.billDiscountReason,
+        approvedBy: prepared.approvals.map((a) => a.approval.approvedBy),
       },
     });
-    if (prepared.discounted) {
-      await recordAudit(tx, {
-        action: 'sales_order.discounted',
-        entityType: 'sales_order',
-        entityId: body.id,
-        metadata: {
-          documentNumber: number.documentNumber,
-          lineDiscountTotal: prepared.header.totals.totalLineDiscount,
-          billDiscount: prepared.header.totals.billDiscount,
-          reason: prepared.header.billDiscountReason,
-          approvedBy: prepared.approvals.map((a) => a.approval.approvedBy),
-        },
-      });
-    }
+  }
 
-    return {
-      order: await loadOrder(tx, body.id),
-      replayed: false,
-      warnings: [...prepared.warnings, ...reservation],
-    };
-  });
+  return {
+    order: await loadOrder(tx, body.id),
+    replayed: false,
+    warnings: [...prepared.warnings, ...reservation],
+  };
 }
 
 /** An order that was cancelled or deleted cannot be changed or invoiced. */
@@ -805,7 +809,11 @@ function updateSaleOrderInTransaction(
 
     const prepared = await prepareOrder(tx, body);
     const invoicedAny = [...existing.values()].some((l) => l.quantityFulfilled > 0);
-    if (order.customerId !== null && prepared.header.customerId !== order.customerId && invoicedAny) {
+    if (
+      order.customerId !== null &&
+      prepared.header.customerId !== order.customerId &&
+      invoicedAny
+    ) {
       throw new UnprocessableError(
         'The customer cannot be changed once an invoice has been raised against the order.',
         ErrorCode.SALES_ORDER_CLOSED,
@@ -1010,12 +1018,7 @@ export function cancelSaleOrder(id: string, body: CancelSaleOrderBody) {
       );
     }
 
-    await trackReservation(
-      tx,
-      id,
-      () => salesOrdersRepository.cancel(tx, id, body.reason),
-      false,
-    );
+    await trackReservation(tx, id, () => salesOrdersRepository.cancel(tx, id, body.reason), false);
     const refund = await settleAdvance(tx, order, body.refundMode, true, 'Sales order cancelled');
     await recordAudit(tx, {
       action: 'sales_order.cancelled',

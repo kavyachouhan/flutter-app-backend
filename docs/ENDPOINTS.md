@@ -261,9 +261,9 @@ back in `errors` with their names. Permission `catalogue:read`, entitlement
 
 ## Terms & Conditions — tag `Terms & Conditions`
 
-Reusable terms a shop attaches to a sale, purchase bill or purchase order.
-Each entry has a `title`, a `description` and `applicableFor` (any of `sale`,
-`sale_order`, `purchase`, `purchase_order`).
+Reusable terms a shop attaches to a sale, purchase bill, purchase order, sales order
+or estimate. Each entry has a `title`, a `description` and `applicableFor` (any of
+`sale`, `sale_order`, `purchase`, `purchase_order`, `estimate`).
 
 ### `GET /v1/terms`
 
@@ -282,8 +282,9 @@ record. Permission `terms:write`.
 
 ### Attaching terms to a document
 
-`POST /v1/invoices`, `/v1/purchase-bills` and `/v1/purchase-orders` accept an
-optional `termsId`. The terms must exist and be applicable to that document
+`POST /v1/invoices`, `/v1/purchase-bills`, `/v1/purchase-orders`,
+`/v1/sales-orders` and `/v1/estimates` accept an optional `termsId`. The terms must
+exist and be applicable to that document
 type (otherwise `422`). The document stores the reference **and** a
 `termsSnapshot` (`{title, description}`), so editing or deleting the entry
 later never changes an issued document. An invoice prints its snapshot in
@@ -569,6 +570,59 @@ Permission `purchases:void`.
 
 ---
 
+## Estimates — tag `Estimates`
+
+An estimate (quotation) is an offer, not a sale: it moves no stock, takes no GST invoice
+number and records no payment. It is editable while `open`; converting it raises a sales
+order or an invoice and freezes it. Needs the `sales_orders` plan feature.
+Status: `open` → `converted` | `closed` | `cancelled`.
+
+### `POST /v1/estimates`
+
+**What** Creates an estimate. `201`, or `200` with `replayed: true` when the client `id`
+was already used.
+**How** Numbered from an auto-provisioned `EST` series. Same body as a sales order minus the
+advance, payment mode and discount approvals; `validUntil` replaces `dueDate`. Totals come from
+the shared tax engine and must match `expectedTotals` (`TOTALS_MISMATCH`). `termsId` must be
+applicable to `estimate`. Permission `estimates:create`.
+
+### `GET /v1/estimates` · `GET /v1/estimates/summary` · `GET /v1/estimates/:id`
+
+**What** List, chip counts and one estimate. `?status=open` is estimates still to be won;
+`?status=closed` is everything no longer open (converted, closed, cancelled). `?q=` matches the
+number, customer name or phone. Permission `estimates:read`.
+
+### `PUT /v1/estimates/:id` · `DELETE /v1/estimates/:id`
+
+**What** Replace the header and lines; soft-delete. Permissions `estimates:update` /
+`estimates:delete`.
+**How** Only an open estimate can be edited (`ESTIMATE_ALREADY_CONVERTED` / `ESTIMATE_NOT_OPEN`,
+`409`). A converted estimate cannot be deleted: the document raised from it names it.
+
+### `POST /v1/estimates/:id/cancel` and `/close`
+
+**What** Cancel (with a `reason`) or close by hand a quote that was lost. Open estimates only.
+Permission `estimates:update`.
+
+### `POST /v1/estimates/:id/convert`
+
+**What** Raises a sales order from the estimate and marks it `converted`, in one transaction.
+Body `{ id, target: "sales_order", discountApprovals? }`; `id` is the client id of the new order.
+**How** The estimate row is locked, so two attempts raise one order and the second gets
+`ESTIMATE_ALREADY_CONVERTED`. The order carries the customer, lines, prices, discounts, taxes and the
+estimate's T&C snapshot (copied, since a T&C written for estimates need not apply to orders); the
+shop's discount policy is enforced here. Needs `estimates:convert` and `sales_orders:create`.
+
+**Converting to a sale.** Invoices are numbered from the till's leased block, so the device raises
+them: send `estimateId` on `POST /v1/invoices`. If the estimate is still open it becomes converted in
+the same transaction. If not (already converted elsewhere, or deleted) the link is dropped and the
+sale still issues: a sale already rung up is never rejected over a stale link.
+
+### `GET /v1/estimates/:id/print-payload`
+
+**What** The estimate formatted for print (title `ESTIMATE`, no balance row). Permission
+`estimates:read`.
+
 ## Debit notes — tag `Debit notes`
 
 ### `POST /v1/debit-notes`
@@ -622,6 +676,8 @@ stock twice. Permission `debit_notes:void`.
 | `RETURN_EXCEEDS_BILL`        | More returned than remains on the bill line.                  |
 | `BILL_NOT_RETURNABLE`        | The bill is void; nothing can be returned or paid against it. |
 | `OVERALLOCATION`             | Allocations exceed the payment, or a bill's outstanding.      |
+| `ESTIMATE_ALREADY_CONVERTED` | The estimate became a sales order or invoice; it is now fixed. |
+| `ESTIMATE_NOT_OPEN`          | Only an open estimate can be edited, converted or closed.     |
 
 ## New permissions
 

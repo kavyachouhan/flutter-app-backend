@@ -51,6 +51,7 @@ export interface SaleOrderRow {
   status: SaleOrderStatus;
   closedManually: boolean;
   cancelledReason: string | null;
+  estimateId: string | null;
   createdAt: Date;
 }
 
@@ -107,6 +108,8 @@ export interface SaleOrderHeaderWrite {
   attachments: readonly unknown[];
   termsId: string | null;
   termsSnapshot: TermsSnapshot | null;
+  /** The estimate this order was raised from, if any. */
+  estimateId?: string | null;
   createdBy: string;
 }
 
@@ -182,7 +185,7 @@ const ORDER_COLUMNS = `
   so.custom_fields AS "customFields",
   so.attachments, so.terms_id AS "termsId", so.terms_snapshot AS "termsSnapshot", so.status,
   so.closed_manually AS "closedManually", so.cancelled_reason AS "cancelledReason",
-  so.created_at AS "createdAt"`;
+  so.estimate_id AS "estimateId", so.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
   id, line_no AS "lineNo", item_id AS "itemId", item_name AS "itemName", hsn_code AS "hsnCode", unit,
@@ -242,7 +245,7 @@ export const salesOrdersRepository = {
          total_cess, total_tax, sub_total, round_off, grand_total, tax_summary, hsn_summary,
          advance_amount, advance_payment_id, payment_mode, notes, attachments, terms_id, terms_snapshot,
          status, created_by, is_reverse_charge, additional_charges, taxable_charges, non_taxable_charges,
-         bill_discount_reason, custom_fields)
+         bill_discount_reason, custom_fields, estimate_id)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7,
          $8, $9, $10, $11, $12, $13,
@@ -251,7 +254,7 @@ export const salesOrdersRepository = {
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36::jsonb, $37, $38,
          'open', $39, $40, $41::jsonb, $42, $43,
-         $44, $45)`,
+         $44, $45, $46)`,
       [
         h.id,
         h.outletId,
@@ -298,6 +301,7 @@ export const salesOrdersRepository = {
         t.nonTaxableCharges,
         h.billDiscountReason,
         jsonParam(h.customFields),
+        h.estimateId ?? null,
       ],
     );
   },

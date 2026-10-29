@@ -46,6 +46,8 @@ export interface InvoiceHeaderInsert {
   /** Pictures and documents attached at billing; see `lib/attachments.ts`. */
   attachments: readonly unknown[];
   salesOrderId: string | null;
+  /** The estimate this invoice was raised from, when that link still held. */
+  estimateId?: string | null;
   /** The invoice this one replaces; it has been fully credited. */
   amendsInvoiceId: string | null;
   billDiscountReason: string | null;
@@ -142,7 +144,7 @@ const HEADER_COLUMNS = `
   i.issued_at AS "issuedAt", i.issued_by AS "issuedBy", i.void_reason AS "voidReason", i.voided_at AS "voidedAt",
   i.voided_by AS "voidedBy", i.print_count AS "printCount", i.printed_at AS "printedAt", i.created_at AS "createdAt",
   i.custom_fields AS "customFields", i.attachments, i.is_reverse_charge AS "isReverseCharge",
-  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId",
+  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId",
   i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
   (SELECT r.id FROM invoices r WHERE r.amends_invoice_id = i.id AND r.status = 'issued' LIMIT 1)
     AS "amendedByInvoiceId",
@@ -197,7 +199,7 @@ export const invoicesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, taxable_charges, non_taxable_charges,
          additional_charges, sub_total, round_off, grand_total, tax_summary, hsn_summary, notes, status,
          issued_at, issued_by, custom_fields, is_reverse_charge, terms_id, terms_snapshot, sales_order_id,
-         amends_invoice_id, bill_discount_reason, attachments)
+         amends_invoice_id, bill_discount_reason, estimate_id, attachments)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -254,6 +256,7 @@ export const invoicesRepository = {
         h.salesOrderId,
         h.amendsInvoiceId,
         h.billDiscountReason,
+        h.estimateId ?? null,
         JSON.stringify(h.attachments),
       ],
     );

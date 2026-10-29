@@ -18,7 +18,7 @@ import { discountApproval } from '../price-lists/price-lists.schemas.js';
 
 export const SALES_ORDER_STATUSES = ['open', 'partial', 'closed', 'cancelled'] as const;
 
-const orderLine = z
+export const orderLine = z
   .object({
     id: clientId,
     itemId: z.string().uuid().nullable().optional(),
@@ -37,9 +37,6 @@ const orderLine = z
     message: 'itemName is required without itemId',
     path: ['itemName'],
   });
-
-// Attachments use the shared shape in `lib/attachments.ts`: the same one every
-// other document takes, so an order's files look like a bill's.
 
 /** The order is stored whole; an edit replaces the same shape. */
 export const saleOrderBody = z.object({

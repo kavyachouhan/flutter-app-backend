@@ -286,7 +286,10 @@ async function ensureBootstrapSeries(
       separator: '/',
     },
     financialYearStarting(fyStartYear, (await tenantsRepository.getSettings(tx)).fyStartMonth),
-    { maxLength: env.DOCUMENT_NUMBER_MAX_LENGTH, minSequenceHeadroom: env.DOCUMENT_SEQUENCE_MIN_HEADROOM },
+    {
+      maxLength: env.DOCUMENT_NUMBER_MAX_LENGTH,
+      minSequenceHeadroom: env.DOCUMENT_SEQUENCE_MIN_HEADROOM,
+    },
   );
 
   const id = newId();

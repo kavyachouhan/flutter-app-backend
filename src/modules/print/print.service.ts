@@ -30,6 +30,7 @@ import { creditNotesRepository } from '../credit-notes/credit-notes.repository.j
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository, type OutletRow } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { estimatesRepository } from '../estimates/estimates.repository.js';
 import { salesOrdersRepository } from '../sales-orders/sales-orders.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { tenantsRepository, type TenantRow } from '../tenants/tenants.repository.js';
@@ -377,7 +378,10 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
  * recognises it, but it is titled SALE ORDER and carries the advance and what is still due
  * rather than tenders: nothing has been supplied yet.
  */
-export function buildSaleOrderPayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+export function buildSaleOrderPayload(
+  id: string,
+  query: PrintPayloadQuery,
+): Promise<PrintDocument> {
   return withReadTransaction(async (tx) => {
     await assertFeature(tx, 'sales_orders');
     const order = await salesOrdersRepository.find(tx, id);
@@ -447,6 +451,81 @@ export function buildSaleOrderPayload(id: string, query: PrintPayloadQuery): Pro
       currencySymbol: tenant.currencySymbol,
       copyIndex,
       notes: order.notes,
+    };
+    return resolvePrintDocument(input);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Estimate
+// ---------------------------------------------------------------------------
+
+export function buildEstimatePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'sales_orders');
+    const estimate = await estimatesRepository.find(tx, id);
+    if (!estimate) throw new NotFoundError('Estimate');
+    assertOutletAccess(estimate.outletId);
+
+    const [tenant, outlet, profiles, lines] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, estimate.outletId),
+      printRepository.findProfilesForOutlet(tx, estimate.outletId),
+      estimatesRepository.findLines(tx, id),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+
+    const customFields = await resolveCustomFields(tx, 'estimate', estimate.customFields);
+
+    const input: ResolveInput = {
+      kind: 'estimate',
+      documentNumber: estimate.documentNumber,
+      documentDate: String(estimate.documentDate),
+      // An estimate's validity date prints where an order prints its due date.
+      dueDate: estimate.validUntil === null ? null : String(estimate.validUntil),
+      issuedAt: estimate.createdAt,
+      taxMode: estimate.taxMode as TaxMode,
+      isInterState: estimate.supplyType !== 'intra_state',
+      business: buildBusiness(outlet, tenant),
+      profile: withDocumentTerms(resolved.profile, estimate.termsSnapshot),
+      customer: await loadCustomer(tx, estimate.customerId, estimate.customerName, null),
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: line.lineDiscount + line.billDiscountShare,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: estimate.grossAmount,
+        totalDiscount: estimate.lineDiscountTotal + estimate.billDiscountAmount,
+        taxableAmount: estimate.taxableAmount,
+        totalCgst: estimate.totalCgst,
+        totalSgst: estimate.totalSgst,
+        totalIgst: estimate.totalIgst,
+        totalCess: estimate.totalCess,
+        charges: estimate.taxableCharges + estimate.nonTaxableCharges,
+        roundOff: estimate.roundOff,
+        grandTotal: estimate.grandTotal,
+        amountPaid: 0,
+      },
+      taxRows: toTaxRows(estimate.taxSummary),
+      tenders: [],
+      customFields,
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      notes: estimate.notes,
     };
     return resolvePrintDocument(input);
   });

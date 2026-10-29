@@ -69,6 +69,10 @@ export const ErrorCode = {
   SALES_ORDER_CLOSED: 'SALES_ORDER_CLOSED',
   /** A line already invoiced keeps the item, price, tax and discount it was invoiced at. */
   ORDER_LINE_INVOICED: 'ORDER_LINE_INVOICED',
+  /** The estimate has already become a sales order or an invoice and is now fixed. */
+  ESTIMATE_ALREADY_CONVERTED: 'ESTIMATE_ALREADY_CONVERTED',
+  /** Only an open estimate can be edited, converted, closed or cancelled. */
+  ESTIMATE_NOT_OPEN: 'ESTIMATE_NOT_OPEN',
   /** The advance has been applied to an invoice or refunded, so its amount is fixed. */
   ADVANCE_LOCKED: 'ADVANCE_LOCKED',
   /** The invoice has credit notes against it; void those first, or amend instead. */
