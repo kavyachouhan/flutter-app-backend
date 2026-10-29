@@ -22,6 +22,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
+import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { apportionLandedCost } from '../../domain/costing/landed-cost.js';
 import { applyReceipt, reverseReceipt } from '../../domain/costing/moving-average.js';
@@ -88,6 +89,7 @@ async function loadBill(tx: Tx, id: string) {
  */
 export async function createPurchaseBill(body: CreatePurchaseBillBody) {
   const auth = requireAuthContext();
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   const result = await withTransaction(async (tx) => {
@@ -188,6 +190,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     });
 
     const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase');
+    assertAttachments(body.attachments);
 
     await purchasesRepository.insertBill(tx, {
       id: body.id,
@@ -216,6 +219,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       notes: body.notes ?? null,
       termsId: terms?.termsId ?? null,
       termsSnapshot: terms?.snapshot ?? null,
+      attachments: body.attachments ?? [],
       receivedAt: body.receivedAt,
       createdBy: auth.userId,
       itcCategory,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { booleanQuery, isoDate, nonEmpty, quantity } from '../../lib/validators.js';
@@ -10,6 +11,8 @@ export const createDeliveryChallanBody = z.object({
   seriesId: z.string().uuid().optional(),
   documentDate: isoDate,
   notes: nonEmpty.max(500).optional(),
+  /** Photos and documents (a signed copy, a vehicle photo). Upload first, then list the keys. */
+  attachments: attachmentsField.optional(),
   lines: z
     .array(
       z.object({
@@ -53,6 +56,8 @@ export type CancelDeliveryChallanBody = z.infer<typeof cancelDeliveryChallanBody
 export const updateDeliveryChallanBody = z.object({
   customerId: z.string().uuid().nullable(),
   notes: nonEmpty.max(500).nullable(),
+  /** Omit to keep the current files; a list (even empty) replaces them. */
+  attachments: attachmentsField.optional(),
   lines: z
     .array(
       z.object({

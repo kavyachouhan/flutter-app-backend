@@ -4,7 +4,8 @@ import { getContext } from '../../lib/context.js';
 import { signDownload, signUpload } from '../../lib/storage.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate, validated } from '../../middleware/validate.js';
-import { downloadUrlQuery, signUploadBody } from './uploads.schemas.js';
+import { assertKeyBelongsToTenant } from '../../lib/storage.js';
+import { downloadUrlQuery, downloadUrlsBody, signUploadBody } from './uploads.schemas.js';
 
 export const uploadsRouter: Router = Router();
 
@@ -39,4 +40,27 @@ const url = { query: downloadUrlQuery };
 uploadsRouter.get('/url', signLimiter, validate(url), async (req, res) => {
   const { query } = validated<typeof url>(req);
   res.json({ data: await signDownload(query.key) });
+});
+
+/**
+ * Read URLs for many keys at once. A key that is not this business's is a 403
+ * for the whole call, checked before anything is signed. A key whose object is
+ * gone (deleted, or never finished uploading) comes back with `url: null` so one
+ * missing photo does not blank a whole list.
+ */
+const urls = { body: downloadUrlsBody };
+uploadsRouter.post('/urls', signLimiter, validate(urls), async (req, res) => {
+  const { body } = validated<typeof urls>(req);
+  const keys = [...new Set(body.keys)];
+  for (const key of keys) assertKeyBelongsToTenant(key);
+
+  const settled = await Promise.allSettled(keys.map((key) => signDownload(key)));
+  res.json({
+    data: keys.map((key, index) => {
+      const result = settled[index];
+      return result?.status === 'fulfilled'
+        ? { key, url: result.value.url, expiresAt: result.value.expiresAt }
+        : { key, url: null, expiresAt: null };
+    }),
+  });
 });

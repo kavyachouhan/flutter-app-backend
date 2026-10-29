@@ -7,6 +7,11 @@
  * actually arrived.
  */
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
+import {
+  assertAttachments,
+  checkAttachments,
+  removeDroppedAttachments,
+} from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
@@ -39,8 +44,9 @@ async function loadOrder(tx: Tx, id: string) {
   };
 }
 
-export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
+export async function createPurchaseOrder(body: CreatePurchaseOrderBody) {
   const auth = requireAuthContext();
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   return withTransaction(async (tx) => {
@@ -73,6 +79,7 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
     );
 
     const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase_order');
+    assertAttachments(body.attachments);
 
     await ordersRepository.insert(tx, {
       id: body.id,
@@ -88,6 +95,7 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
       notes: body.notes ?? null,
       termsId: terms?.termsId ?? null,
       termsSnapshot: terms?.snapshot ?? null,
+      attachments: body.attachments ?? [],
       createdBy: auth.userId,
     });
 
@@ -124,11 +132,27 @@ export function createPurchaseOrder(body: CreatePurchaseOrderBody) {
  * already refers to it. The supplier is likewise fixed once anything has been
  * received. A cancelled or fully received order is not editable.
  */
-export function updatePurchaseOrder(id: string, body: UpdatePurchaseOrderBody) {
+export async function updatePurchaseOrder(id: string, body: UpdatePurchaseOrderBody) {
+  await checkAttachments(body.attachments);
+  let previous: unknown;
+  const result = await updatePurchaseOrderInTransaction(id, body, (a) => {
+    previous = a;
+  });
+  // After the commit: files the edit took off the order are no longer referenced.
+  await removeDroppedAttachments(previous, body.attachments);
+  return result;
+}
+
+function updatePurchaseOrderInTransaction(
+  id: string,
+  body: UpdatePurchaseOrderBody,
+  onPrevious: (attachments: unknown) => void,
+) {
   return withTransaction(async (tx) => {
     await assertFeature(tx, 'purchases');
     const order = await ordersRepository.find(tx, id, true);
     if (!order) throw new NotFoundError('Purchase order');
+    onPrevious(order.attachments);
     assertOutletAccess(order.outletId);
     if (order.status === 'cancelled' || order.status === 'received') {
       throw new UnprocessableError(
@@ -204,6 +228,7 @@ export function updatePurchaseOrder(id: string, body: UpdatePurchaseOrderBody) {
       0,
     );
     const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase_order');
+    assertAttachments(body.attachments);
 
     const rows = body.lines.map((line, index) => ({
       id: line.id,
@@ -223,6 +248,7 @@ export function updatePurchaseOrder(id: string, body: UpdatePurchaseOrderBody) {
       notes: body.notes ?? null,
       termsId: terms?.termsId ?? null,
       termsSnapshot: terms?.snapshot ?? null,
+      attachments: body.attachments ?? [],
     });
     await ordersRepository.deleteLines(
       tx,

@@ -15,6 +15,11 @@
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import type { Discount, TaxInvoiceResult, TaxMode } from '../../domain/tax/types.js';
+import {
+  assertAttachments,
+  checkAttachments,
+  removeDroppedAttachments,
+} from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   ErrorCode,
@@ -26,7 +31,6 @@ import {
   type WarningCodeValue,
 } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
-import { assertKeyBelongsToTenant } from '../../lib/storage.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
 import { customersRepository, type NewLedgerEntry } from '../customers/customers.repository.js';
@@ -169,14 +173,9 @@ async function prepareOrder(tx: Tx, body: OrderBody): Promise<PreparedOrder> {
     throw new ValidationError('A customer is required.', { details: { field: 'customerName' } });
   }
 
-  for (const attachment of body.attachments ?? []) {
-    assertKeyBelongsToTenant(attachment.objectKey);
-    if (attachment.objectKey.split('/')[1] !== 'order_attachment') {
-      throw new ValidationError('That file was not uploaded as an order attachment.', {
-        details: { objectKey: attachment.objectKey },
-      });
-    }
-  }
+  // Accepts the older `order_attachment` kind as well as the newer
+  // `attachment_image` / `attachment_file`, so existing orders stay editable.
+  assertAttachments(body.attachments);
 
   // Before the bag becomes part of the order, so a field the tenant never defined is
   // named in the rejection rather than stored and unprintable.
@@ -608,6 +607,7 @@ async function recordApprovals(
 
 export async function createSaleOrder(body: CreateSaleOrderBody) {
   const auth = requireAuthContext();
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   return withTransaction(async (tx) => {
@@ -727,11 +727,27 @@ function assertNotCancelled(order: SaleOrderRow): void {
  *
  * A closed order can be edited too. Adding something to deliver re-opens it.
  */
-export function updateSaleOrder(id: string, body: UpdateSaleOrderBody) {
+export async function updateSaleOrder(id: string, body: UpdateSaleOrderBody) {
+  await checkAttachments(body.attachments);
+  let previous: unknown;
+  const result = await updateSaleOrderInTransaction(id, body, (a) => {
+    previous = a;
+  });
+  // After the commit: files the edit took off the order are no longer referenced.
+  await removeDroppedAttachments(previous, body.attachments);
+  return result;
+}
+
+function updateSaleOrderInTransaction(
+  id: string,
+  body: UpdateSaleOrderBody,
+  onPrevious: (attachments: unknown) => void,
+) {
   return withTransaction(async (tx) => {
     await assertFeature(tx, 'sales_orders');
     const order = await salesOrdersRepository.find(tx, id, true);
     if (!order) throw new NotFoundError('Sales order');
+    onPrevious(order.attachments);
     assertOutletAccess(order.outletId);
     assertNotCancelled(order);
     if (body.outletId !== order.outletId) {

@@ -16,6 +16,7 @@ export interface PurchaseOrderRow {
   notes: string | null;
   termsId: string | null;
   termsSnapshot: TermsSnapshot | null;
+  attachments: unknown;
   createdAt: Date;
 }
 
@@ -44,6 +45,7 @@ export interface NewPurchaseOrder {
   notes: string | null;
   termsId: string | null;
   termsSnapshot: TermsSnapshot | null;
+  attachments: readonly unknown[];
   createdBy: string;
 }
 
@@ -61,7 +63,7 @@ const ORDER_COLUMNS = `
   po.id, po.outlet_id AS "outletId", po.supplier_id AS "supplierId", s.name AS "supplierName",
   po.document_number AS "documentNumber", po.document_date AS "documentDate",
   po.expected_date AS "expectedDate", po.status, po.estimated_total AS "estimatedTotal",
-  po.notes, po.terms_id AS "termsId", po.terms_snapshot AS "termsSnapshot",
+  po.notes, po.terms_id AS "termsId", po.terms_snapshot AS "termsSnapshot", po.attachments,
   po.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
@@ -98,8 +100,8 @@ export const ordersRepository = {
     await tx.query(
       `INSERT INTO purchase_orders (id, tenant_id, outlet_id, supplier_id, series_id, sequence_no,
          document_number, document_date, fy_start_year, expected_date, status, estimated_total,
-         notes, created_by, terms_id, terms_snapshot)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, 'sent', $10, $11, $12, $13, $14)`,
+         notes, created_by, terms_id, terms_snapshot, attachments)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, 'sent', $10, $11, $12, $13, $14, $15::jsonb)`,
       [
         o.id,
         o.outletId,
@@ -115,6 +117,7 @@ export const ordersRepository = {
         o.createdBy,
         o.termsId,
         jsonParam(o.termsSnapshot),
+        JSON.stringify(o.attachments),
       ],
     );
   },
@@ -255,12 +258,13 @@ export const ordersRepository = {
       notes: string | null;
       termsId: string | null;
       termsSnapshot: TermsSnapshot | null;
+      attachments: readonly unknown[];
     },
   ): Promise<void> {
     await tx.query(
       `UPDATE purchase_orders
        SET supplier_id = $2, document_date = $3, expected_date = $4, estimated_total = $5,
-           notes = $6, terms_id = $7, terms_snapshot = $8
+           notes = $6, terms_id = $7, terms_snapshot = $8, attachments = $9::jsonb
        WHERE id = $1`,
       [
         orderId,
@@ -271,6 +275,7 @@ export const ordersRepository = {
         o.notes,
         o.termsId,
         jsonParam(o.termsSnapshot),
+        JSON.stringify(o.attachments),
       ],
     );
   },

@@ -23,6 +23,7 @@ import {
 import type { PrintDocument } from '../../domain/print/types.js';
 import type { TaxMode } from '../../domain/tax/types.js';
 import { ConflictError, ErrorCode, NotFoundError } from '../../lib/errors.js';
+import { remove as removeObject, verifyUploadedObject } from '../../lib/storage.js';
 import { assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
 import { creditNotesRepository } from '../credit-notes/credit-notes.repository.js';
@@ -684,7 +685,25 @@ export function listPrintProfiles() {
 }
 
 /** `outletId` is null for the tenant-wide default. Upsert: a profile is settings, not a record. */
-export function upsertPrintProfile(outletId: string | null, body: UpsertPrintProfileBody) {
+export async function upsertPrintProfile(outletId: string | null, body: UpsertPrintProfileBody) {
+  // The real files are checked before the transaction opens (storage can be slow).
+  if (body.logoObjectKey) await verifyUploadedObject(body.logoObjectKey, ['logo']);
+  if (body.signatureObjectKey) await verifyUploadedObject(body.signatureObjectKey, ['signature']);
+
+  const replaced: { logo: string | null; signature: string | null } = { logo: null, signature: null };
+  const saved = await saveProfile(outletId, body, replaced);
+  // After the commit: a logo or signature that was replaced or removed is no longer used.
+  await Promise.all(
+    [replaced.logo, replaced.signature].filter((k): k is string => !!k).map((k) => removeObject(k)),
+  );
+  return saved;
+}
+
+function saveProfile(
+  outletId: string | null,
+  body: UpsertPrintProfileBody,
+  replaced: { logo: string | null; signature: string | null },
+) {
   return withTransaction(async (tx) => {
     if (outletId) {
       assertOutletAccess(outletId);
@@ -693,6 +712,15 @@ export function upsertPrintProfile(outletId: string | null, body: UpsertPrintPro
 
     const existing = await printRepository.findProfile(tx, outletId);
     if (existing) {
+      if (body.logoObjectKey !== undefined && existing.logoObjectKey !== body.logoObjectKey) {
+        replaced.logo = existing.logoObjectKey;
+      }
+      if (
+        body.signatureObjectKey !== undefined &&
+        existing.signatureObjectKey !== body.signatureObjectKey
+      ) {
+        replaced.signature = existing.signatureObjectKey;
+      }
       await printRepository.updateProfile(tx, existing.id, body);
     } else {
       await printRepository.insertProfile(tx, {

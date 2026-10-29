@@ -591,6 +591,8 @@ async function writeRow(
       // the reverse under-reports turnover.
       supplyCategory: 'taxable',
       isActive: true,
+      // A spreadsheet carries no photo; one is added from the app afterwards.
+      imageObjectKey: null,
     });
     if (barcode) await catalogueRepository.replaceBarcodes(tx, itemId, [barcode]);
     return;
@@ -635,7 +637,7 @@ async function resolveCategory(
   if (existing) return existing;
 
   const id = randomUUID();
-  await catalogueRepository.insertCategory(tx, { id, name: value.trim(), parentId: null });
+  await catalogueRepository.insertCategory(tx, { id, name: value.trim(), parentId: null, icon: null });
   categories.set(key, id);
   return id;
 }
