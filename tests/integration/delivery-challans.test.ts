@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { closeOwnerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import {
   createCustomer,
@@ -31,7 +31,6 @@ describe('delivery challans', () => {
   let t: TenantFixture;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Challan Shop' });
   });
 

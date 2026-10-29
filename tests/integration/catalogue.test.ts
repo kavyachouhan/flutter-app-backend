@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { closeOwnerClient, truncateAll } from './setup/database.js';
+import { closeOwnerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import { data } from './setup/body.js';
 import { closePool } from '../../src/db/pool.js';
@@ -20,7 +20,6 @@ describe('catalogue items', () => {
   let t: TenantFixture;
 
   beforeAll(async () => {
-    await truncateAll();
     t = await createTenant({ name: 'Catalogue Shop' });
   });
 
