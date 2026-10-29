@@ -10,6 +10,7 @@ import {
   paise,
   positivePaise,
   quantity,
+  requireAccountForNonCashMode,
   stateCode,
   supplyCategory,
   timestamp,
@@ -108,25 +109,29 @@ export const voidPurchaseBillBody = z.object({ reason: nonEmpty.max(200) });
 
 // --- Supplier payments -----------------------------------------------------
 
-export const createSupplierPaymentBody = z.object({
-  id: clientId,
-  outletId: z.string().uuid(),
-  supplierId: z.string().uuid(),
-  mode: z.enum(['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque']),
-  amount: positivePaise,
-  reference: nonEmpty.max(100).optional(),
-  paidAt: timestamp,
-  notes: nonEmpty.max(200).optional(),
-  /**
-   * Which bills this settles. Omitting it leaves the payment on account,
-   * reducing the supplier's balance without being tied to a bill — which is
-   * what an advance is.
-   */
-  allocations: z
-    .array(z.object({ purchaseBillId: z.string().uuid(), amount: positivePaise }))
-    .max(200)
-    .optional(),
-});
+export const createSupplierPaymentBody = z
+  .object({
+    id: clientId,
+    outletId: z.string().uuid(),
+    supplierId: z.string().uuid(),
+    mode: z.enum(['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque']),
+    amount: positivePaise,
+    reference: nonEmpty.max(100).optional(),
+    paidAt: timestamp,
+    notes: nonEmpty.max(200).optional(),
+    /**
+     * Which bills this settles. Omitting it leaves the payment on account,
+     * reducing the supplier's balance without being tied to a bill — which is
+     * what an advance is.
+     */
+    allocations: z
+      .array(z.object({ purchaseBillId: z.string().uuid(), amount: positivePaise }))
+      .max(200)
+      .optional(),
+    /** Which Cash & Bank account this was paid from; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 export type CreateSupplierPaymentBody = z.infer<typeof createSupplierPaymentBody>;
 
 export const listSupplierPaymentsQuery = pageQuery.extend({

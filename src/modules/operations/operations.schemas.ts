@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
-import { isoDate, nonEmpty, paise, positivePaise, timestamp } from '../../lib/validators.js';
+import {
+  isoDate,
+  nonEmpty,
+  paise,
+  positivePaise,
+  requireAccountForNonCashMode,
+  timestamp,
+} from '../../lib/validators.js';
 import { TENDER_MODES } from '../invoices/invoices.schemas.js';
 
 // --- Held bills -------------------------------------------------------------
@@ -61,19 +68,23 @@ export type UpdateExpenseCategoryBody = z.infer<typeof updateExpenseCategoryBody
 
 // --- Expenses ---------------------------------------------------------------
 
-export const createExpenseBody = z.object({
-  id: clientId,
-  outletId: z.string().uuid(),
-  categoryId: z.string().uuid().nullable().optional(),
-  amount: positivePaise,
-  mode: z.enum(TENDER_MODES),
-  vendorName: nonEmpty.optional(),
-  reference: nonEmpty.optional(),
-  note: nonEmpty.optional(),
-  /** Storage object key from `POST /uploads`, never a URL: URLs expire. */
-  receiptObjectKey: nonEmpty.optional(),
-  spentAt: timestamp,
-});
+export const createExpenseBody = z
+  .object({
+    id: clientId,
+    outletId: z.string().uuid(),
+    categoryId: z.string().uuid().nullable().optional(),
+    amount: positivePaise,
+    mode: z.enum(TENDER_MODES),
+    vendorName: nonEmpty.optional(),
+    reference: nonEmpty.max(100).optional(),
+    note: nonEmpty.optional(),
+    /** Storage object key from `POST /uploads`, never a URL: URLs expire. */
+    receiptObjectKey: nonEmpty.optional(),
+    spentAt: timestamp,
+    /** Which Cash & Bank account this was paid from; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 export type CreateExpenseBody = z.infer<typeof createExpenseBody>;
 
 export const voidExpenseBody = z.object({ reason: nonEmpty });

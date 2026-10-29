@@ -6,6 +6,7 @@
  * was paid out of the drawer.
  */
 import { env } from '../../config/env.js';
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
@@ -245,6 +246,17 @@ export function createExpense(body: CreateExpenseBody) {
       spentAt: body.spentAt,
       spentBy: auth.userId,
     });
+    await recordDocumentMoney(tx, {
+      accountId: body.mode === 'cash' ? null : (body.accountId ?? null),
+      amount: -body.amount,
+      transactionType: 'expense',
+      sourceType: 'expense',
+      sourceId: body.id,
+      chequeNumber: body.mode === 'cheque' ? (body.reference ?? null) : null,
+      chequeDate: body.mode === 'cheque' ? body.spentAt.slice(0, 10) : null,
+      note: body.note ?? body.reference ?? null,
+      occurredAt: body.spentAt,
+    });
     await recordAudit(tx, {
       action: 'expense.recorded',
       entityType: 'expense',
@@ -300,6 +312,7 @@ export function voidExpense(id: string, reason: string) {
     if (expense.status === 'void') return expense;
 
     await operationsRepository.markExpenseVoid(tx, id, reason, auth.userId);
+    await voidDocumentMoney(tx, 'expense', id, 'expense');
     await recordAudit(tx, {
       action: 'expense.voided',
       entityType: 'expense',

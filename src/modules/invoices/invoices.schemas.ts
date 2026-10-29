@@ -10,6 +10,7 @@ import {
   paise,
   positivePaise,
   quantity,
+  requireAccountForNonCashMode,
   stateCode,
   supplyCategory,
   timestamp,
@@ -60,13 +61,17 @@ export const additionalCharge = z.object({
 
 export const TENDER_MODES = ['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque'] as const;
 
-const tender = z.object({
-  id: clientId,
-  mode: z.enum(TENDER_MODES),
-  amount: positivePaise,
-  tenderedAmount: paise.optional(),
-  reference: nonEmpty.optional(),
-});
+const tender = z
+  .object({
+    id: clientId,
+    mode: z.enum(TENDER_MODES),
+    amount: positivePaise,
+    tenderedAmount: paise.optional(),
+    reference: nonEmpty.max(100).optional(),
+    /** Which Cash & Bank account this payment moved through; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 
 export const createInvoiceBody = z.object({
   id: clientId,

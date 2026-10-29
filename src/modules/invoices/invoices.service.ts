@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
 import { requireAuthContext } from '../../lib/context.js';
@@ -484,6 +485,19 @@ export async function createInvoice(body: CreateInvoiceBody) {
         tx,
         tenders.map((t) => ({ paymentId: t.id, invoiceId: body.id, amount: t.amount })),
       );
+      for (const t of tenders) {
+        await recordDocumentMoney(tx, {
+          accountId: t.mode === 'cash' ? null : (t.accountId ?? null),
+          amount: t.amount,
+          transactionType: 'sale',
+          sourceType: 'invoice_payment',
+          sourceId: t.id,
+          chequeNumber: t.mode === 'cheque' ? (t.reference ?? null) : null,
+          chequeDate: t.mode === 'cheque' ? body.issuedAt.slice(0, 10) : null,
+          note: t.reference ?? null,
+          occurredAt: body.issuedAt,
+        });
+      }
     }
     // What the customer already paid on the order counts toward this invoice. The khata
     // already nets it (the advance was a credit), so this changes no ledger entry; it is
@@ -682,6 +696,9 @@ export async function voidInvoice(id: string, reason: string) {
       reason,
       auth.userId,
     );
+    for (const t of voidedTenders) {
+      await voidDocumentMoney(tx, 'invoice_payment', t.id, 'sale');
+    }
 
     if (header.customerId) {
       const customerId = header.customerId;

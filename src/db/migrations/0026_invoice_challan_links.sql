@@ -14,3 +14,5 @@ ALTER TABLE invoice_lines
 CREATE INDEX invoice_lines_delivery_challan_line_idx
   ON invoice_lines (tenant_id, delivery_challan_line_id)
   WHERE delivery_challan_line_id IS NOT NULL;
+
+SELECT app.grant_runtime_privileges();

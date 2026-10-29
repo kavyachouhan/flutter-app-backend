@@ -55,6 +55,8 @@ export const PERMISSIONS = [
   'day_close:create',
   'stock:read',
   'stock:adjust',
+  'accounts:read',
+  'accounts:write',
   // Bulk import rewrites the price list wholesale, so it sits with the
   // owner/manager tier rather than with catalogue:write.
   'imports:read',
@@ -129,6 +131,9 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'day_close:read',
     'day_close:create',
     'stock:read',
+    // Read-only: picking which bank account a non-cash payment or expense
+    // moved through, at the till. Adding/editing accounts stays withheld.
+    'accounts:read',
     // Needed to price a customer correctly at the till. Writing a list and
     // approving a breach are both withheld — that is the point of the cap.
     'price_lists:read',

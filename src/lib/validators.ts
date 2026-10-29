@@ -27,6 +27,22 @@ export const shortCode = z
   .toUpperCase()
   .regex(/^[A-Z0-9]+$/, 'letters and digits only');
 
+/** RBI's fixed format: 4-letter bank code, a literal '0', 6-char branch code. */
+export const ifsc = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'must be a valid IFSC code');
+
+/**
+ * No single length is correct across Indian banks (SBI 11, HDFC 14, ICICI 12,
+ * some co-operative banks fewer) — this is a sanity bound, not a real format.
+ */
+export const bankAccountNumber = z
+  .string()
+  .trim()
+  .regex(/^[0-9]{9,18}$/, 'must be 9-18 digits');
+
 const safeInt = z.number().int().refine(Number.isSafeInteger, 'is out of range');
 
 export const paise = safeInt.refine((v) => v >= 0, 'cannot be negative');
@@ -50,6 +66,24 @@ export const isoDate = z
   );
 
 export const timestamp = z.string().datetime({ offset: true });
+
+/**
+ * Cash always means the one Cash In-Hand account — nothing to choose. Any
+ * other tender mode has to say which bank account the money moved through,
+ * so the Cash & Bank ledger knows where to put it.
+ */
+export function requireAccountForNonCashMode(
+  obj: { mode: string; accountId?: string | null },
+  ctx: z.RefinementCtx,
+): void {
+  if (obj.mode !== 'cash' && !obj.accountId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['accountId'],
+      message: 'Choose which account this payment moved through.',
+    });
+  }
+}
 
 export const booleanQuery = z.enum(['true', 'false']).transform((v) => v === 'true');
 

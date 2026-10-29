@@ -41,6 +41,7 @@ import { suppliersRouter } from './modules/suppliers/suppliers.routes.js';
 import { termsRouter } from './modules/terms/terms.routes.js';
 import { customFieldsRouter, printProfilesRouter } from './modules/print/print.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
+import { accountsRouter } from './modules/accounts/accounts.routes.js';
 import { stockRouter } from './modules/stock/stock.routes.js';
 import { syncRouter } from './modules/sync/sync.routes.js';
 import { onboardingRouter, tenantRouter } from './modules/tenants/tenants.routes.js';
@@ -107,6 +108,7 @@ export function createV1Router(): Router {
   tenantScoped.use('/exports', exportsRouter);
   tenantScoped.use('/labels', labelsRouter);
   tenantScoped.use('/stock', stockRouter);
+  tenantScoped.use('/accounts', accountsRouter);
   tenantScoped.use('/reports', reportsRouter);
   tenantScoped.use('/audit', auditRouter);
   tenantScoped.use('/sync', syncRouter);

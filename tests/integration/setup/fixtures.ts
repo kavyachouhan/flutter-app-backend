@@ -167,7 +167,13 @@ export interface IssueInvoiceOptions {
   sequenceNo: number;
   lines: InvoiceLineSpec[];
   customerId?: string | null;
-  payments?: { id: string; mode: string; amount: number }[];
+  payments?: {
+    id: string;
+    mode: string;
+    amount: number;
+    accountId?: string;
+    reference?: string;
+  }[];
   id?: string;
   /** Overrides the computed totals, to provoke TOTALS_MISMATCH. */
   totalsOverride?: { grandTotal: number; totalTax: number; taxableAmount: number };
