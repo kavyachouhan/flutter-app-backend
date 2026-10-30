@@ -16,7 +16,9 @@ import { newId } from '../../lib/ids.js';
 import { createLogger } from '../../lib/logger.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
+import { hasPermission, type Permission } from '../auth/permissions.js';
 import { devicesRepository } from '../devices/devices.repository.js';
+import { isFeatureEnabled, type Feature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type BlockRow, type SeriesRow } from './numbering.repository.js';
@@ -245,10 +247,46 @@ async function ensureSuccessorSeries(tx: Tx, series: SeriesRow): Promise<SeriesR
  * is a legal obligation, and until this existed a shop could not issue its
  * first one without hand-creating a series it had no reason to know about.
  */
-const BOOTSTRAP_SERIES: Record<'invoice' | 'credit_note', string> = {
+const BOOTSTRAP_SERIES: Record<LeasedDocumentType, string> = {
   invoice: 'INV',
   credit_note: 'CN',
+  estimate: 'EST',
+  sales_order: 'SO',
+  purchase_order: 'PO',
 };
+
+/**
+ * Estimates, sales orders and purchase orders can also be made offline, so a device holds
+ * blocks for them too. Unlike an invoice, though, they are not for every plan or every
+ * role: a block leased to a device that may not use it would just sit there. A device is
+ * leased one only when its plan includes the feature and its user may create the document.
+ */
+const LEASE_REQUIREMENTS: Partial<
+  Record<LeasedDocumentType, { feature: Feature; permission: Permission }>
+> = {
+  estimate: { feature: 'sales_orders', permission: 'estimates:create' },
+  sales_order: { feature: 'sales_orders', permission: 'sales_orders:create' },
+  purchase_order: { feature: 'purchases', permission: 'purchases:create' },
+};
+
+type LeasedDocumentType =
+  | 'invoice'
+  | 'credit_note'
+  | 'estimate'
+  | 'sales_order'
+  | 'purchase_order';
+
+async function mayLease(tx: Tx, documentType: LeasedDocumentType): Promise<boolean> {
+  const need = LEASE_REQUIREMENTS[documentType];
+  if (!need) return true;
+  let role;
+  try {
+    role = requireAuthContext().role;
+  } catch {
+    return false;
+  }
+  return hasPermission(role, need.permission) && (await isFeatureEnabled(tx, need.feature));
+}
 
 /**
  * Makes sure the outlet has a live series for `documentType` in this financial
@@ -351,6 +389,7 @@ async function bootstrapLeases(
   const leased: BlockRow[] = [];
   for (const documentType of Object.keys(BOOTSTRAP_SERIES) as (keyof typeof BOOTSTRAP_SERIES)[]) {
     if (held.has(documentType)) continue;
+    if (!(await mayLease(tx, documentType))) continue;
     const series = await ensureBootstrapSeries(tx, outletId, documentType, fy.startYear);
     if (!series) continue;
     const block = await leaseInTx(tx, series, fy, deviceId, undefined);

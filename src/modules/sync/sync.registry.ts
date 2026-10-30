@@ -108,6 +108,41 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   // is prepared and filed on a connected screen by whoever does the books, and
   // a till has no use for an ITC register — syncing it would push a shop's tax
   // position onto every phone for nothing.
+  // Documents a device can make offline. The lines are their own tables with soft delete, so a
+  // line removed in an edit reaches every device as a delete rather than lingering.
+  table('suppliers', ['id'], true, ['supplier.create', 'supplier.update', 'supplier.delete']),
+  // Pull-only, like a customer's: what the shop owes comes from purchase bills and payments the
+  // server keeps, so a phone shows the figure and never writes it.
+  table('supplier_balances', ['supplier_id'], false),
+  table('estimates', ['id'], true, [
+    'estimate.create',
+    'estimate.update',
+    'estimate.delete',
+    'estimate.cancel',
+    'estimate.close',
+    'estimate.convert',
+  ]),
+  table('estimate_lines', ['id'], true, ['estimate.create', 'estimate.update']),
+  table('sales_orders', ['id'], true, [
+    'sale_order.create',
+    'sale_order.update',
+    'sale_order.delete',
+    'sale_order.cancel',
+    'sale_order.close',
+    'estimate.convert',
+  ]),
+  table('sales_order_lines', ['id'], true, [
+    'sale_order.create',
+    'sale_order.update',
+    'estimate.convert',
+  ]),
+  table('purchase_orders', ['id'], true, [
+    'purchase_order.create',
+    'purchase_order.update',
+    'purchase_order.delete',
+    'purchase_order.cancel',
+  ]),
+  table('purchase_order_lines', ['id'], true, ['purchase_order.create', 'purchase_order.update']),
   table('expense_categories', ['id'], true),
   table('expenses', ['id'], false, ['expense.create', 'expense.void']),
   table('day_closes', ['id'], false, ['day_close.create']),

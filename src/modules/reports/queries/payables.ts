@@ -101,7 +101,7 @@ export async function purchaseOrderStatus(tx: Tx, params: ReportParams): Promise
            COALESCE(SUM(pol.quantity_ordered - pol.quantity_received), 0)::bigint AS "pendingQuantity"
     FROM purchase_orders po
     JOIN suppliers s ON s.id = po.supplier_id
-    LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id
+    LEFT JOIN purchase_order_lines pol ON pol.purchase_order_id = po.id AND pol.deleted_at IS NULL
     WHERE po.deleted_at IS NULL
       AND ${outletScope(p, 'po', params)}
       AND ${dateRange(p, 'po.document_date', params)}

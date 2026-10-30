@@ -512,7 +512,11 @@ Entities in the feed: tenants, outlets, counters, memberships, subscriptions,
 categories, items, item_barcodes, customers, customer_balances, document_series,
 invoices, invoice_lines, credit_notes, credit_note_lines, payments,
 payment_allocations, customer_ledger_entries, stock_ledger_entries,
-stock_balances, held_bills, expense_categories, expenses, day_closes.
+stock_balances, held_bills, expense_categories, expenses, day_closes, terms_conditions,
+estimates, estimate_lines, sales_orders, sales_order_lines, purchase_orders,
+purchase_order_lines, suppliers, supplier_balances. The three `*_lines` tables carry
+`deletedAt`: an order edit hides a dropped line instead of deleting it, so the removal
+reaches every device (migration 0032).
 
 **Push.** Send up to `SYNC_PUSH_MAX_OPERATIONS` operations in outbox order:
 
@@ -554,7 +558,18 @@ header-scoped cache would make a partly failed batch non-retryable.
 Operation types: `invoice.create|void|printed`, `credit_note.create|void|printed`,
 `payment.create|void`, `customer.create|update`, `item.create|update`,
 `category.create|update`, `stock.adjust`, `held_bill.upsert|release`,
-`expense.create|void`, `day_close.create`.
+`expense.create|void`, `day_close.create`, `estimate.create|update|delete|cancel|close|convert`,
+`sale_order.create|update|delete|cancel|close`, `purchase_order.create|update|delete|cancel`,
+`supplier.create|update|delete`.
+
+**Offline documents.** Estimates, sale orders and purchase orders are numbered on the
+phone from leased blocks, like invoices: the create payload carries `seriesId` and
+`sequenceNo` (and `estimate.convert` carries them for the new order, plus `lineIds` so
+the phone and server agree on the order's line ids). Without them the REST create
+still allocates a number on the server. Blocks for the `EST`, `SO` and `PO` series are
+leased on pull only to a device whose plan has the feature and whose role may create
+the document. A pushed order whose discount is over policy is accepted with a warning
+(the person already agreed it offline), not refused as on REST.
 
 ### 4.14 Audit and health
 

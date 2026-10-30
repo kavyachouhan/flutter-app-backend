@@ -28,12 +28,16 @@ import { hasPermission, type Permission } from '../auth/permissions.js';
 import * as catalogueService from '../catalogue/catalogue.service.js';
 import * as creditNotesService from '../credit-notes/credit-notes.service.js';
 import * as customersService from '../customers/customers.service.js';
+import * as estimatesService from '../estimates/estimates.service.js';
 import * as invoicesService from '../invoices/invoices.service.js';
 import type { BlockRow } from '../numbering/numbering.repository.js';
 import * as operationsService from '../operations/operations.service.js';
 import { topUpLeasesForDevice } from '../numbering/numbering.service.js';
 import * as paymentsService from '../payments/payments.service.js';
+import * as purchaseOrdersService from '../purchases/orders.service.js';
+import * as saleOrdersService from '../sales-orders/sales-orders.service.js';
 import * as stockService from '../stock/stock.service.js';
+import * as suppliersService from '../suppliers/suppliers.service.js';
 import * as termsService from '../terms/terms.service.js';
 import { SYNC_TABLES } from './sync.registry.js';
 import { syncRepository, type ChangeRow } from './sync.repository.js';
@@ -192,6 +196,26 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'expense.create': 'expenses:write',
   'expense.void': 'expenses:void',
   'day_close.create': 'day_close:create',
+  // The REST routes guard purchase orders with the purchases permissions: create, edit and
+  // cancel with `create`, delete with `void`.
+  'supplier.create': 'suppliers:write',
+  'supplier.update': 'suppliers:write',
+  'supplier.delete': 'suppliers:write',
+  'estimate.create': 'estimates:create',
+  'estimate.update': 'estimates:update',
+  'estimate.delete': 'estimates:delete',
+  'estimate.cancel': 'estimates:update',
+  'estimate.close': 'estimates:update',
+  'estimate.convert': 'estimates:convert',
+  'sale_order.create': 'sales_orders:create',
+  'sale_order.update': 'sales_orders:update',
+  'sale_order.delete': 'sales_orders:delete',
+  'sale_order.cancel': 'sales_orders:cancel',
+  'sale_order.close': 'sales_orders:cancel',
+  'purchase_order.create': 'purchases:create',
+  'purchase_order.update': 'purchases:create',
+  'purchase_order.delete': 'purchases:void',
+  'purchase_order.cancel': 'purchases:create',
 };
 
 /** Table a create/update touches, for replay detection and stale-write checks. */
@@ -210,6 +234,24 @@ const OPERATION_TABLE: Partial<Record<OperationType, string>> = {
   'held_bill.upsert': 'held_bills',
   'expense.create': 'expenses',
   'day_close.create': 'day_closes',
+  'supplier.create': 'suppliers',
+  'supplier.update': 'suppliers',
+  'supplier.delete': 'suppliers',
+  'estimate.create': 'estimates',
+  'estimate.update': 'estimates',
+  'estimate.delete': 'estimates',
+  'estimate.cancel': 'estimates',
+  'estimate.close': 'estimates',
+  'estimate.convert': 'estimates',
+  'sale_order.create': 'sales_orders',
+  'sale_order.update': 'sales_orders',
+  'sale_order.delete': 'sales_orders',
+  'sale_order.cancel': 'sales_orders',
+  'sale_order.close': 'sales_orders',
+  'purchase_order.create': 'purchase_orders',
+  'purchase_order.update': 'purchase_orders',
+  'purchase_order.delete': 'purchase_orders',
+  'purchase_order.cancel': 'purchase_orders',
 };
 
 type Payload<T extends OperationType> = (typeof OPERATION_PAYLOADS)[T]['_output'];
@@ -218,6 +260,11 @@ interface Applied {
   id: string;
   replayed?: boolean;
   warnings?: unknown[];
+}
+
+/** A retried delete finds it already gone; that is the outcome asked for. */
+function ignoreNotFound(error: unknown): void {
+  if (!(error instanceof NotFoundError)) throw error;
 }
 
 /** Every branch calls the same service the REST route calls. */
@@ -341,6 +388,106 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
       const p = payload as Payload<'day_close.create'>;
       const r = await operationsService.createDayClose(p);
       return { id: p.id, replayed: r.replayed, warnings: r.warnings };
+    }
+    case 'supplier.create': {
+      const p = payload as Payload<'supplier.create'>;
+      await suppliersService.createSupplier(p);
+      return { id: p.id };
+    }
+    case 'supplier.update': {
+      const p = payload as Payload<'supplier.update'>;
+      await suppliersService.updateSupplier(p.id, p.patch);
+      return { id: p.id };
+    }
+    case 'supplier.delete': {
+      const p = payload as Payload<'supplier.delete'>;
+      await suppliersService.deleteSupplier(p.id).catch(ignoreNotFound);
+      return { id: p.id };
+    }
+    case 'estimate.create': {
+      const p = payload as Payload<'estimate.create'>;
+      const r = await estimatesService.createEstimate(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'estimate.update': {
+      const p = payload as Payload<'estimate.update'>;
+      await estimatesService.updateEstimate(p.id, p);
+      return { id: p.id };
+    }
+    case 'estimate.delete': {
+      const p = payload as Payload<'estimate.delete'>;
+      await estimatesService.deleteEstimate(p.id).catch(ignoreNotFound);
+      return { id: p.id };
+    }
+    case 'estimate.cancel': {
+      const p = payload as Payload<'estimate.cancel'>;
+      await estimatesService.cancelEstimate(p.id, p);
+      return { id: p.id };
+    }
+    case 'estimate.close': {
+      const p = payload as Payload<'estimate.close'>;
+      await estimatesService.closeEstimate(p.id);
+      return { id: p.id };
+    }
+    case 'estimate.convert': {
+      const p = payload as Payload<'estimate.convert'>;
+      const { orderId, ...rest } = p;
+      const r = await estimatesService.convertEstimateToSalesOrder(
+        p.id,
+        { ...rest, id: orderId },
+        { warnOnDiscountCap: true },
+      );
+      return { id: p.id, warnings: r.warnings };
+    }
+    case 'sale_order.create': {
+      const p = payload as Payload<'sale_order.create'>;
+      const r = await saleOrdersService.createSaleOrder(p, { warnOnDiscountCap: true });
+      return { id: p.id, replayed: r.replayed, warnings: r.warnings };
+    }
+    case 'sale_order.update': {
+      const p = payload as Payload<'sale_order.update'>;
+      const r = await saleOrdersService.updateSaleOrder(p.id, p);
+      return { id: p.id, warnings: r.warnings };
+    }
+    case 'sale_order.delete': {
+      const p = payload as Payload<'sale_order.delete'>;
+      await saleOrdersService
+        .deleteSaleOrder(p.id, p.refundMode ? { refundMode: p.refundMode } : {})
+        .catch(ignoreNotFound);
+      return { id: p.id };
+    }
+    case 'sale_order.cancel': {
+      const p = payload as Payload<'sale_order.cancel'>;
+      await saleOrdersService.cancelSaleOrder(p.id, p);
+      return { id: p.id };
+    }
+    case 'sale_order.close': {
+      const p = payload as Payload<'sale_order.close'>;
+      await saleOrdersService.closeSaleOrder(
+        p.id,
+        p.refundMode ? { refundMode: p.refundMode } : {},
+      );
+      return { id: p.id };
+    }
+    case 'purchase_order.create': {
+      const p = payload as Payload<'purchase_order.create'>;
+      await purchaseOrdersService.createPurchaseOrder(p);
+      return { id: p.id };
+    }
+    case 'purchase_order.update': {
+      const p = payload as Payload<'purchase_order.update'>;
+      await purchaseOrdersService.updatePurchaseOrder(p.id, p);
+      return { id: p.id };
+    }
+    case 'purchase_order.delete': {
+      const p = payload as Payload<'purchase_order.delete'>;
+      await purchaseOrdersService.deletePurchaseOrder(p.id).catch(ignoreNotFound);
+      return { id: p.id };
+    }
+    case 'purchase_order.cancel': {
+      const p = payload as Payload<'purchase_order.cancel'>;
+      await purchaseOrdersService.cancelPurchaseOrder(p.id, p.reason);
+      return { id: p.id };
     }
   }
 }

@@ -145,6 +145,12 @@ export const voidSupplierPaymentBody = z.object({ reason: nonEmpty.max(200) });
 
 export const createPurchaseOrderBody = z.object({
   id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
   outletId: z.string().uuid(),
   supplierId: z.string().uuid(),
   documentDate: isoDate,
@@ -171,7 +177,11 @@ export const createPurchaseOrderBody = z.object({
 export type CreatePurchaseOrderBody = z.infer<typeof createPurchaseOrderBody>;
 
 /** An edit replaces the order's header and lines, so it takes the create shape without the id. */
-export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({ id: true });
+export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({
+  id: true,
+  seriesId: true,
+  sequenceNo: true,
+});
 export type UpdatePurchaseOrderBody = z.infer<typeof updatePurchaseOrderBody>;
 
 export const listPurchaseOrdersQuery =pageQuery.extend({

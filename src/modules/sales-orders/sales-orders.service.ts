@@ -40,7 +40,7 @@ import { paymentsRepository } from '../payments/payments.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
 import { discountsRepository } from '../price-lists/discounts.repository.js';
 import { resolveLinePrices } from '../price-lists/price-lists.service.js';
-import { allocateNumber } from '../purchases/numbering.js';
+import { numberForDocument } from '../purchases/numbering.js';
 import {
   assertItemsKnown,
   assertTotalsMatch,
@@ -149,7 +149,11 @@ const normDiscount = (d: Discount | null | undefined) =>
  * engine, the totals check and the discount policy. Kept in one place so an edit
  * cannot be validated more loosely than a create.
  */
-async function prepareOrder(tx: Tx, body: OrderBody): Promise<PreparedOrder> {
+async function prepareOrder(
+  tx: Tx,
+  body: OrderBody,
+  options: CreateOptions = {},
+): Promise<PreparedOrder> {
   if (body.dueDate && body.dueDate < body.documentDate) {
     throw new ValidationError('The due date cannot be before the order date.', {
       details: { field: 'dueDate' },
@@ -253,7 +257,14 @@ async function prepareOrder(tx: Tx, body: OrderBody): Promise<PreparedOrder> {
       evaluation.breaches,
       new Set(submitted.map((a) => a.breachKind)),
     );
-    if (unapproved.length > 0) {
+    if (unapproved.length > 0 && options.warnOnDiscountCap) {
+      // Made offline, where the person had already agreed the discount with the customer: it
+      // is recorded and reported, not refused, exactly as an offline invoice is.
+      warnings.push({
+        code: WarningCode.DISCOUNT_CAP_EXCEEDED,
+        details: { breaches: unapproved },
+      });
+    } else if (unapproved.length > 0) {
       throw new UnprocessableError(
         'A discount is over the limit the shop has set and needs approval.',
         ErrorCode.DISCOUNT_CAP_EXCEEDED,
@@ -602,11 +613,18 @@ async function recordApprovals(
 
 // --- Create / read / update --------------------------------------------------
 
-export async function createSaleOrder(body: CreateSaleOrderBody) {
-  const auth = requireAuthContext();
+export interface CreateOptions {
+  /**
+   * Report a discount over the shop's policy as a warning instead of refusing it. Set for an
+   * order a device made offline and pushes later; an order typed online is still refused.
+   */
+  warnOnDiscountCap?: boolean;
+}
+
+export async function createSaleOrder(body: CreateSaleOrderBody, options: CreateOptions = {}) {
   await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
-  return withTransaction((tx) => createSaleOrderInTx(tx, body));
+  return withTransaction((tx) => createSaleOrderInTx(tx, body, null, options));
 }
 
 /**
@@ -618,6 +636,7 @@ export async function createSaleOrderInTx(
   tx: Tx,
   body: CreateSaleOrderBody,
   estimateId: string | null = null,
+  options: CreateOptions = {},
 ) {
   const auth = requireAuthContext();
   await assertFeature(tx, 'sales_orders');
@@ -629,13 +648,15 @@ export async function createSaleOrderInTx(
     return { order: await loadOrder(tx, body.id), replayed: true, warnings: [] as OrderWarning[] };
   }
 
-  const prepared = await prepareOrder(tx, body);
+  const prepared = await prepareOrder(tx, body, options);
   const settings = await tenantsRepository.getSettings(tx);
-  const number = await allocateNumber(tx, {
+  const number = await numberForDocument(tx, {
     outletId: body.outletId,
     documentType: 'sales_order',
     documentDate: body.documentDate,
     fyStartMonth: settings.fyStartMonth,
+    seriesId: body.seriesId,
+    sequenceNo: body.sequenceNo,
   });
 
   // The header goes in with no advance yet: the payment row points at the order,

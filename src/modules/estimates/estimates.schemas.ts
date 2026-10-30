@@ -23,7 +23,15 @@ export const estimateBody = saleOrderBody
     validUntil: isoDate.nullable().optional(),
   });
 
-export const createEstimateBody = estimateBody.extend({ id: clientId });
+export const createEstimateBody = estimateBody.extend({
+  id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
+});
 export type CreateEstimateBody = z.infer<typeof createEstimateBody>;
 
 export const updateEstimateBody = estimateBody;
@@ -55,5 +63,22 @@ export const convertEstimateBody = z.object({
   target: z.literal('sales_order'),
   /** Approvals for discounts over the shop's policy, as on a sales order. */
   discountApprovals: z.array(discountApproval).max(50).optional(),
+  /** A device converting offline numbers the new order from a block leased to it. */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
+  /**
+   * The ids the order's lines take, by the estimate line each comes from. A device that already
+   * showed the order to its user names them, so the order the server raises has those very lines
+   * and not a second set. A line not named gets a new id.
+   */
+  lineIds: z.record(z.string().uuid()).optional(),
 });
 export type ConvertEstimateBody = z.infer<typeof convertEstimateBody>;
+
+/**
+ * The same conversion queued by a device. The operation's `id` is the estimate; the order it
+ * becomes carries its own client id, so a retried push cannot raise a second order.
+ */
+export const convertEstimateOperation = convertEstimateBody
+  .omit({ id: true })
+  .extend({ id: z.string().uuid(), orderId: clientId });

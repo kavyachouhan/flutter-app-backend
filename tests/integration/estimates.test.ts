@@ -233,6 +233,162 @@ describe('estimates', () => {
     });
   });
 
+  describe('attachments', () => {
+    // A 1x1 transparent PNG.
+    const PNG = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      'base64',
+    );
+
+    // Real uploads need the storage bucket; some environments (CI, a bare test project) have
+    // none. The rule checks below use made-up keys and never touch storage.
+    let storageReady = false;
+
+    async function uploadPng(who: TenantFixture = t): Promise<string> {
+      const sign = await who
+        .post('/v1/uploads/sign')
+        .send({ kind: 'attachment_image', contentType: 'image/png', sizeBytes: PNG.length });
+      if (sign.status !== 200) throw new Error(`storage unavailable: ${sign.status}`);
+      const slot = data<{ uploadUrl: string; objectKey: string }>(sign);
+      const put = await fetch(slot.uploadUrl, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/png' },
+        body: PNG,
+      });
+      if (!put.ok) throw new Error(`storage unavailable: ${put.status}`);
+      return slot.objectKey;
+    }
+
+    beforeAll(async () => {
+      try {
+        await uploadPng();
+        storageReady = true;
+      } catch {
+        storageReady = false;
+      }
+    });
+
+    const needsStorage = (name: string, fn: () => Promise<void>) =>
+      it(name, async (ctx) => {
+        if (!storageReady) ctx.skip();
+        await fn();
+      });
+
+    const fake = (kind: string) => `${t.tenantId}/${kind}/${randomUUID()}.png`;
+
+    const image = (objectKey: string) => ({ objectKey, kind: 'image', name: 'pic.png' });
+
+    needsStorage('saves an estimate with a real uploaded picture and returns it', async () => {
+      const key = await uploadPng();
+      const created = await newEstimate({ attachments: [image(key)] });
+      const read = data<Estimate & { attachments: { objectKey: string }[] }>(
+        await t.get(`/v1/estimates/${created.id}`).expect(200),
+      );
+      expect(read.attachments.map((a) => a.objectKey)).toEqual([key]);
+    });
+
+    it('still accepts the older order_attachment kind in the key', async () => {
+      // Existing records and older app versions use it. Not a real object, so it is the
+      // content check (or storage), not the key rule, that stops this one.
+      const item = await createItem(t);
+      const res = await t
+        .post('/v1/estimates')
+        .send(body(t, [line(item.id)], { attachments: [image(fake('order_attachment'))] }));
+      expect(res.status).not.toBe(201);
+      const message = (res.body as { error?: { message?: string } }).error?.message ?? '';
+      expect(message).not.toMatch(/not uploaded for this purpose/i);
+    });
+
+    it('refuses a key of another business', async () => {
+      const other = await createTenant({ name: 'Key Owner' });
+      const item = await createItem(t);
+      await create(
+        body(t, [line(item.id)], {
+          attachments: [image(`${other.tenantId}/attachment_image/${randomUUID()}.png`)],
+        }),
+        403,
+      );
+    });
+
+    it('refuses a key that was uploaded for another purpose', async () => {
+      const item = await createItem(t);
+      const res = await create(
+        body(t, [line(item.id)], {
+          attachments: [image(fake('logo'))],
+        }),
+        400,
+      );
+      expect(error(res).message).toMatch(/not uploaded for this purpose/i);
+    });
+
+    it('refuses the same file attached twice', async () => {
+      const key = fake('attachment_image');
+      const item = await createItem(t);
+      const res = await create(
+        body(t, [line(item.id)], { attachments: [image(key), image(key)] }),
+        400,
+      );
+      expect(error(res).message).toMatch(/twice/i);
+    });
+
+    it('refuses a picture attached as a document', async () => {
+      const item = await createItem(t);
+      const res = await create(
+        body(t, [line(item.id)], {
+          attachments: [{ objectKey: fake('attachment_image'), kind: 'document', name: 'x.pdf' }],
+        }),
+        400,
+      );
+      expect(error(res).message).toMatch(/picture cannot be attached as a document/i);
+    });
+
+    needsStorage('refuses a key whose file was never uploaded', async () => {
+      const item = await createItem(t);
+      const res = await t
+        .post('/v1/estimates')
+        .send(body(t, [line(item.id)], { attachments: [image(fake('attachment_image'))] }));
+      expect([400, 422]).toContain(res.status);
+    });
+
+    needsStorage('keeps the attachments through an edit and carries them onto the converted order', async () => {
+      const key = await uploadPng();
+      const item = await createItem(t);
+      const lines = [line(item.id)];
+      const made = data<Estimate>(await create(body(t, lines, { attachments: [image(key)] })));
+      const edited = data<Estimate & { attachments: { objectKey: string }[] }>(
+        await t
+          .put(`/v1/estimates/${made.id}`)
+          .send({ ...body(t, lines, { attachments: [image(key)], notes: 'v2' }), id: undefined })
+          .expect(200),
+      );
+      expect(edited.attachments.map((a) => a.objectKey)).toEqual([key]);
+
+      const orderId = randomUUID();
+      await t
+        .post(`/v1/estimates/${made.id}/convert`)
+        .send({ id: orderId, target: 'sales_order' })
+        .expect(201);
+      const order = data<{ attachments: { objectKey: string }[] }>(
+        await t.get(`/v1/sales-orders/${orderId}`).expect(200),
+      );
+      expect(order.attachments.map((a) => a.objectKey)).toEqual([key]);
+    });
+
+    needsStorage('can drop an attachment on edit', async () => {
+      const key = await uploadPng();
+      const item = await createItem(t);
+      const lines = [line(item.id)];
+      const made = data<Estimate>(await create(body(t, lines, { attachments: [image(key)] })));
+      const edited = data<Estimate & { attachments: unknown[] }>(
+        await t
+          .put(`/v1/estimates/${made.id}`)
+          .send({ ...body(t, lines, { attachments: [] }), id: undefined })
+          .expect(200),
+      );
+      expect(edited.attachments).toEqual([]);
+    });
+  });
+
   describe('edit', () => {
     it('replaces the lines and recomputes the totals, keeping the number', async () => {
       const item = await createItem(t);

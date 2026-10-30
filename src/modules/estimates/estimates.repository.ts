@@ -173,7 +173,8 @@ export const estimatesRepository = {
 
   findLines(tx: Tx, estimateId: string): Promise<EstimateLineRow[]> {
     return tx.many<EstimateLineRow>(
-      `SELECT ${LINE_COLUMNS} FROM estimate_lines WHERE estimate_id = $1 ORDER BY line_no`,
+      `SELECT ${LINE_COLUMNS} FROM estimate_lines
+       WHERE estimate_id = $1 AND deleted_at IS NULL ORDER BY line_no`,
       [estimateId],
     );
   },
@@ -317,14 +318,37 @@ export const estimatesRepository = {
               l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount", l."lineDiscount",
               l."billDiscountShare", l."taxableAmount", l."taxRatePercent", l."cessRatePercent",
               l.cgst, l.sgst, l.igst, l.cess, l."lineTotal", l."supplyCategory"
-       FROM jsonb_to_recordset($2::jsonb) AS l(${LINE_RECORDSET})`,
+       FROM jsonb_to_recordset($2::jsonb) AS l(${LINE_RECORDSET})
+       ON CONFLICT (id) DO UPDATE SET
+         line_no = EXCLUDED.line_no, item_id = EXCLUDED.item_id, item_name = EXCLUDED.item_name,
+         hsn_code = EXCLUDED.hsn_code, unit = EXCLUDED.unit, quantity = EXCLUDED.quantity,
+         unit_price = EXCLUDED.unit_price, discount = EXCLUDED.discount,
+         gross_amount = EXCLUDED.gross_amount, line_discount = EXCLUDED.line_discount,
+         bill_discount_share = EXCLUDED.bill_discount_share, taxable_amount = EXCLUDED.taxable_amount,
+         tax_rate_percent = EXCLUDED.tax_rate_percent, cess_rate_percent = EXCLUDED.cess_rate_percent,
+         cgst = EXCLUDED.cgst, sgst = EXCLUDED.sgst, igst = EXCLUDED.igst, cess = EXCLUDED.cess,
+         line_total = EXCLUDED.line_total, supply_category = EXCLUDED.supply_category,
+         deleted_at = NULL`,
       [estimateId, JSON.stringify(lines)],
     );
   },
 
-  /** An estimate has no fulfilment to protect, so an edit simply rewrites the lines. */
-  async deleteLines(tx: Tx, estimateId: string): Promise<void> {
-    await tx.query('DELETE FROM estimate_lines WHERE estimate_id = $1', [estimateId]);
+  /**
+   * An estimate has no fulfilment to protect, so an edit rewrites the lines: the ones sent are
+   * written (a removed line sent again comes back), the rest are hidden, not deleted, so the
+   * removal reaches every device that syncs.
+   */
+  async replaceLines(
+    tx: Tx,
+    estimateId: string,
+    lines: readonly EstimateLineWrite[],
+  ): Promise<void> {
+    await tx.query(
+      `UPDATE estimate_lines SET deleted_at = now()
+       WHERE estimate_id = $1 AND deleted_at IS NULL AND id <> ALL($2::uuid[])`,
+      [estimateId, lines.map((l) => l.id)],
+    );
+    await estimatesRepository.insertLines(tx, estimateId, lines);
   },
 
   async markConverted(

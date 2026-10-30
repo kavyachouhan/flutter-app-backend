@@ -9,6 +9,11 @@
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import type { TaxInvoiceResult } from '../../domain/tax/types.js';
+import {
+  assertAttachments,
+  checkAttachments,
+  removeDroppedAttachments,
+} from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   ConflictError,
@@ -19,7 +24,6 @@ import {
   ValidationError,
 } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
-import { assertKeyBelongsToTenant } from '../../lib/storage.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
 import { hasPermission } from '../auth/permissions.js';
@@ -27,7 +31,7 @@ import { customersRepository } from '../customers/customers.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
-import { allocateNumber } from '../purchases/numbering.js';
+import { numberForDocument } from '../purchases/numbering.js';
 import {
   assertItemsKnown,
   assertTotalsMatch,
@@ -35,7 +39,11 @@ import {
   loadSaleItems,
   taxModeFor,
 } from '../sales-docs/prepare.js';
-import { createSaleOrderInTx, manualTotals } from '../sales-orders/sales-orders.service.js';
+import {
+  createSaleOrderInTx,
+  manualTotals,
+  type CreateOptions,
+} from '../sales-orders/sales-orders.service.js';
 import type { CreateSaleOrderBody } from '../sales-orders/sales-orders.schemas.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
@@ -105,15 +113,9 @@ async function prepareEstimate(tx: Tx, body: UpdateEstimateBody): Promise<Prepar
     throw new ValidationError('A customer is required.', { details: { field: 'customerName' } });
   }
 
-  for (const attachment of body.attachments ?? []) {
-    assertKeyBelongsToTenant(attachment.objectKey);
-    // Estimates share the order attachment policy (photo or PDF, 5 MB).
-    if (attachment.objectKey.split('/')[1] !== 'order_attachment') {
-      throw new ValidationError('That file was not uploaded as an attachment.', {
-        details: { objectKey: attachment.objectKey },
-      });
-    }
-  }
+  // Same rules as a sales order: the older `order_attachment` kind and the newer
+  // `attachment_image` / `attachment_file` are both accepted.
+  assertAttachments(body.attachments);
 
   await validateCustomFields(tx, 'estimate', body.customFields);
 
@@ -261,8 +263,10 @@ function assertOpen(estimate: EstimateRow): void {
 
 // --- Create / read / update --------------------------------------------------
 
-export function createEstimate(body: CreateEstimateBody) {
+export async function createEstimate(body: CreateEstimateBody) {
   const auth = requireAuthContext();
+  // Proves each file really exists and is what it claims, before anything is written.
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   return withTransaction(async (tx) => {
@@ -277,11 +281,13 @@ export function createEstimate(body: CreateEstimateBody) {
 
     const prepared = await prepareEstimate(tx, body);
     const settings = await tenantsRepository.getSettings(tx);
-    const number = await allocateNumber(tx, {
+    const number = await numberForDocument(tx, {
       outletId: body.outletId,
       documentType: 'estimate',
       documentDate: body.documentDate,
       fyStartMonth: settings.fyStartMonth,
+      seriesId: body.seriesId,
+      sequenceNo: body.sequenceNo,
     });
 
     await estimatesRepository.insertHeader(tx, {
@@ -309,12 +315,28 @@ export function createEstimate(body: CreateEstimateBody) {
   });
 }
 
-export function updateEstimate(id: string, body: UpdateEstimateBody) {
+export async function updateEstimate(id: string, body: UpdateEstimateBody) {
+  await checkAttachments(body.attachments);
+  let previous: unknown;
+  const result = await updateEstimateInTransaction(id, body, (a) => {
+    previous = a;
+  });
+  // After the commit: files the edit took off the estimate are no longer referenced.
+  await removeDroppedAttachments(previous, body.attachments);
+  return result;
+}
+
+function updateEstimateInTransaction(
+  id: string,
+  body: UpdateEstimateBody,
+  onPrevious: (attachments: unknown) => void,
+) {
   return withTransaction(async (tx) => {
     await assertFeature(tx, FEATURE);
     // Locked, so an edit and a conversion of the same estimate cannot interleave.
     const estimate = await estimatesRepository.find(tx, id, true);
     if (!estimate) throw new NotFoundError('Estimate');
+    onPrevious(estimate.attachments);
     assertOutletAccess(estimate.outletId);
     assertOpen(estimate);
     if (body.outletId !== estimate.outletId) {
@@ -325,8 +347,7 @@ export function updateEstimate(id: string, body: UpdateEstimateBody) {
 
     const prepared = await prepareEstimate(tx, body);
     await estimatesRepository.updateHeader(tx, { ...prepared.header, id });
-    await estimatesRepository.deleteLines(tx, id);
-    await estimatesRepository.insertLines(tx, id, prepared.lines);
+    await estimatesRepository.replaceLines(tx, id, prepared.lines);
 
     await recordAudit(tx, {
       action: 'estimate.updated',
@@ -475,7 +496,11 @@ const DECLARED_SUPPLY_TYPES = [
  * taxes, and its T&C snapshot. The T&C is copied as the estimate printed it rather than
  * re-resolved, since a T&C written for estimates need not also apply to sales orders.
  */
-export function convertEstimateToSalesOrder(id: string, input: ConvertEstimateBody) {
+export function convertEstimateToSalesOrder(
+  id: string,
+  input: ConvertEstimateBody,
+  options: CreateOptions = {},
+) {
   const auth = requireAuthContext();
   if (!hasPermission(auth.role, 'sales_orders:create')) {
     throw new ForbiddenError(undefined, ErrorCode.INSUFFICIENT_ROLE, {
@@ -497,6 +522,8 @@ export function convertEstimateToSalesOrder(id: string, input: ConvertEstimateBo
     const declared = DECLARED_SUPPLY_TYPES.find((t) => t === estimate.supplyType);
     const body: CreateSaleOrderBody = {
       id: input.id,
+      ...(input.seriesId !== undefined ? { seriesId: input.seriesId } : {}),
+      ...(input.sequenceNo !== undefined ? { sequenceNo: input.sequenceNo } : {}),
       outletId: estimate.outletId,
       documentDate: todayIn(tenant.timezone),
       customerId: estimate.customerId,
@@ -509,7 +536,7 @@ export function convertEstimateToSalesOrder(id: string, input: ConvertEstimateBo
       roundOff: estimate.roundOffEnabled,
       lines: lines.map((l) => ({
         // The order's lines are its own rows with their own ids.
-        id: randomUUID(),
+        id: input.lineIds?.[l.id] ?? randomUUID(),
         itemId: l.itemId,
         itemName: l.itemName,
         ...(l.hsnCode ? { hsnCode: l.hsnCode } : {}),
@@ -537,7 +564,12 @@ export function convertEstimateToSalesOrder(id: string, input: ConvertEstimateBo
       },
     };
 
-    const { order, replayed, warnings } = await createSaleOrderInTx(tx, body, estimate.id);
+    const { order, replayed, warnings } = await createSaleOrderInTx(
+      tx,
+      body,
+      estimate.id,
+      options,
+    );
     if (replayed) {
       // The caller reused an order id; nothing was raised, so nothing may be marked.
       throw new ConflictError('That order id is already in use.', ErrorCode.DUPLICATE);

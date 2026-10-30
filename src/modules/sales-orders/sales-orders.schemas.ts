@@ -87,7 +87,15 @@ export const saleOrderBody = z.object({
   }),
 });
 
-export const createSaleOrderBody = saleOrderBody.extend({ id: clientId });
+export const createSaleOrderBody = saleOrderBody.extend({
+  id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
+});
 export type CreateSaleOrderBody = z.infer<typeof createSaleOrderBody>;
 
 export const updateSaleOrderBody = saleOrderBody;
