@@ -35,6 +35,10 @@ import {
   markEstimateConvertedByInvoice,
 } from '../estimates/estimates.service.js';
 import {
+  claimProformaInvoiceForInvoice,
+  markProformaInvoiceConvertedByInvoice,
+} from '../proforma-invoices/proforma-invoices.service.js';
+import {
   applyAdvanceToInvoice,
   applyFulfilment,
   assertFulfilmentFits,
@@ -323,7 +327,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
         })
       : undefined;
 
-    const estimateId = await claimEstimateForInvoice(tx, body.estimateId);
+    const estimateId = await claimEstimateForInvoice(tx, body.estimateId, body.documentDate);
+    const proformaInvoiceId = await claimProformaInvoiceForInvoice(
+      tx,
+      body.proformaInvoiceId,
+      body.documentDate,
+    );
 
     await invoicesRepository.insertHeader(tx, {
       id: body.id,
@@ -354,6 +363,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       salesOrderId: body.salesOrderId ?? null,
       amendsInvoiceId: body.amendsInvoiceId ?? null,
       estimateId,
+      proformaInvoiceId,
       billDiscountReason: body.billDiscountReason ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
@@ -401,6 +411,9 @@ export async function createInvoice(body: CreateInvoiceBody) {
     });
     await invoicesRepository.insertLines(tx, body.id, body.outletId, body.documentDate, lineRows);
     if (estimateId) await markEstimateConvertedByInvoice(tx, estimateId, body.id, documentNumber);
+    if (proformaInvoiceId) {
+      await markProformaInvoiceConvertedByInvoice(tx, proformaInvoiceId, body.id, documentNumber);
+    }
     if (body.salesOrderId) await applyFulfilment(tx, body.salesOrderId, fulfilments);
 
     // A line billing a delivery challan already moved this stock when the

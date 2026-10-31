@@ -14,6 +14,11 @@ import {
   createEstimateBody,
   updateEstimateBody,
 } from '../estimates/estimates.schemas.js';
+import {
+  cancelProformaInvoiceBody,
+  createProformaInvoiceBody,
+  updateProformaInvoiceBody,
+} from '../proforma-invoices/proforma-invoices.schemas.js';
 import { createCustomerBody, updateCustomerBody } from '../customers/customers.schemas.js';
 import { createInvoiceBody, voidInvoiceBody } from '../invoices/invoices.schemas.js';
 import { createReceiptBody, voidPaymentBody } from '../payments/payments.schemas.js';
@@ -89,6 +94,11 @@ export const OPERATION_PAYLOADS = {
   'estimate.cancel': withId(cancelEstimateBody.shape),
   'estimate.close': withId({}),
   'estimate.convert': convertEstimateOperation,
+  'proforma_invoice.create': createProformaInvoiceBody,
+  'proforma_invoice.update': updateProformaInvoiceBody.extend({ id: z.string().uuid() }),
+  'proforma_invoice.delete': withId({}),
+  'proforma_invoice.cancel': withId(cancelProformaInvoiceBody.shape),
+  'proforma_invoice.close': withId({}),
   'sale_order.create': createSaleOrderBody,
   'sale_order.update': updateSaleOrderBody.extend({ id: z.string().uuid() }),
   'sale_order.delete': withId(deleteSaleOrderQuery.shape),

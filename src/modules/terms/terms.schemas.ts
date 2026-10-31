@@ -9,6 +9,7 @@ export const TERMS_DOCUMENT_TYPES = [
   'purchase',
   'purchase_order',
   'estimate',
+  'proforma_invoice',
 ] as const;
 export type TermsDocumentType = (typeof TERMS_DOCUMENT_TYPES)[number];
 export const termsDocumentType = z.enum(TERMS_DOCUMENT_TYPES);

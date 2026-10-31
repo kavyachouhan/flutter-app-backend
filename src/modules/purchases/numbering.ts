@@ -27,7 +27,7 @@ import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type SeriesRow } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 
-export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order' | 'delivery_challan' | 'estimate';
+export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order' | 'delivery_challan' | 'estimate' | 'proforma_invoice';
 
 const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   purchase_bill: 'PB',
@@ -36,6 +36,7 @@ const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   delivery_challan: 'DC',
   sales_order: 'SO',
   estimate: 'EST',
+  proforma_invoice: 'PI',
 };
 
 async function ensureSeries(

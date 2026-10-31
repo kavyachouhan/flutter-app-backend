@@ -123,6 +123,18 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
     'estimate.convert',
   ]),
   table('estimate_lines', ['id'], true, ['estimate.create', 'estimate.update']),
+  // Converted by the invoice that names it, so there is no convert operation here.
+  table('proforma_invoices', ['id'], true, [
+    'proforma_invoice.create',
+    'proforma_invoice.update',
+    'proforma_invoice.delete',
+    'proforma_invoice.cancel',
+    'proforma_invoice.close',
+  ]),
+  table('proforma_invoice_lines', ['id'], true, [
+    'proforma_invoice.create',
+    'proforma_invoice.update',
+  ]),
   table('sales_orders', ['id'], true, [
     'sale_order.create',
     'sale_order.update',

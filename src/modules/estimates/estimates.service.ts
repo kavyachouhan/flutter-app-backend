@@ -32,6 +32,7 @@ import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { validateCustomFields } from '../print/custom-fields.js';
 import { numberForDocument } from '../purchases/numbering.js';
+import { effectiveStatus, isExpired, todayIn } from '../sales-docs/expiry.js';
 import {
   assertItemsKnown,
   assertTotalsMatch,
@@ -77,12 +78,28 @@ async function loadEstimate(tx: Tx, id: string) {
           estimate.convertedToId,
         )
       : null;
+  const today = await shopToday(tx);
   return {
     ...estimate,
+    ...validity(estimate, today),
     // Nothing is owed on an offer; it is still "to be won" only while open.
     balance: estimate.status === 'open' ? estimate.grandTotal : 0,
     convertedToNumber,
     lines,
+  };
+}
+
+/** Today in the shop's time zone: the date every validity check is made against. */
+async function shopToday(tx: Tx): Promise<string> {
+  const tenant = await tenantsRepository.findCurrent(tx);
+  if (!tenant) throw new NotFoundError('Tenant');
+  return todayIn(tenant.timezone);
+}
+
+function validity(row: Pick<EstimateRow, 'status' | 'validUntil'>, today: string) {
+  return {
+    isExpired: isExpired(row.status, row.validUntil, today),
+    effectiveStatus: effectiveStatus(row.status, row.validUntil, today),
   };
 }
 
@@ -375,8 +392,10 @@ export function getEstimate(id: string) {
 export async function listEstimates(query: ListEstimatesQuery) {
   if (query.outletId) assertOutletAccess(query.outletId);
   const page = parsePage(query);
+  let today = '';
   const rows = await withReadTransaction(async (tx) => {
     await assertFeature(tx, FEATURE);
+    today = await shopToday(tx);
     return estimatesRepository.list(
       tx,
       {
@@ -384,6 +403,7 @@ export async function listEstimates(query: ListEstimatesQuery) {
         customerId: query.customerId,
         outletId: query.outletId,
         q: query.q,
+        today,
       },
       accessibleOutletIds(),
       page.limit,
@@ -398,6 +418,7 @@ export async function listEstimates(query: ListEstimatesQuery) {
     ...result,
     data: result.data.map((row) => ({
       ...row,
+      ...validity(row, today),
       balance: row.status === 'open' ? row.grandTotal : 0,
     })),
   };
@@ -407,7 +428,12 @@ export function summaryEstimates(query: SummaryEstimatesQuery) {
   if (query.outletId) assertOutletAccess(query.outletId);
   return withReadTransaction(async (tx) => {
     await assertFeature(tx, FEATURE);
-    return estimatesRepository.summary(tx, query.outletId, accessibleOutletIds());
+    return estimatesRepository.summary(
+      tx,
+      query.outletId,
+      accessibleOutletIds(),
+      await shopToday(tx),
+    );
   });
 }
 
@@ -475,11 +501,6 @@ export function closeEstimate(id: string) {
 
 // --- Conversion ----------------------------------------------------------------
 
-/** The estimate's own date format is YYYY-MM-DD in the shop's time zone. */
-function todayIn(timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
-}
-
 const DECLARED_SUPPLY_TYPES = [
   'export_with_tax',
   'export_without_tax',
@@ -518,6 +539,13 @@ export function convertEstimateToSalesOrder(
     const lines = await estimatesRepository.findLines(tx, id);
     const tenant = await tenantsRepository.findCurrent(tx);
     if (!tenant) throw new NotFoundError('Tenant');
+    if (isExpired(estimate.status, estimate.validUntil, todayIn(tenant.timezone))) {
+      throw new ConflictError(
+        'This estimate has passed its validity date. Extend the date to convert it.',
+        ErrorCode.ESTIMATE_EXPIRED,
+        { details: { validUntil: estimate.validUntil } },
+      );
+    }
 
     const declared = DECLARED_SUPPLY_TYPES.find((t) => t === estimate.supplyType);
     const body: CreateSaleOrderBody = {
@@ -612,10 +640,13 @@ export function convertEstimateToSalesOrder(
 export async function claimEstimateForInvoice(
   tx: Tx,
   estimateId: string | undefined,
+  asOf: string,
 ): Promise<string | null> {
   if (!estimateId) return null;
   const estimate = await estimatesRepository.find(tx, estimateId, true);
   if (!estimate || estimate.status !== 'open') return null;
+  // Validity is judged on the day of the sale, not the day it reached the server.
+  if (isExpired(estimate.status, estimate.validUntil, asOf)) return null;
   return estimate.id;
 }
 

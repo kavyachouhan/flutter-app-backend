@@ -63,6 +63,20 @@ describe('permissions', () => {
     }
   });
 
+  it('lets a cashier create and read proforma invoices, but not change or delete them', () => {
+    expect(hasPermission('cashier', 'proforma_invoices:create')).toBe(true);
+    expect(hasPermission('cashier', 'proforma_invoices:read')).toBe(true);
+    for (const p of ['proforma_invoices:update', 'proforma_invoices:delete'] as const) {
+      expect(hasPermission('cashier', p)).toBe(false);
+      expect(hasPermission('manager', p)).toBe(true);
+      expect(hasPermission('owner', p)).toBe(true);
+    }
+    for (const role of ['accountant', 'viewer'] as const) {
+      expect(hasPermission(role, 'proforma_invoices:read')).toBe(true);
+      expect(hasPermission(role, 'proforma_invoices:create')).toBe(false);
+    }
+  });
+
   it('only lets an owner assign or modify the owner role', () => {
     for (const actor of ROLES) {
       expect(canManageRole(actor, 'owner')).toBe(actor === 'owner');

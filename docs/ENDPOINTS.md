@@ -262,8 +262,8 @@ back in `errors` with their names. Permission `catalogue:read`, entitlement
 ## Terms & Conditions — tag `Terms & Conditions`
 
 Reusable terms a shop attaches to a sale, purchase bill, purchase order, sales order
-or estimate. Each entry has a `title`, a `description` and `applicableFor` (any of
-`sale`, `sale_order`, `purchase`, `purchase_order`, `estimate`).
+estimate or proforma invoice. Each entry has a `title`, a `description` and `applicableFor` (any of
+`sale`, `sale_order`, `purchase`, `purchase_order`, `estimate`, `proforma_invoice`).
 
 ### `GET /v1/terms`
 
@@ -283,7 +283,7 @@ record. Permission `terms:write`.
 ### Attaching terms to a document
 
 `POST /v1/invoices`, `/v1/purchase-bills`, `/v1/purchase-orders`,
-`/v1/sales-orders` and `/v1/estimates` accept an optional `termsId`. The terms must
+`/v1/sales-orders`, `/v1/estimates` and `/v1/proforma-invoices` accept an optional `termsId`. The terms must
 exist and be applicable to that document
 type (otherwise `422`). The document stores the reference **and** a
 `termsSnapshot` (`{title, description}`), so editing or deleting the entry
@@ -577,6 +577,12 @@ number and records no payment. It is editable while `open`; converting it raises
 order or an invoice and freezes it. Needs the `sales_orders` plan feature.
 Status: `open` → `converted` | `closed` | `cancelled`.
 
+**Expiry.** `validUntil` is enforced. *Expired* is never stored: a document is expired when it is
+`open` and `validUntil` is before today in the shop's time zone (the last day still counts). Every
+estimate response carries `isExpired` and `effectiveStatus` (`expired` stands in for `open`). In lists
+and chip counts an expired estimate counts as **closed**, not open. An expired estimate cannot be
+converted (`ESTIMATE_EXPIRED`, `409`) but can still be edited, which is how its date is extended.
+
 ### `POST /v1/estimates`
 
 **What** Creates an estimate. `201`, or `200` with `replayed: true` when the client `id`
@@ -615,13 +621,44 @@ shop's discount policy is enforced here. Needs `estimates:convert` and `sales_or
 
 **Converting to a sale.** Invoices are numbered from the till's leased block, so the device raises
 them: send `estimateId` on `POST /v1/invoices`. If the estimate is still open it becomes converted in
-the same transaction. If not (already converted elsewhere, or deleted) the link is dropped and the
-sale still issues: a sale already rung up is never rejected over a stale link.
+the same transaction. If not (already converted elsewhere, deleted, or past `validUntil` on the
+invoice's `documentDate`) the link is dropped and the sale still issues: a sale already rung up is never
+rejected over a stale link.
 
 ### `GET /v1/estimates/:id/print-payload`
 
 **What** The estimate formatted for print (title `ESTIMATE`, no balance row). Permission
 `estimates:read`.
+
+---
+
+## Proforma Invoices — tag `Proforma Invoices`
+
+A proforma invoice is a preliminary invoice, not a sale: it moves no stock, takes no GST invoice
+number and records no payment or revenue. It is editable while `open` and becomes an invoice when the
+till raises one that names it. Same shape and rules as an estimate (shared body, totals, `expectedTotals`
+check, expiry), with these differences: numbered from a `PI` series (`proforma_invoice` document type),
+no custom fields, and **no convert route**. Needs the `sales_orders` plan feature.
+Status: `open` → `converted` | `closed` | `cancelled`; `converted` always means "became an invoice".
+
+| Endpoint | Permission |
+|---|---|
+| `POST /v1/proforma-invoices` (`201`, or `200` with `replayed: true`) | `proforma_invoices:create` |
+| `GET /v1/proforma-invoices` (`?status=all\|open\|closed`, `?q=`, `?customerId=`) · `/summary` · `/:id` | `proforma_invoices:read` |
+| `PUT /v1/proforma-invoices/:id` · `DELETE /v1/proforma-invoices/:id` | `proforma_invoices:update` / `:delete` |
+| `POST /v1/proforma-invoices/:id/cancel` (`{reason}`) · `/close` | `proforma_invoices:update` |
+| `GET /v1/proforma-invoices/:id/print-payload` (title `PROFORMA INVOICE`, no balance row) | `proforma_invoices:read` |
+
+**Expiry.** As for estimates: `isExpired` / `effectiveStatus` on every response, an expired document
+counts under `closed`, and it can be edited to extend `validUntil`.
+
+**Converting to an invoice.** Send `proformaInvoiceId` on `POST /v1/invoices`. If the proforma invoice is
+still open and not past `validUntil` on the invoice's `documentDate` (judged on the sale's date, so a till
+that was offline is not penalised), it becomes converted in the same transaction and records the invoice.
+If not (already converted, closed, cancelled, deleted, expired, or unknown) the link is dropped and the
+sale still issues. The proforma invoice's row is locked, so two tills cannot both claim it. A converted
+proforma invoice cannot be edited, closed, cancelled or deleted (`PROFORMA_INVOICE_ALREADY_CONVERTED`);
+a closed or cancelled one is final (`PROFORMA_INVOICE_NOT_OPEN`).
 
 ## Debit notes — tag `Debit notes`
 
@@ -678,6 +715,9 @@ stock twice. Permission `debit_notes:void`.
 | `OVERALLOCATION`             | Allocations exceed the payment, or a bill's outstanding.      |
 | `ESTIMATE_ALREADY_CONVERTED` | The estimate became a sales order or invoice; it is now fixed. |
 | `ESTIMATE_NOT_OPEN`          | Only an open estimate can be edited, converted or closed.     |
+| `ESTIMATE_EXPIRED`           | The estimate is past its validity date; extend it to convert. |
+| `PROFORMA_INVOICE_ALREADY_CONVERTED` | The proforma invoice became an invoice; it is now fixed. |
+| `PROFORMA_INVOICE_NOT_OPEN`  | Only an open proforma invoice can be edited, closed or cancelled. |
 
 ## New permissions
 

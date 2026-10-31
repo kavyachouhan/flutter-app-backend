@@ -417,6 +417,8 @@ export const estimatesRepository = {
       customerId: string | undefined;
       outletId: string | undefined;
       q: string | undefined;
+      /** The shop's today: an open estimate past its validity counts as closed, not open. */
+      today: string;
     },
     restrictTo: readonly string[] | null,
     limit: number,
@@ -425,8 +427,11 @@ export const estimatesRepository = {
     return tx.many<EstimateRow>(
       `SELECT ${ESTIMATE_COLUMNS} FROM estimates e
        WHERE e.deleted_at IS NULL
-         AND ($1::text IS NULL OR ($1 = 'open' AND e.status = 'open')
-              OR ($1 = 'closed' AND e.status <> 'open'))
+         AND ($1::text IS NULL
+              OR ($1 = 'open' AND e.status = 'open'
+                  AND (e.valid_until IS NULL OR e.valid_until >= $9::date))
+              OR ($1 = 'closed' AND NOT (e.status = 'open'
+                  AND (e.valid_until IS NULL OR e.valid_until >= $9::date))))
          AND ($2::uuid IS NULL OR e.customer_id = $2)
          AND ($3::uuid IS NULL OR e.outlet_id = $3)
          AND ($4::uuid[] IS NULL OR e.outlet_id = ANY($4::uuid[]))
@@ -444,6 +449,7 @@ export const estimatesRepository = {
         cursor?.id ?? null,
         limit + 1,
         filter.q ? likeContains(filter.q) : null,
+        filter.today,
       ],
     );
   },
@@ -453,16 +459,19 @@ export const estimatesRepository = {
     tx: Tx,
     outletId: string | undefined,
     restrictTo: readonly string[] | null,
+    today: string,
   ): Promise<EstimateSummary> {
     const row = await tx.one<EstimateSummary>(
       `SELECT count(*)::int AS "all",
-              count(*) FILTER (WHERE status = 'open')::int AS open,
-              count(*) FILTER (WHERE status <> 'open')::int AS closed
+              count(*) FILTER (WHERE status = 'open'
+                               AND (valid_until IS NULL OR valid_until >= $3::date))::int AS open,
+              count(*) FILTER (WHERE NOT (status = 'open'
+                               AND (valid_until IS NULL OR valid_until >= $3::date)))::int AS closed
        FROM estimates
        WHERE deleted_at IS NULL
          AND ($1::uuid IS NULL OR outlet_id = $1)
          AND ($2::uuid[] IS NULL OR outlet_id = ANY($2::uuid[]))`,
-      [outletId ?? null, restrictTo ? [...restrictTo] : null],
+      [outletId ?? null, restrictTo ? [...restrictTo] : null, today],
     );
     return row ?? { all: 0, open: 0, closed: 0 };
   },

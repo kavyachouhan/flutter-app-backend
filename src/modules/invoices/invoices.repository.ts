@@ -48,6 +48,8 @@ export interface InvoiceHeaderInsert {
   salesOrderId: string | null;
   /** The estimate this invoice was raised from, when that link still held. */
   estimateId?: string | null;
+  /** The proforma invoice this invoice was raised from, when that link still held. */
+  proformaInvoiceId?: string | null;
   /** The invoice this one replaces; it has been fully credited. */
   amendsInvoiceId: string | null;
   billDiscountReason: string | null;
@@ -144,7 +146,7 @@ const HEADER_COLUMNS = `
   i.issued_at AS "issuedAt", i.issued_by AS "issuedBy", i.void_reason AS "voidReason", i.voided_at AS "voidedAt",
   i.voided_by AS "voidedBy", i.print_count AS "printCount", i.printed_at AS "printedAt", i.created_at AS "createdAt",
   i.custom_fields AS "customFields", i.attachments, i.is_reverse_charge AS "isReverseCharge",
-  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId",
+  i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId", i.proforma_invoice_id AS "proformaInvoiceId",
   i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
   (SELECT r.id FROM invoices r WHERE r.amends_invoice_id = i.id AND r.status = 'issued' LIMIT 1)
     AS "amendedByInvoiceId",
@@ -199,7 +201,7 @@ export const invoicesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, taxable_charges, non_taxable_charges,
          additional_charges, sub_total, round_off, grand_total, tax_summary, hsn_summary, notes, status,
          issued_at, issued_by, custom_fields, is_reverse_charge, terms_id, terms_snapshot, sales_order_id,
-         amends_invoice_id, bill_discount_reason, estimate_id, attachments)
+         amends_invoice_id, bill_discount_reason, estimate_id, attachments, proforma_invoice_id)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -207,7 +209,7 @@ export const invoicesRepository = {
          $20, $21, $22, $23, $24,
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
-         $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb)`,
+         $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb, $50)`,
       [
         h.id,
         h.outletId,
@@ -258,6 +260,7 @@ export const invoicesRepository = {
         h.billDiscountReason,
         h.estimateId ?? null,
         JSON.stringify(h.attachments),
+        h.proformaInvoiceId ?? null,
       ],
     );
   },

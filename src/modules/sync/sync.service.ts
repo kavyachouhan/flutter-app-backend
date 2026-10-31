@@ -29,6 +29,7 @@ import * as catalogueService from '../catalogue/catalogue.service.js';
 import * as creditNotesService from '../credit-notes/credit-notes.service.js';
 import * as customersService from '../customers/customers.service.js';
 import * as estimatesService from '../estimates/estimates.service.js';
+import * as proformaInvoicesService from '../proforma-invoices/proforma-invoices.service.js';
 import * as invoicesService from '../invoices/invoices.service.js';
 import type { BlockRow } from '../numbering/numbering.repository.js';
 import * as operationsService from '../operations/operations.service.js';
@@ -207,6 +208,11 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'estimate.cancel': 'estimates:update',
   'estimate.close': 'estimates:update',
   'estimate.convert': 'estimates:convert',
+  'proforma_invoice.create': 'proforma_invoices:create',
+  'proforma_invoice.update': 'proforma_invoices:update',
+  'proforma_invoice.delete': 'proforma_invoices:delete',
+  'proforma_invoice.cancel': 'proforma_invoices:update',
+  'proforma_invoice.close': 'proforma_invoices:update',
   'sale_order.create': 'sales_orders:create',
   'sale_order.update': 'sales_orders:update',
   'sale_order.delete': 'sales_orders:delete',
@@ -243,6 +249,11 @@ const OPERATION_TABLE: Partial<Record<OperationType, string>> = {
   'estimate.cancel': 'estimates',
   'estimate.close': 'estimates',
   'estimate.convert': 'estimates',
+  'proforma_invoice.create': 'proforma_invoices',
+  'proforma_invoice.update': 'proforma_invoices',
+  'proforma_invoice.delete': 'proforma_invoices',
+  'proforma_invoice.cancel': 'proforma_invoices',
+  'proforma_invoice.close': 'proforma_invoices',
   'sale_order.create': 'sales_orders',
   'sale_order.update': 'sales_orders',
   'sale_order.delete': 'sales_orders',
@@ -438,6 +449,31 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
         { warnOnDiscountCap: true },
       );
       return { id: p.id, warnings: r.warnings };
+    }
+    case 'proforma_invoice.create': {
+      const p = payload as Payload<'proforma_invoice.create'>;
+      const r = await proformaInvoicesService.createProformaInvoice(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'proforma_invoice.update': {
+      const p = payload as Payload<'proforma_invoice.update'>;
+      await proformaInvoicesService.updateProformaInvoice(p.id, p);
+      return { id: p.id };
+    }
+    case 'proforma_invoice.delete': {
+      const p = payload as Payload<'proforma_invoice.delete'>;
+      await proformaInvoicesService.deleteProformaInvoice(p.id).catch(ignoreNotFound);
+      return { id: p.id };
+    }
+    case 'proforma_invoice.cancel': {
+      const p = payload as Payload<'proforma_invoice.cancel'>;
+      await proformaInvoicesService.cancelProformaInvoice(p.id, p);
+      return { id: p.id };
+    }
+    case 'proforma_invoice.close': {
+      const p = payload as Payload<'proforma_invoice.close'>;
+      await proformaInvoicesService.closeProformaInvoice(p.id);
+      return { id: p.id };
     }
     case 'sale_order.create': {
       const p = payload as Payload<'sale_order.create'>;

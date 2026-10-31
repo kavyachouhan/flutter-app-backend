@@ -31,6 +31,7 @@ import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository, type OutletRow } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
 import { estimatesRepository } from '../estimates/estimates.repository.js';
+import { proformaInvoicesRepository } from '../proforma-invoices/proforma-invoices.repository.js';
 import { salesOrdersRepository } from '../sales-orders/sales-orders.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { tenantsRepository, type TenantRow } from '../tenants/tenants.repository.js';
@@ -526,6 +527,80 @@ export function buildEstimatePayload(id: string, query: PrintPayloadQuery): Prom
       currencySymbol: tenant.currencySymbol,
       copyIndex,
       notes: estimate.notes,
+    };
+    return resolvePrintDocument(input);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Proforma invoice
+// ---------------------------------------------------------------------------
+
+export function buildProformaInvoicePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'sales_orders');
+    const proformaInvoice = await proformaInvoicesRepository.find(tx, id);
+    if (!proformaInvoice) throw new NotFoundError('Proforma invoice');
+    assertOutletAccess(proformaInvoice.outletId);
+
+    const [tenant, outlet, profiles, lines] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, proformaInvoice.outletId),
+      printRepository.findProfilesForOutlet(tx, proformaInvoice.outletId),
+      proformaInvoicesRepository.findLines(tx, id),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+
+
+    const input: ResolveInput = {
+      kind: 'proforma_invoice',
+      documentNumber: proformaInvoice.documentNumber,
+      documentDate: String(proformaInvoice.documentDate),
+      // The validity date prints where an order prints its due date.
+      dueDate: proformaInvoice.validUntil === null ? null : String(proformaInvoice.validUntil),
+      issuedAt: proformaInvoice.createdAt,
+      taxMode: proformaInvoice.taxMode as TaxMode,
+      isInterState: proformaInvoice.supplyType !== 'intra_state',
+      business: buildBusiness(outlet, tenant),
+      profile: withDocumentTerms(resolved.profile, proformaInvoice.termsSnapshot),
+      customer: await loadCustomer(tx, proformaInvoice.customerId, proformaInvoice.customerName, null),
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: line.lineDiscount + line.billDiscountShare,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: proformaInvoice.grossAmount,
+        totalDiscount: proformaInvoice.lineDiscountTotal + proformaInvoice.billDiscountAmount,
+        taxableAmount: proformaInvoice.taxableAmount,
+        totalCgst: proformaInvoice.totalCgst,
+        totalSgst: proformaInvoice.totalSgst,
+        totalIgst: proformaInvoice.totalIgst,
+        totalCess: proformaInvoice.totalCess,
+        charges: proformaInvoice.taxableCharges + proformaInvoice.nonTaxableCharges,
+        roundOff: proformaInvoice.roundOff,
+        grandTotal: proformaInvoice.grandTotal,
+        amountPaid: 0,
+      },
+      taxRows: toTaxRows(proformaInvoice.taxSummary),
+      tenders: [],
+      customFields: [],
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      notes: proformaInvoice.notes,
     };
     return resolvePrintDocument(input);
   });

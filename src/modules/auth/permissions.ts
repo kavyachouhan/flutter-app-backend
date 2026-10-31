@@ -51,6 +51,11 @@ export const PERMISSIONS = [
   'estimates:delete',
   // Turns an estimate into a sales order; creating that order needs sales_orders:create too.
   'estimates:convert',
+  // A proforma invoice is invoiced from the till (invoices:create), so there is no convert permission.
+  'proforma_invoices:read',
+  'proforma_invoices:create',
+  'proforma_invoices:update',
+  'proforma_invoices:delete',
   'debit_notes:read',
   'debit_notes:create',
   'debit_notes:void',
@@ -128,6 +133,9 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     // Quotes at the counter; changing, deleting or converting one is withheld.
     'estimates:read',
     'estimates:create',
+    // Writes proforma invoices at the counter; changing or deleting one is withheld.
+    'proforma_invoices:read',
+    'proforma_invoices:create',
     'payments:read',
     'payments:create',
     'credit_notes:read',

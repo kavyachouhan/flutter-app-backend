@@ -251,12 +251,13 @@ const BOOTSTRAP_SERIES: Record<LeasedDocumentType, string> = {
   invoice: 'INV',
   credit_note: 'CN',
   estimate: 'EST',
+  proforma_invoice: 'PI',
   sales_order: 'SO',
   purchase_order: 'PO',
 };
 
 /**
- * Estimates, sales orders and purchase orders can also be made offline, so a device holds
+ * Estimates, proforma invoices, sales orders and purchase orders can also be made offline, so a device holds
  * blocks for them too. Unlike an invoice, though, they are not for every plan or every
  * role: a block leased to a device that may not use it would just sit there. A device is
  * leased one only when its plan includes the feature and its user may create the document.
@@ -265,6 +266,7 @@ const LEASE_REQUIREMENTS: Partial<
   Record<LeasedDocumentType, { feature: Feature; permission: Permission }>
 > = {
   estimate: { feature: 'sales_orders', permission: 'estimates:create' },
+  proforma_invoice: { feature: 'sales_orders', permission: 'proforma_invoices:create' },
   sales_order: { feature: 'sales_orders', permission: 'sales_orders:create' },
   purchase_order: { feature: 'purchases', permission: 'purchases:create' },
 };
@@ -273,6 +275,7 @@ type LeasedDocumentType =
   | 'invoice'
   | 'credit_note'
   | 'estimate'
+  | 'proforma_invoice'
   | 'sales_order'
   | 'purchase_order';
 

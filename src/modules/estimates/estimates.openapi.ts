@@ -60,6 +60,12 @@ const estimate = registry.register(
     termsId: uuid.nullable(),
     termsSnapshot: termsSnapshot.nullable(),
     status: z.enum(ESTIMATE_STATUSES),
+    isExpired: z.boolean().openapi({
+      description: 'Open and past `validUntil` in the shop time zone. Derived, never stored.',
+    }),
+    effectiveStatus: z
+      .enum(['open', 'converted', 'closed', 'cancelled', 'expired'])
+      .openapi({ description: '`expired` stands in for an open document past its validity.' }),
     convertedToType: z.enum(['sales_order', 'invoice']).nullable(),
     convertedToId: uuid.nullable(),
     convertedToNumber: z.string().nullable().optional(),

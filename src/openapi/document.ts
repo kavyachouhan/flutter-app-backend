@@ -27,6 +27,7 @@ import '../modules/terms/terms.openapi.js';
 import '../modules/purchases/purchases.openapi.js';
 import '../modules/sales-orders/sales-orders.openapi.js';
 import '../modules/estimates/estimates.openapi.js';
+import '../modules/proforma-invoices/proforma-invoices.openapi.js';
 import '../modules/debit-notes/debit-notes.openapi.js';
 import '../modules/price-lists/price-lists.openapi.js';
 import '../modules/gst/gst.openapi.js';
@@ -95,6 +96,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
       {
         name: 'Estimates',
         description: 'Estimates / quotations, and converting them to sales orders or invoices.',
+      },
+      {
+        name: 'Proforma Invoices',
+        description: 'Preliminary invoices: no stock, no payment; raised as a sale from the till.',
       },
       { name: 'Debit notes', description: 'Returns and corrections against a purchase bill.' },
       {

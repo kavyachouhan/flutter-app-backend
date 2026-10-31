@@ -73,6 +73,12 @@ export const ErrorCode = {
   ESTIMATE_ALREADY_CONVERTED: 'ESTIMATE_ALREADY_CONVERTED',
   /** Only an open estimate can be edited, converted, closed or cancelled. */
   ESTIMATE_NOT_OPEN: 'ESTIMATE_NOT_OPEN',
+  /** The estimate's validity date has passed, so it can no longer be converted. */
+  ESTIMATE_EXPIRED: 'ESTIMATE_EXPIRED',
+  /** The proforma invoice has already become an invoice and is now fixed. */
+  PROFORMA_INVOICE_ALREADY_CONVERTED: 'PROFORMA_INVOICE_ALREADY_CONVERTED',
+  /** Only an open proforma invoice can be edited, closed or cancelled. */
+  PROFORMA_INVOICE_NOT_OPEN: 'PROFORMA_INVOICE_NOT_OPEN',
   /** The advance has been applied to an invoice or refunded, so its amount is fixed. */
   ADVANCE_LOCKED: 'ADVANCE_LOCKED',
   /** The invoice has credit notes against it; void those first, or amend instead. */
