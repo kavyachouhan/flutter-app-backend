@@ -91,7 +91,8 @@ export const ordersRepository = {
 
   findLines(tx: Tx, orderId: string): Promise<PurchaseOrderLineRow[]> {
     return tx.many<PurchaseOrderLineRow>(
-      `SELECT ${LINE_COLUMNS} FROM purchase_order_lines WHERE purchase_order_id = $1 ORDER BY line_no`,
+      `SELECT ${LINE_COLUMNS} FROM purchase_order_lines
+       WHERE purchase_order_id = $1 AND deleted_at IS NULL ORDER BY line_no`,
       [orderId],
     );
   },
@@ -134,7 +135,11 @@ export const ordersRepository = {
               l."quantityOrdered", l."expectedUnitCost"
        FROM jsonb_to_recordset($2::jsonb) AS l(
          id uuid, "lineNo" int, "itemId" uuid, "itemName" text, unit text,
-         "quantityOrdered" bigint, "expectedUnitCost" bigint)`,
+         "quantityOrdered" bigint, "expectedUnitCost" bigint)
+       ON CONFLICT (id) DO UPDATE SET
+         line_no = EXCLUDED.line_no, item_id = EXCLUDED.item_id, item_name = EXCLUDED.item_name,
+         unit = EXCLUDED.unit, quantity_ordered = EXCLUDED.quantity_ordered,
+         expected_unit_cost = EXCLUDED.expected_unit_cost, deleted_at = NULL`,
       [orderId, JSON.stringify(lines)],
     );
   },
@@ -189,7 +194,8 @@ export const ordersRepository = {
   lockLinesForReceipt(tx: Tx, orderId: string) {
     return tx.many<{ id: string; quantityOrdered: number; quantityReceived: number }>(
       `SELECT id, quantity_ordered AS "quantityOrdered", quantity_received AS "quantityReceived"
-       FROM purchase_order_lines WHERE purchase_order_id = $1 FOR UPDATE`,
+       FROM purchase_order_lines
+       WHERE purchase_order_id = $1 AND deleted_at IS NULL FOR UPDATE`,
       [orderId],
     );
   },
@@ -234,10 +240,11 @@ export const ordersRepository = {
        SET status = CASE
              WHEN po.status = 'cancelled' THEN 'cancelled'
              WHEN NOT EXISTS (SELECT 1 FROM purchase_order_lines l
-                              WHERE l.purchase_order_id = po.id AND l.quantity_received > 0)
+                              WHERE l.purchase_order_id = po.id AND l.deleted_at IS NULL
+                                AND l.quantity_received > 0)
                THEN 'sent'
              WHEN NOT EXISTS (SELECT 1 FROM purchase_order_lines l
-                              WHERE l.purchase_order_id = po.id
+                              WHERE l.purchase_order_id = po.id AND l.deleted_at IS NULL
                                 AND l.quantity_received < l.quantity_ordered)
                THEN 'received'
              ELSE 'partial'
@@ -302,7 +309,8 @@ export const ordersRepository = {
   async deleteLines(tx: Tx, orderId: string, lineIds: readonly string[]): Promise<void> {
     if (lineIds.length === 0) return;
     await tx.query(
-      'DELETE FROM purchase_order_lines WHERE purchase_order_id = $1 AND id = ANY($2::uuid[])',
+      `UPDATE purchase_order_lines SET deleted_at = now()
+       WHERE purchase_order_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL`,
       [orderId, [...lineIds]],
     );
   },

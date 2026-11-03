@@ -146,6 +146,17 @@ export async function assertFeature(tx: Tx, feature: Feature): Promise<void> {
   }
 }
 
+/** The same check as `assertFeature`, answered as a yes or no instead of a refusal. */
+export async function isFeatureEnabled(tx: Tx, feature: Feature): Promise<boolean> {
+  try {
+    await assertFeature(tx, feature);
+    return true;
+  } catch (error) {
+    if (error instanceof EntitlementError) return false;
+    throw error;
+  }
+}
+
 /**
  * Locks the subscription row, so two concurrent creates serialise here and
  * cannot both observe room for one more.

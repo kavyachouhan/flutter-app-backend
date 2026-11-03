@@ -35,15 +35,17 @@ export interface SyncBatchInsert {
 /** Tables the push dispatcher may probe for existence or version. */
 const PROBEABLE = new Set(SYNC_TABLES.map((t) => t.table));
 
-function branch(t: SyncedTable): string {
+/** One table's slice of the change-feed query. Exported so its shape can be tested. */
+export function branch(t: SyncedTable): string {
   const tenantFilter = `t.${t.tenantColumn} = app.current_tenant_id()`;
   const deleted = t.softDelete ? 't.deleted_at IS NOT NULL' : 'false';
-  const row = t.join
-    ? `(to_jsonb(t) - 'tenant_id') || jsonb_build_object(${t.join.fields})`
-    : `(to_jsonb(t) - 'tenant_id')`;
+  // Always without the tenant column; `omit` adds the columns a device must not receive.
+  const removed = ['tenant_id', ...(t.omit ?? [])].map((c) => `'${c}'`).join(', ');
+  const base = `(to_jsonb(t) - ARRAY[${removed}])`;
+  const row = t.join ? `${base} || jsonb_build_object(${t.join.fields})` : base;
   return `SELECT '${t.entity}' AS entity, t.server_seq AS "serverSeq", ${deleted} AS deleted, ${row} AS row
           FROM ${t.table} t ${t.join?.sql ?? ''}
-          WHERE ${tenantFilter} AND t.server_seq > $1`;
+          WHERE ${tenantFilter} AND t.server_seq > $1${t.where ? ` AND ${t.where}` : ''}`;
 }
 
 // Built once: a UNION ALL over every synced table, ordered by the tenant-wide

@@ -17,6 +17,7 @@ export type PrintDocumentKind =
   | 'credit_note'
   | 'payment_receipt'
   | 'estimate'
+  | 'proforma_invoice'
   | 'sales_order';
 
 export interface PrintField {

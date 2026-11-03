@@ -51,6 +51,7 @@ export interface SaleOrderRow {
   status: SaleOrderStatus;
   closedManually: boolean;
   cancelledReason: string | null;
+  estimateId: string | null;
   createdAt: Date;
 }
 
@@ -107,6 +108,8 @@ export interface SaleOrderHeaderWrite {
   attachments: readonly unknown[];
   termsId: string | null;
   termsSnapshot: TermsSnapshot | null;
+  /** The estimate this order was raised from, if any. */
+  estimateId?: string | null;
   createdBy: string;
 }
 
@@ -182,7 +185,7 @@ const ORDER_COLUMNS = `
   so.custom_fields AS "customFields",
   so.attachments, so.terms_id AS "termsId", so.terms_snapshot AS "termsSnapshot", so.status,
   so.closed_manually AS "closedManually", so.cancelled_reason AS "cancelledReason",
-  so.created_at AS "createdAt"`;
+  so.estimate_id AS "estimateId", so.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
   id, line_no AS "lineNo", item_id AS "itemId", item_name AS "itemName", hsn_code AS "hsnCode", unit,
@@ -217,7 +220,8 @@ export const salesOrdersRepository = {
 
   findLines(tx: Tx, orderId: string): Promise<SaleOrderLineRow[]> {
     return tx.many<SaleOrderLineRow>(
-      `SELECT ${LINE_COLUMNS} FROM sales_order_lines WHERE sales_order_id = $1 ORDER BY line_no`,
+      `SELECT ${LINE_COLUMNS} FROM sales_order_lines
+       WHERE sales_order_id = $1 AND deleted_at IS NULL ORDER BY line_no`,
       [orderId],
     );
   },
@@ -225,7 +229,8 @@ export const salesOrdersRepository = {
   /** Locked so two invoices against one order cannot both see the same fulfilled quantity. */
   lockLines(tx: Tx, orderId: string): Promise<SaleOrderLineRow[]> {
     return tx.many<SaleOrderLineRow>(
-      `SELECT ${LINE_COLUMNS} FROM sales_order_lines WHERE sales_order_id = $1
+      `SELECT ${LINE_COLUMNS} FROM sales_order_lines
+       WHERE sales_order_id = $1 AND deleted_at IS NULL
        ORDER BY line_no FOR UPDATE`,
       [orderId],
     );
@@ -242,7 +247,7 @@ export const salesOrdersRepository = {
          total_cess, total_tax, sub_total, round_off, grand_total, tax_summary, hsn_summary,
          advance_amount, advance_payment_id, payment_mode, notes, attachments, terms_id, terms_snapshot,
          status, created_by, is_reverse_charge, additional_charges, taxable_charges, non_taxable_charges,
-         bill_discount_reason, custom_fields)
+         bill_discount_reason, custom_fields, estimate_id)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7,
          $8, $9, $10, $11, $12, $13,
@@ -251,7 +256,7 @@ export const salesOrdersRepository = {
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36::jsonb, $37, $38,
          'open', $39, $40, $41::jsonb, $42, $43,
-         $44, $45)`,
+         $44, $45, $46)`,
       [
         h.id,
         h.outletId,
@@ -298,6 +303,7 @@ export const salesOrdersRepository = {
         t.nonTaxableCharges,
         h.billDiscountReason,
         jsonParam(h.customFields),
+        h.estimateId ?? null,
       ],
     );
   },
@@ -372,7 +378,17 @@ export const salesOrdersRepository = {
               l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount", l."lineDiscount",
               l."billDiscountShare", l."taxableAmount", l."taxRatePercent", l."cessRatePercent",
               l.cgst, l.sgst, l.igst, l.cess, l."lineTotal", l."supplyCategory"
-       FROM jsonb_to_recordset($2::jsonb) AS l(${LINE_RECORDSET})`,
+       FROM jsonb_to_recordset($2::jsonb) AS l(${LINE_RECORDSET})
+       ON CONFLICT (id) DO UPDATE SET
+         line_no = EXCLUDED.line_no, item_id = EXCLUDED.item_id, item_name = EXCLUDED.item_name,
+         hsn_code = EXCLUDED.hsn_code, unit = EXCLUDED.unit, quantity = EXCLUDED.quantity,
+         unit_price = EXCLUDED.unit_price, discount = EXCLUDED.discount,
+         gross_amount = EXCLUDED.gross_amount, line_discount = EXCLUDED.line_discount,
+         bill_discount_share = EXCLUDED.bill_discount_share, taxable_amount = EXCLUDED.taxable_amount,
+         tax_rate_percent = EXCLUDED.tax_rate_percent, cess_rate_percent = EXCLUDED.cess_rate_percent,
+         cgst = EXCLUDED.cgst, sgst = EXCLUDED.sgst, igst = EXCLUDED.igst, cess = EXCLUDED.cess,
+         line_total = EXCLUDED.line_total, supply_category = EXCLUDED.supply_category,
+         deleted_at = NULL`,
       [orderId, JSON.stringify(lines)],
     );
   },
@@ -398,7 +414,8 @@ export const salesOrdersRepository = {
   async deleteLines(tx: Tx, orderId: string, lineIds: readonly string[]): Promise<void> {
     if (lineIds.length === 0) return;
     await tx.query(
-      'DELETE FROM sales_order_lines WHERE sales_order_id = $1 AND id = ANY($2::uuid[])',
+      `UPDATE sales_order_lines SET deleted_at = now()
+       WHERE sales_order_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL`,
       [orderId, [...lineIds]],
     );
   },
@@ -488,10 +505,12 @@ export const salesOrdersRepository = {
              WHEN so.status = 'cancelled' THEN 'cancelled'
              WHEN so.closed_manually THEN 'closed'
              WHEN NOT EXISTS (SELECT 1 FROM sales_order_lines l
-                              WHERE l.sales_order_id = so.id AND l.quantity_fulfilled > 0)
+                              WHERE l.sales_order_id = so.id AND l.deleted_at IS NULL
+                                AND l.quantity_fulfilled > 0)
                THEN 'open'
              WHEN NOT EXISTS (SELECT 1 FROM sales_order_lines l
-                              WHERE l.sales_order_id = so.id AND l.quantity_fulfilled < l.quantity)
+                              WHERE l.sales_order_id = so.id AND l.deleted_at IS NULL
+                                AND l.quantity_fulfilled < l.quantity)
                THEN 'closed'
              ELSE 'partial'
            END
@@ -602,7 +621,7 @@ export const salesOrdersRepository = {
       `SELECT so.outlet_id AS "outletId", l.item_id AS "itemId",
               SUM(GREATEST(0, l.quantity - l.quantity_fulfilled))::bigint AS reserved
        FROM sales_orders so
-       JOIN sales_order_lines l ON l.sales_order_id = so.id
+       JOIN sales_order_lines l ON l.sales_order_id = so.id AND l.deleted_at IS NULL
        JOIN items i ON i.id = l.item_id
        WHERE so.id = $1 AND so.deleted_at IS NULL AND so.status IN ('open', 'partial') AND i.track_stock
        GROUP BY so.outlet_id, l.item_id`,

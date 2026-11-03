@@ -9,6 +9,7 @@
  * SET LOCAL (via set_config(..., true)) rather than SET: on a transaction-mode
  * pooler a session setting would survive onto the next tenant's transaction.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { env } from '../config/env.js';
 import { pool } from './pool.js';
@@ -145,10 +146,41 @@ export interface TransactionOptions {
   isolation?: IsolationLevel;
 }
 
+/**
+ * The transaction opened by [runInTransactionScope], while its callback is running.
+ *
+ * A pushed operation must record its idempotency key in the SAME transaction as its effects, but
+ * the services it calls each open their own. Inside a scope those calls join the open transaction
+ * instead, each behind a savepoint, so a service that fails still undoes only its own writes —
+ * exactly as it did when it had a transaction to itself — while the whole operation commits or
+ * rolls back as one.
+ */
+const scope = new AsyncLocalStorage<{ tx: Tx }>();
+let savepointCounter = 0;
+
+async function joinTransaction<T>(tx: Tx, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  const name = `join_${++savepointCounter}`;
+  await tx.query(`SAVEPOINT ${name}`);
+  try {
+    const result = await fn(tx);
+    await tx.query(`RELEASE SAVEPOINT ${name}`);
+    return result;
+  } catch (error) {
+    await tx.query(`ROLLBACK TO SAVEPOINT ${name}`).catch(() => undefined);
+    // Rethrown untouched: the outer transaction translates it once, and a retryable SQLSTATE
+    // must still look like one to its retry loop.
+    throw error;
+  }
+}
+
 export async function withTransaction<T>(
   fn: (tx: Tx) => Promise<T>,
   options: TransactionOptions = {},
 ): Promise<T> {
+  const open = scope.getStore();
+  if (open && (options.tenantId === undefined || options.tenantId === open.tx.tenantId)) {
+    return joinTransaction(open.tx, fn);
+  }
   const tenantId = options.tenantId ?? requireTenantId();
   const maxAttempts = (options.retries ?? env.DATABASE_TRANSACTION_MAX_RETRIES) + 1;
 
@@ -174,6 +206,18 @@ export async function withTransaction<T>(
       client.release();
     }
   }
+}
+
+/**
+ * Runs [fn] in one transaction that every `withTransaction` / `withReadTransaction` call made
+ * inside it (however deep) joins. A conflict (deadlock) restarts the whole callback, including
+ * whatever it claimed first, so nothing is half-applied.
+ */
+export function runInTransactionScope<T>(
+  fn: (tx: Tx) => Promise<T>,
+  options: TransactionOptions = {},
+): Promise<T> {
+  return withTransaction((tx) => scope.run({ tx }, () => fn(tx)), options);
 }
 
 export function withReadTransaction<T>(

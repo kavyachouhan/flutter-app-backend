@@ -59,6 +59,17 @@ export const operationResultSchema = registry.register(
     id: uuid.optional(),
     serverSeq: z.number().int().optional(),
     warnings: z.array(warningSchema).optional(),
+    mergedInto: z
+      .object({
+        entity: z.enum(['customer', 'supplier', 'item', 'category']),
+        aliasId: uuid,
+        canonicalId: uuid,
+      })
+      .optional()
+      .openapi({
+        description:
+          'On `applied`: the create was matched to a record that already existed (same phone, code or name). The device must treat `aliasId` as `canonicalId` from now on; `id` is the canonical id. Its queued operations are already rewritten on the server.',
+      }),
     error: z
       .object({
         code: errorCodeSchema,
@@ -119,7 +130,7 @@ registry.registerPath({
   tags: ['Sync'],
   summary: 'Push queued offline operations',
   description:
-    'Each operation is validated and applied independently, in order, through the same code path as its REST endpoint. The response is always 200 with a per-operation status; retry only operations marked `retryable`. Do not send an Idempotency-Key — the `opId` and the entity ids are the idempotency keys.',
+    'Each operation is validated and applied independently, in order, through the same code path as its REST endpoint. The response is always 200 with a per-operation status; retry only operations marked `retryable`. Send each operation once per attempt with a stable `opId`: the server remembers it (for SYNC_OPERATION_KEY_TTL_DAYS, 90 by default) together with the operation\'s effects, so a repeat is answered `replayed` with the first result and does nothing again. Reusing an `opId` for a different operation or payload is refused with OPERATION_KEY_REUSED. There is no Idempotency-Key header; the entity ids remain a second line of defence after a key expires.',
   security: accessTokenSecurity,
   request: { body: { content: { 'application/json': { schema: pushBody } } } },
   responses: {

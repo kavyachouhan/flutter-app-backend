@@ -36,6 +36,10 @@ describe('openapi document', () => {
       '/v1/credit-notes/{id}/print-payload',
       '/v1/payments/{id}/print-payload',
       '/v1/sales-orders/{id}/print-payload',
+      '/v1/estimates/{id}/print-payload',
+      '/v1/estimates/{id}/convert',
+      '/v1/proforma-invoices',
+      '/v1/proforma-invoices/{id}/print-payload',
       '/v1/print-profiles',
       '/v1/custom-fields',
     ]) {

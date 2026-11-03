@@ -8,17 +8,49 @@ import {
   updateItemBody,
 } from '../catalogue/catalogue.schemas.js';
 import { createCreditNoteBody } from '../credit-notes/credit-notes.schemas.js';
+import {
+  cancelEstimateBody,
+  convertEstimateOperation,
+  createEstimateBody,
+  updateEstimateBody,
+} from '../estimates/estimates.schemas.js';
+import {
+  cancelProformaInvoiceBody,
+  createProformaInvoiceBody,
+  updateProformaInvoiceBody,
+} from '../proforma-invoices/proforma-invoices.schemas.js';
 import { createCustomerBody, updateCustomerBody } from '../customers/customers.schemas.js';
 import { createInvoiceBody, voidInvoiceBody } from '../invoices/invoices.schemas.js';
 import { createReceiptBody, voidPaymentBody } from '../payments/payments.schemas.js';
 import {
+  cancelPurchaseOrderBody,
+  createPurchaseOrderBody,
+  updatePurchaseOrderBody,
+} from '../purchases/purchases.schemas.js';
+import {
+  cancelSaleOrderBody,
+  createSaleOrderBody,
+  deleteSaleOrderQuery,
+  updateSaleOrderBody,
+} from '../sales-orders/sales-orders.schemas.js';
+import {
   createDayCloseBody,
   createExpenseBody,
+  createExpenseCategoryBody,
   releaseHeldBillBody,
+  updateExpenseCategoryBody,
   upsertHeldBillBody,
   voidExpenseBody,
 } from '../operations/operations.schemas.js';
+import {
+  createPurchaseBillBody,
+  createSupplierPaymentBody,
+  voidPurchaseBillBody,
+  voidSupplierPaymentBody,
+} from '../purchases/purchases.schemas.js';
+import { createDebitNoteBody, voidDebitNoteBody } from '../debit-notes/debit-notes.schemas.js';
 import { createAdjustmentBody } from '../stock/stock.schemas.js';
+import { createSupplierBody, updateSupplierBody } from '../suppliers/suppliers.schemas.js';
 import { createTermsBody, updateTermsBody } from '../terms/terms.schemas.js';
 
 export const pullQuery = z.object({
@@ -29,7 +61,17 @@ export const pullQuery = z.object({
 export type PullQuery = z.infer<typeof pullQuery>;
 
 const withId = <T extends z.ZodRawShape>(shape: T) => z.object({ id: z.string().uuid(), ...shape });
-const update = <T extends z.ZodTypeAny>(patch: T) => z.object({ id: z.string().uuid(), patch });
+/**
+ * An edit. `was` is what each patched field held when the device made the edit, so the server can
+ * tell a field nobody else touched from one two devices changed (see merge.ts). Optional: an older
+ * build omits it and keeps the whole-row version check.
+ */
+const update = <T extends z.ZodTypeAny>(patch: T) =>
+  z.object({
+    id: z.string().uuid(),
+    patch,
+    was: z.record(z.string(), z.unknown()).optional(),
+  });
 
 /**
  * Every operation a device may queue while offline, with the exact body the
@@ -48,10 +90,13 @@ export const OPERATION_PAYLOADS = {
   'payment.void': withId(voidPaymentBody.shape),
   'customer.create': createCustomerBody,
   'customer.update': update(updateCustomerBody),
+  'customer.delete': withId({}),
   'item.create': createItemBody,
   'item.update': update(updateItemBody),
+  'item.delete': withId({}),
   'category.create': createCategoryBody,
   'category.update': update(updateCategoryBody),
+  'category.delete': withId({}),
   'terms.create': createTermsBody,
   'terms.update': update(updateTermsBody),
   'terms.delete': withId({}),
@@ -60,7 +105,40 @@ export const OPERATION_PAYLOADS = {
   'held_bill.release': z.object({ id: z.string().uuid(), ...releaseHeldBillBody.shape }),
   'expense.create': createExpenseBody,
   'expense.void': withId(voidExpenseBody.shape),
+  'expense_category.create': createExpenseCategoryBody,
+  'expense_category.update': update(updateExpenseCategoryBody),
+  'expense_category.delete': withId({}),
   'day_close.create': createDayCloseBody,
+  'supplier.create': createSupplierBody,
+  'supplier.update': update(updateSupplierBody),
+  'supplier.delete': withId({}),
+  'purchase_bill.create': createPurchaseBillBody,
+  'purchase_bill.void': withId(voidPurchaseBillBody.shape),
+  'supplier_payment.create': createSupplierPaymentBody,
+  'supplier_payment.void': withId(voidSupplierPaymentBody.shape),
+  'debit_note.create': createDebitNoteBody,
+  'debit_note.void': withId(voidDebitNoteBody.shape),
+  // An edit sends the whole document, as the REST PUT does, plus the id of what it edits.
+  'estimate.create': createEstimateBody,
+  'estimate.update': updateEstimateBody.extend({ id: z.string().uuid() }),
+  'estimate.delete': withId({}),
+  'estimate.cancel': withId(cancelEstimateBody.shape),
+  'estimate.close': withId({}),
+  'estimate.convert': convertEstimateOperation,
+  'proforma_invoice.create': createProformaInvoiceBody,
+  'proforma_invoice.update': updateProformaInvoiceBody.extend({ id: z.string().uuid() }),
+  'proforma_invoice.delete': withId({}),
+  'proforma_invoice.cancel': withId(cancelProformaInvoiceBody.shape),
+  'proforma_invoice.close': withId({}),
+  'sale_order.create': createSaleOrderBody,
+  'sale_order.update': updateSaleOrderBody.extend({ id: z.string().uuid() }),
+  'sale_order.delete': withId(deleteSaleOrderQuery.shape),
+  'sale_order.cancel': withId(cancelSaleOrderBody.shape),
+  'sale_order.close': withId(deleteSaleOrderQuery.shape),
+  'purchase_order.create': createPurchaseOrderBody,
+  'purchase_order.update': updatePurchaseOrderBody.extend({ id: z.string().uuid() }),
+  'purchase_order.delete': withId({}),
+  'purchase_order.cancel': withId(cancelPurchaseOrderBody.shape),
 } as const;
 void voidInvoiceBody;
 

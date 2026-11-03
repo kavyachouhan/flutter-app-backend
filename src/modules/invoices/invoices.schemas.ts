@@ -81,6 +81,16 @@ export const createInvoiceBody = z.object({
   /** Fulfils (part of) this sales order; lines name which order lines they cover. */
   salesOrderId: z.string().uuid().optional(),
   /**
+   * Raised from this estimate. If it is still open it becomes converted in the same transaction;
+   * if not (already converted elsewhere, or gone) the link is dropped and the sale still issues.
+   */
+  estimateId: z.string().uuid().optional(),
+  /**
+   * Raised from this proforma invoice. Same rule as `estimateId`: converted if still open and in
+   * date, otherwise the link is dropped and the sale still issues.
+   */
+  proformaInvoiceId: z.string().uuid().optional(),
+  /**
    * Replaces this invoice. The original must already be fully credited: an
    * amendment is a credit note for the whole of it plus this new invoice.
    */

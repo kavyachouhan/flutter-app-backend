@@ -156,7 +156,8 @@ export const stockRepository = {
        FROM sales_order_lines l
        JOIN sales_orders so ON so.id = l.sales_order_id
        JOIN items i ON i.id = l.item_id
-       WHERE so.deleted_at IS NULL AND so.status IN ('open', 'partial') AND i.track_stock
+       WHERE so.deleted_at IS NULL AND l.deleted_at IS NULL
+         AND so.status IN ('open', 'partial') AND i.track_stock
          AND ($1::uuid IS NULL OR so.outlet_id = $1)
        GROUP BY so.outlet_id, l.item_id
        HAVING SUM(GREATEST(0, l.quantity - l.quantity_fulfilled)) > 0`,
@@ -192,7 +193,8 @@ export const stockRepository = {
          FROM sales_order_lines l
          JOIN sales_orders so ON so.id = l.sales_order_id
          JOIN items i ON i.id = l.item_id
-         WHERE so.deleted_at IS NULL AND so.status IN ('open', 'partial') AND i.track_stock
+         WHERE so.deleted_at IS NULL AND l.deleted_at IS NULL
+           AND so.status IN ('open', 'partial') AND i.track_stock
            AND ($1::uuid IS NULL OR so.outlet_id = $1)
          GROUP BY so.outlet_id, l.item_id
          HAVING SUM(GREATEST(0, l.quantity - l.quantity_fulfilled)) > 0
