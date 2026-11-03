@@ -51,7 +51,8 @@ import {
 } from '../suppliers/suppliers.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
-import { allocateNumber } from './numbering.js';
+import { dueDateFor } from '../../domain/purchases/due-date.js';
+import { numberForDocument } from './numbering.js';
 import { ordersRepository } from './orders.repository.js';
 import { assertReceiptFits } from './orders.service.js';
 import { purchasesRepository, type PurchaseBillLineInsert } from './purchases.repository.js';
@@ -119,12 +120,13 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const itcCategory = itcEligible ? (body.itcCategory ?? 'inputs') : 'ineligible';
     const itcIneligibleReason = itcEligible ? null : (body.itcIneligibleReason ?? null);
 
-    const number = await allocateNumber(tx, {
+    const number = await numberForDocument(tx, {
       outletId: body.outletId,
       documentType: 'purchase_bill',
       documentDate: body.documentDate,
       fyStartMonth: settings.fyStartMonth,
       seriesId: body.seriesId,
+      sequenceNo: body.sequenceNo,
     });
 
     const duplicate = await purchasesRepository.findBySupplierInvoice(
@@ -425,14 +427,6 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
 
   if (!result.replayed) businessEvents.inc({ event: 'purchase_bill.created' });
   return result;
-}
-
-/** Supplier terms decide the due date unless the bill states one. */
-function dueDateFor(documentDate: string, termsDays: number | null): string | null {
-  if (termsDays === null) return null;
-  const date = new Date(`${documentDate}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + termsDays);
-  return date.toISOString().slice(0, 10);
 }
 
 export function getPurchaseBill(id: string) {

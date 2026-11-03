@@ -254,6 +254,8 @@ const BOOTSTRAP_SERIES: Record<LeasedDocumentType, string> = {
   proforma_invoice: 'PI',
   sales_order: 'SO',
   purchase_order: 'PO',
+  purchase_bill: 'PB',
+  debit_note: 'DN',
 };
 
 /**
@@ -269,6 +271,8 @@ const LEASE_REQUIREMENTS: Partial<
   proforma_invoice: { feature: 'sales_orders', permission: 'proforma_invoices:create' },
   sales_order: { feature: 'sales_orders', permission: 'sales_orders:create' },
   purchase_order: { feature: 'purchases', permission: 'purchases:create' },
+  purchase_bill: { feature: 'purchases', permission: 'purchases:create' },
+  debit_note: { feature: 'purchases', permission: 'debit_notes:create' },
 };
 
 type LeasedDocumentType =
@@ -277,7 +281,9 @@ type LeasedDocumentType =
   | 'estimate'
   | 'proforma_invoice'
   | 'sales_order'
-  | 'purchase_order';
+  | 'purchase_order'
+  | 'purchase_bill'
+  | 'debit_note';
 
 async function mayLease(tx: Tx, documentType: LeasedDocumentType): Promise<boolean> {
   const need = LEASE_REQUIREMENTS[documentType];

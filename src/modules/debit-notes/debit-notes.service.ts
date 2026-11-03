@@ -27,7 +27,7 @@ import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { itcRepository } from '../gst/itc.repository.js';
-import { allocateNumber } from '../purchases/numbering.js';
+import { numberForDocument } from '../purchases/numbering.js';
 import { purchasesRepository } from '../purchases/purchases.repository.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { suppliersRepository } from '../suppliers/suppliers.repository.js';
@@ -170,11 +170,13 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       { allowedGstRates: env.GST_ALLOWED_RATES },
     );
 
-    const number = await allocateNumber(tx, {
+    const number = await numberForDocument(tx, {
       outletId: bill.outletId,
       documentType: 'debit_note',
       documentDate: body.documentDate,
       fyStartMonth: settings.fyStartMonth,
+      seriesId: body.seriesId,
+      sequenceNo: body.sequenceNo,
     });
 
     await debitNotesRepository.insertHeader(tx, {

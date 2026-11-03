@@ -46,6 +46,8 @@ export const createPurchaseBillBody = z.object({
   supplierId: z.string().uuid(),
   purchaseOrderId: z.string().uuid().optional(),
   seriesId: z.string().uuid().optional(),
+  /** With `seriesId`: the number a device leased and used offline. */
+  sequenceNo: z.number().int().positive().optional(),
   documentDate: isoDate,
   /** The number printed on the supplier's own bill. */
   supplierInvoiceNo: nonEmpty.max(64),

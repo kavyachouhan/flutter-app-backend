@@ -8,12 +8,20 @@
 import '../setup/setup-env.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildAccessVectors, buildNumberingVectors, buildTaxVectors } from './build.js';
+import {
+  buildAccessVectors,
+  buildCostingVectors,
+  buildNumberingVectors,
+  buildReturnsVectors,
+  buildTaxVectors,
+} from './build.js';
 
 export const CONTRACTS_DIR = fileURLToPath(new URL('../../contracts/', import.meta.url));
 export const TAX_VECTORS_PATH = `${CONTRACTS_DIR}tax-vectors.json`;
 export const NUMBERING_VECTORS_PATH = `${CONTRACTS_DIR}numbering-vectors.json`;
 export const ACCESS_VECTORS_PATH = `${CONTRACTS_DIR}access-vectors.json`;
+export const COSTING_VECTORS_PATH = `${CONTRACTS_DIR}costing-vectors.json`;
+export const RETURNS_VECTORS_PATH = `${CONTRACTS_DIR}returns-vectors.json`;
 
 function write(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -23,3 +31,5 @@ mkdirSync(CONTRACTS_DIR, { recursive: true });
 write(TAX_VECTORS_PATH, buildTaxVectors());
 write(NUMBERING_VECTORS_PATH, buildNumberingVectors());
 write(ACCESS_VECTORS_PATH, buildAccessVectors());
+write(COSTING_VECTORS_PATH, buildCostingVectors());
+write(RETURNS_VECTORS_PATH, buildReturnsVectors());

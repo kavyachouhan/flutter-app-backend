@@ -347,6 +347,16 @@ describe('offline documents through sync', () => {
       expect(order.estimateId).toBe(estimateId);
       expect(order.documentNumber).toMatch(new RegExp(`^SO/.+/0*${soBlock.startSeq}$`));
 
+      // The same conversion sent again (a lost response) is a replay, not a failure.
+      const retried = await push(t, 'estimate.convert', {
+        id: estimateId,
+        orderId,
+        target: 'sales_order',
+        seriesId: soBlock.seriesId,
+        sequenceNo: soBlock.startSeq,
+      });
+      expect(retried.status).toBe('replayed');
+
       const again = await push(t, 'estimate.convert', {
         id: estimateId,
         orderId: randomUUID(),
