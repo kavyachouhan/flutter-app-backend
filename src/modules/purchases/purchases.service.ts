@@ -22,6 +22,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { apportionLandedCost } from '../../domain/costing/landed-cost.js';
@@ -648,6 +649,18 @@ export function createSupplierPayment(body: CreateSupplierPaymentBody) {
       );
     }
 
+    await recordDocumentMoney(tx, {
+      accountId: body.mode === 'cash' ? null : (body.accountId ?? null),
+      amount: -body.amount,
+      transactionType: 'supplier_payment',
+      sourceType: 'supplier_payment',
+      sourceId: body.id,
+      chequeNumber: body.mode === 'cheque' ? (body.reference ?? null) : null,
+      chequeDate: body.mode === 'cheque' ? body.paidAt.slice(0, 10) : null,
+      note: body.notes ?? body.reference ?? null,
+      occurredAt: body.paidAt,
+    });
+
     // The full amount hits the ledger whether or not it was allocated: an
     // unallocated payment is an advance, and it still reduces what is owed.
     await suppliersRepository.insertLedgerEntries(tx, [
@@ -699,6 +712,7 @@ export function voidSupplierPayment(id: string, reason: string) {
     if (payment.status === 'void') return payment;
 
     await purchasesRepository.markPaymentVoid(tx, id, reason, auth.userId);
+    await voidDocumentMoney(tx, 'supplier_payment', id, 'supplier_payment');
     await suppliersRepository.insertLedgerEntries(tx, [
       {
         supplierId: payment.supplierId,

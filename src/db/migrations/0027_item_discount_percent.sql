@@ -8,3 +8,5 @@ SET LOCAL search_path = public, extensions;
 
 ALTER TABLE items
   ADD COLUMN discount_percent NUMERIC(6, 3) CHECK (discount_percent BETWEEN 0 AND 100);
+
+SELECT app.grant_runtime_privileges();

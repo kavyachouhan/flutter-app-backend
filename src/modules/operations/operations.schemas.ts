@@ -8,6 +8,7 @@ import {
   nonEmpty,
   paise,
   positivePaise,
+  requireAccountForNonCashMode,
   timestamp,
 } from '../../lib/validators.js';
 import { TENDER_MODES } from '../invoices/invoices.schemas.js';
@@ -72,21 +73,25 @@ export type UpdateExpenseCategoryBody = z.infer<typeof updateExpenseCategoryBody
 
 // --- Expenses ---------------------------------------------------------------
 
-export const createExpenseBody = z.object({
-  id: clientId,
-  outletId: z.string().uuid(),
-  categoryId: z.string().uuid().nullable().optional(),
-  amount: positivePaise,
-  mode: z.enum(TENDER_MODES),
-  vendorName: nonEmpty.optional(),
-  reference: nonEmpty.optional(),
-  note: nonEmpty.optional(),
-  /** Storage object key from `POST /uploads`, never a URL: URLs expire. */
-  receiptObjectKey: nonEmpty.optional(),
-  /** Photos and documents (a bill, a delivery note). Upload first, then list the keys here. */
-  attachments: attachmentsField.optional(),
-  spentAt: timestamp,
-});
+export const createExpenseBody = z
+  .object({
+    id: clientId,
+    outletId: z.string().uuid(),
+    categoryId: z.string().uuid().nullable().optional(),
+    amount: positivePaise,
+    mode: z.enum(TENDER_MODES),
+    vendorName: nonEmpty.optional(),
+    reference: nonEmpty.max(100).optional(),
+    note: nonEmpty.optional(),
+    /** Storage object key from `POST /uploads`, never a URL: URLs expire. */
+    receiptObjectKey: nonEmpty.optional(),
+    /** Photos and documents (a bill, a delivery note). Upload first, then list the keys here. */
+    attachments: attachmentsField.optional(),
+    spentAt: timestamp,
+    /** Which Cash & Bank account this was paid from; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 export type CreateExpenseBody = z.infer<typeof createExpenseBody>;
 
 export const voidExpenseBody = z.object({ reason: nonEmpty });
