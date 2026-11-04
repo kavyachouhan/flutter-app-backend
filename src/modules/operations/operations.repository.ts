@@ -34,6 +34,8 @@ const HELD_COLUMNS = `
 export interface ExpenseCategoryRow {
   id: string;
   name: string;
+  /** Name of an icon the app ships with; null = the default. */
+  icon: string | null;
   isDirect: boolean;
   isActive: boolean;
 }
@@ -49,6 +51,8 @@ export interface ExpenseRow {
   reference: string | null;
   note: string | null;
   receiptObjectKey: string | null;
+  /** Pictures and documents attached to the expense; see `lib/attachments.ts`. */
+  attachments: unknown;
   spentAt: Date;
   spentBy: string;
   status: 'issued' | 'void';
@@ -65,18 +69,19 @@ export interface ExpenseFilter {
   to: string | undefined;
 }
 
-const CATEGORY_COLUMNS = 'id, name, is_direct AS "isDirect", is_active AS "isActive"';
+const CATEGORY_COLUMNS = 'id, name, icon, is_direct AS "isDirect", is_active AS "isActive"';
 
 const EXPENSE_COLUMNS = `
   e.id, e.outlet_id AS "outletId", e.category_id AS "categoryId", c.name AS "categoryName", e.amount, e.mode,
   e.vendor_name AS "vendorName", e.reference, e.note, e.receipt_object_key AS "receiptObjectKey",
-  e.spent_at AS "spentAt", e.spent_by AS "spentBy", e.status, e.void_reason AS "voidReason",
+  e.attachments, e.spent_at AS "spentAt", e.spent_by AS "spentBy", e.status, e.void_reason AS "voidReason",
   e.voided_at AS "voidedAt"`;
 
 const EXPENSE_FROM = 'FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id';
 
 const CATEGORY_UPDATABLE = {
   name: 'name',
+  icon: 'icon',
   isDirect: 'is_direct',
   isActive: 'is_active',
 } as const;
@@ -259,12 +264,12 @@ export const operationsRepository = {
 
   async insertExpenseCategory(
     tx: Tx,
-    c: { id: string; name: string; isDirect: boolean },
+    c: { id: string; name: string; isDirect: boolean; icon: string | null },
   ): Promise<void> {
     await tx.query(
-      `INSERT INTO expense_categories (id, tenant_id, name, is_direct)
-       VALUES ($1, app.current_tenant_id(), $2, $3)`,
-      [c.id, c.name, c.isDirect],
+      `INSERT INTO expense_categories (id, tenant_id, name, is_direct, icon)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4)`,
+      [c.id, c.name, c.isDirect, c.icon],
     );
   },
 
@@ -316,14 +321,15 @@ export const operationsRepository = {
       reference: string | null;
       note: string | null;
       receiptObjectKey: string | null;
+      attachments: readonly unknown[];
       spentAt: string;
       spentBy: string;
     },
   ): Promise<void> {
     await tx.query(
       `INSERT INTO expenses (id, tenant_id, outlet_id, category_id, amount, mode, vendor_name, reference, note,
-         receipt_object_key, spent_at, spent_by, status)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'issued')`,
+         receipt_object_key, spent_at, spent_by, status, attachments)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'issued', $12::jsonb)`,
       [
         e.id,
         e.outletId,
@@ -336,6 +342,7 @@ export const operationsRepository = {
         e.receiptObjectKey,
         e.spentAt,
         e.spentBy,
+        JSON.stringify(e.attachments),
       ],
     );
   },

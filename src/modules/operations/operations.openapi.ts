@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { idParams } from '../../lib/validators.js';
 import {
   documentStatusSchema,
@@ -63,6 +64,9 @@ export const expenseCategorySchema = registry.register(
   z.object({
     id: uuid,
     name: z.string(),
+    icon: z.string().nullable().openapi({
+      description: 'Name of an icon the app bundles; null means the default icon.',
+    }),
     isDirect: z.boolean().openapi({
       description: 'Direct costs sit above the gross-margin line in the daily P&L.',
     }),
@@ -83,6 +87,9 @@ export const expenseSchema = registry.register(
     reference: z.string().nullable(),
     note: z.string().nullable(),
     receiptObjectKey: z.string().nullable(),
+    attachments: attachmentsField.openapi({
+      description: 'Photos and documents attached to the expense.',
+    }),
     spentAt: timestamp,
     spentBy: uuid,
     status: documentStatusSchema,

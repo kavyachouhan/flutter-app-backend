@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import {
@@ -17,7 +18,7 @@ import { discountApproval } from '../price-lists/price-lists.schemas.js';
 
 export const SALES_ORDER_STATUSES = ['open', 'partial', 'closed', 'cancelled'] as const;
 
-const orderLine = z
+export const orderLine = z
   .object({
     id: clientId,
     itemId: z.string().uuid().nullable().optional(),
@@ -36,13 +37,6 @@ const orderLine = z
     message: 'itemName is required without itemId',
     path: ['itemName'],
   });
-
-/** Object keys returned by POST /uploads/sign for kind `order_attachment`. */
-const attachment = z.object({
-  objectKey: nonEmpty.max(300),
-  kind: z.enum(['image', 'document']),
-  name: nonEmpty.max(200).optional(),
-});
 
 /** The order is stored whole; an edit replaces the same shape. */
 export const saleOrderBody = z.object({
@@ -77,7 +71,7 @@ export const saleOrderBody = z.object({
   notes: nonEmpty.max(1000).nullable().optional(),
   /** Values for the tenant's user-defined fields; validated against the definitions. */
   customFields: z.record(z.string()).optional(),
-  attachments: z.array(attachment).max(10).optional(),
+  attachments: attachmentsField.optional(),
   /** A saved T&C; its text is snapshotted onto the order. null clears it. */
   termsId: z.string().uuid().nullable().optional(),
   /**
@@ -93,7 +87,15 @@ export const saleOrderBody = z.object({
   }),
 });
 
-export const createSaleOrderBody = saleOrderBody.extend({ id: clientId });
+export const createSaleOrderBody = saleOrderBody.extend({
+  id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
+});
 export type CreateSaleOrderBody = z.infer<typeof createSaleOrderBody>;
 
 export const updateSaleOrderBody = saleOrderBody;

@@ -3,7 +3,14 @@ import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { nonEmpty } from '../../lib/validators.js';
 
-export const TERMS_DOCUMENT_TYPES = ['sale', 'sale_order', 'purchase', 'purchase_order'] as const;
+export const TERMS_DOCUMENT_TYPES = [
+  'sale',
+  'sale_order',
+  'purchase',
+  'purchase_order',
+  'estimate',
+  'proforma_invoice',
+] as const;
 export type TermsDocumentType = (typeof TERMS_DOCUMENT_TYPES)[number];
 export const termsDocumentType = z.enum(TERMS_DOCUMENT_TYPES);
 

@@ -202,6 +202,14 @@ const envSchema = z.object({
   SYNC_PULL_MAX_CHANGES: required(positiveInt),
   // Operations per push batch; larger batches are rejected outright.
   SYNC_PUSH_MAX_OPERATIONS: required(positiveInt),
+  // How long a pushed operation's idempotency key is remembered. A phone can hold an operation
+  // offline for weeks, so this is long; after it lapses the entity ids and status guards still
+  // make a repeat safe. Defaulted so an existing deployment keeps booting.
+  SYNC_OPERATION_KEY_TTL_DAYS: z.preprocess(blankToUndefined, positiveInt.default(90)),
+  // How many days of invoice lines (and the credit-note lines that return them) a device is sent,
+  // so a return can be made offline against a bill from another phone. Older bills still return
+  // online. Integer-only: it is written into the pull query.
+  SYNC_RETURN_WINDOW_DAYS: z.preprocess(blankToUndefined, positiveInt.default(90)),
   // A pull tops up a device's block for a series when fewer numbers remain.
   SYNC_LEASE_TOPUP_THRESHOLD: required(positiveInt),
   // Days before a financial year ends at which next year's series are created

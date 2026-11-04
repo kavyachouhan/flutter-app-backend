@@ -15,3 +15,12 @@ export const downloadUrlQuery = z.object({
   key: z.string().min(1).max(512),
 });
 export type DownloadUrlQuery = z.infer<typeof downloadUrlQuery>;
+
+/**
+ * Many keys in one call: a list of items shows a photo per row, and one
+ * request per row would be a request storm that trips the signing limiter.
+ */
+export const downloadUrlsBody = z.object({
+  keys: z.array(z.string().min(1).max(512)).min(1).max(50),
+});
+export type DownloadUrlsBody = z.infer<typeof downloadUrlsBody>;

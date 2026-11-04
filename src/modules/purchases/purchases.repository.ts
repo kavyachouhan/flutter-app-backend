@@ -38,6 +38,7 @@ export interface PurchaseBillHeaderInsert {
   notes: string | null;
   termsId: string | null;
   termsSnapshot: TermsSnapshot | null;
+  attachments: readonly unknown[];
   receivedAt: string;
   createdBy: string;
 }
@@ -128,7 +129,7 @@ const HEADER_COLUMNS = `
   pb.tax_summary AS "taxSummary", pb.hsn_summary AS "hsnSummary",
   pb.freight_amount AS "freightAmount", pb.other_charges_amount AS "otherChargesAmount",
   pb.landed_cost_basis AS "landedCostBasis", pb.notes, pb.status,
-  pb.terms_id AS "termsId", pb.terms_snapshot AS "termsSnapshot",
+  pb.terms_id AS "termsId", pb.terms_snapshot AS "termsSnapshot", pb.attachments,
   pb.received_at AS "receivedAt", pb.created_by AS "createdBy", pb.void_reason AS "voidReason",
   pb.voided_at AS "voidedAt", pb.created_at AS "createdAt",
   ${AMOUNT_PAID} AS "amountPaid", ${RETURNED} AS "returnedAmount"`;
@@ -223,7 +224,7 @@ export const purchasesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
          grand_total, tax_summary, hsn_summary, freight_amount, other_charges_amount,
          landed_cost_basis, notes, status, received_at, created_by, is_reverse_charge,
-         itc_category, itc_ineligible_reason, terms_id, terms_snapshot)
+         itc_category, itc_ineligible_reason, terms_id, terms_snapshot, attachments)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6,
          $7, $8, $9, $10, $11,
@@ -232,7 +233,7 @@ export const purchasesRepository = {
          $21, $22, $23, $24, $25,
          $26, $27, $28, $29, $30, $31, $32,
          $33, $34, $35, $36, $37,
-         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46)`,
+         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46, $47::jsonb)`,
       [
         h.id,
         h.outletId,
@@ -280,6 +281,7 @@ export const purchasesRepository = {
         h.itcIneligibleReason,
         h.termsId,
         jsonParam(h.termsSnapshot),
+        JSON.stringify(h.attachments),
       ],
     );
   },

@@ -15,6 +15,8 @@ export const DOCUMENT_TYPES = [
   'purchase_bill',
   'delivery_challan',
   'sales_order',
+  'estimate',
+  'proforma_invoice',
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 

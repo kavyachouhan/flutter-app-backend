@@ -10,6 +10,8 @@ export interface DeliveryChallanRow {
   documentDate: string;
   status: 'open' | 'partial' | 'converted' | 'cancelled';
   notes: string | null;
+  /** Pictures and files attached to the challan; see `lib/attachments.ts`. */
+  attachments: unknown;
   createdAt: Date;
 }
 
@@ -33,6 +35,7 @@ export interface NewDeliveryChallan {
   documentDate: string;
   fyStartYear: number;
   notes: string | null;
+  attachments: readonly unknown[];
   createdBy: string;
 }
 
@@ -48,7 +51,7 @@ export interface NewDeliveryChallanLine {
 const CHALLAN_COLUMNS = `
   dc.id, dc.outlet_id AS "outletId", dc.customer_id AS "customerId", c.name AS "customerName",
   dc.document_number AS "documentNumber", dc.document_date AS "documentDate",
-  dc.status, dc.notes, dc.created_at AS "createdAt"`;
+  dc.status, dc.notes, dc.attachments, dc.created_at AS "createdAt"`;
 
 const LINE_COLUMNS = `
   id, line_no AS "lineNo", item_id AS "itemId", item_name AS "itemName", unit,
@@ -82,8 +85,8 @@ export const deliveryChallansRepository = {
   async insert(tx: Tx, c: NewDeliveryChallan): Promise<void> {
     await tx.query(
       `INSERT INTO delivery_challans (id, tenant_id, outlet_id, customer_id, series_id, sequence_no,
-         document_number, document_date, fy_start_year, notes, created_by)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         document_number, document_date, fy_start_year, notes, created_by, attachments)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
       [
         c.id,
         c.outletId,
@@ -95,6 +98,7 @@ export const deliveryChallansRepository = {
         c.fyStartYear,
         c.notes,
         c.createdBy,
+        JSON.stringify(c.attachments),
       ],
     );
   },
@@ -156,11 +160,24 @@ export const deliveryChallansRepository = {
   async updateHeader(
     tx: Tx,
     challanId: string,
-    header: { customerId: string | null; notes: string | null },
+    header: {
+      customerId: string | null;
+      notes: string | null;
+      /** Undefined leaves the files alone; a list (even empty) replaces them. */
+      attachments?: readonly unknown[];
+    },
   ): Promise<void> {
+    if (header.attachments === undefined) {
+      await tx.query('UPDATE delivery_challans SET customer_id = $2, notes = $3 WHERE id = $1', [
+        challanId,
+        header.customerId,
+        header.notes,
+      ]);
+      return;
+    }
     await tx.query(
-      'UPDATE delivery_challans SET customer_id = $2, notes = $3 WHERE id = $1',
-      [challanId, header.customerId, header.notes],
+      'UPDATE delivery_challans SET customer_id = $2, notes = $3, attachments = $4::jsonb WHERE id = $1',
+      [challanId, header.customerId, header.notes, JSON.stringify(header.attachments)],
     );
   },
 

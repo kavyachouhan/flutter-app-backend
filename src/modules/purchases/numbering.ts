@@ -14,6 +14,8 @@
 import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
 import type { Tx } from '../../db/tx.js';
+import { requireAuthContext } from '../../lib/context.js';
+import { ErrorCode, UnprocessableError, ValidationError } from '../../lib/errors.js';
 import {
   financialYearOf,
   financialYearStarting,
@@ -25,7 +27,7 @@ import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type SeriesRow } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
 
-export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order' | 'delivery_challan';
+export type KeyedDocumentType = 'purchase_bill' | 'debit_note' | 'purchase_order' | 'sales_order' | 'delivery_challan' | 'estimate' | 'proforma_invoice';
 
 const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   purchase_bill: 'PB',
@@ -33,6 +35,8 @@ const DEFAULT_PREFIX: Record<KeyedDocumentType, string> = {
   purchase_order: 'PO',
   delivery_challan: 'DC',
   sales_order: 'SO',
+  estimate: 'EST',
+  proforma_invoice: 'PI',
 };
 
 async function ensureSeries(
@@ -124,6 +128,75 @@ export async function allocateNumber(
   if (!series) throw new Error('series not found');
 
   const sequenceNo = await numberingRepository.allocateSequence(tx, series.id);
+  return {
+    seriesId: series.id,
+    sequenceNo,
+    documentNumber: formatDocumentNumber(
+      toSeriesFormat(series),
+      fy,
+      sequenceNo,
+      env.DOCUMENT_NUMBER_MAX_LENGTH,
+    ),
+    fyStartYear: fy.startYear,
+  };
+}
+
+/**
+ * The number for a keyed document, from one of two places.
+ *
+ * Online, the server takes the next one off the series (`allocateNumber`). A device that
+ * made the document offline already numbered it from a block leased to it, exactly as an
+ * invoice is numbered: the document names the series and the sequence it used, and that
+ * must be a number this device was actually leased and has not used (`NUMBER_NOT_LEASED`
+ * otherwise). Either way the number is final the moment the document exists.
+ *
+ * A request naming only one of `seriesId` and `sequenceNo` is a mistake, not a choice.
+ */
+export async function numberForDocument(
+  tx: Tx,
+  input: {
+    outletId: string;
+    documentType: KeyedDocumentType;
+    documentDate: string;
+    fyStartMonth: number;
+    seriesId?: string | undefined;
+    sequenceNo?: number | undefined;
+  },
+): Promise<AllocatedNumber> {
+  const { seriesId, sequenceNo } = input;
+  if (seriesId === undefined && sequenceNo === undefined) return allocateNumber(tx, input);
+  if (seriesId === undefined || sequenceNo === undefined) {
+    throw new ValidationError('seriesId and sequenceNo go together.', {
+      details: { field: seriesId === undefined ? 'seriesId' : 'sequenceNo' },
+    });
+  }
+
+  const auth = requireAuthContext();
+  const series = await numberingRepository.findSeries(tx, seriesId);
+  if (!series || series.outletId !== input.outletId || series.documentType !== input.documentType) {
+    throw new UnprocessableError(
+      `The series is not a ${input.documentType.replace('_', ' ')} series for this outlet.`,
+    );
+  }
+  const fy = financialYearOf(input.documentDate, input.fyStartMonth);
+  if (fy.startYear !== series.fyStartYear) {
+    throw new UnprocessableError('The document date falls outside the series financial year.');
+  }
+
+  const block = await numberingRepository.lockBlockForSequence(
+    tx,
+    series.id,
+    auth.deviceId,
+    sequenceNo,
+  );
+  if (!block) {
+    throw new UnprocessableError(
+      `Sequence ${sequenceNo} is not leased to this device.`,
+      ErrorCode.NUMBER_NOT_LEASED,
+    );
+  }
+  await numberingRepository.markConsumed(tx, block.id, sequenceNo);
+
   return {
     seriesId: series.id,
     sequenceNo,

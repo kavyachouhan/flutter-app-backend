@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import {
@@ -46,6 +47,8 @@ export const createPurchaseBillBody = z.object({
   supplierId: z.string().uuid(),
   purchaseOrderId: z.string().uuid().optional(),
   seriesId: z.string().uuid().optional(),
+  /** With `seriesId`: the number a device leased and used offline. */
+  sequenceNo: z.number().int().positive().optional(),
   documentDate: isoDate,
   /** The number printed on the supplier's own bill. */
   supplierInvoiceNo: nonEmpty.max(64),
@@ -86,6 +89,8 @@ export const createPurchaseBillBody = z.object({
   notes: nonEmpty.optional(),
   /** A saved T&C; its text is snapshotted onto the bill when issued. */
   termsId: z.string().uuid().nullable().optional(),
+  /** Photos and documents (the supplier's bill, a delivery challan). Upload first, then list the keys. */
+  attachments: attachmentsField.optional(),
   receivedAt: timestamp,
   /** Payment made at the time of the bill, if any. */
   paidAmount: paise.default(0),
@@ -147,6 +152,12 @@ export const voidSupplierPaymentBody = z.object({ reason: nonEmpty.max(200) });
 
 export const createPurchaseOrderBody = z.object({
   id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
   outletId: z.string().uuid(),
   supplierId: z.string().uuid(),
   documentDate: isoDate,
@@ -154,6 +165,8 @@ export const createPurchaseOrderBody = z.object({
   notes: nonEmpty.max(500).optional(),
   /** A saved T&C; its text is snapshotted onto the order when created. */
   termsId: z.string().uuid().nullable().optional(),
+  /** Photos and documents. The whole list is replaced when the order is edited. */
+  attachments: attachmentsField.optional(),
   lines: z
     .array(
       z.object({
@@ -171,7 +184,11 @@ export const createPurchaseOrderBody = z.object({
 export type CreatePurchaseOrderBody = z.infer<typeof createPurchaseOrderBody>;
 
 /** An edit replaces the order's header and lines, so it takes the create shape without the id. */
-export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({ id: true });
+export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({
+  id: true,
+  seriesId: true,
+  sequenceNo: true,
+});
 export type UpdatePurchaseOrderBody = z.infer<typeof updatePurchaseOrderBody>;
 
 export const listPurchaseOrdersQuery =pageQuery.extend({

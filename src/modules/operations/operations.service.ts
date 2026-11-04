@@ -18,6 +18,7 @@ import {
   WarningCode,
   type WarningCodeValue,
 } from '../../lib/errors.js';
+import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
@@ -190,6 +191,7 @@ export function createExpenseCategory(body: CreateExpenseCategoryBody) {
       id: body.id,
       name: body.name,
       isDirect: body.isDirect ?? false,
+      icon: body.icon ?? null,
     });
     return requireExpenseCategory(tx, body.id);
   });
@@ -217,8 +219,9 @@ export function deleteExpenseCategory(id: string) {
 
 // --- Expenses ---------------------------------------------------------------
 
-export function createExpense(body: CreateExpenseBody) {
+export async function createExpense(body: CreateExpenseBody) {
   const auth = requireAuthContext();
+  await checkAttachments(body.attachments);
   assertOutletAccess(body.outletId);
 
   return withTransaction(async (tx) => {
@@ -232,6 +235,7 @@ export function createExpense(body: CreateExpenseBody) {
       throw new NotFoundError('Outlet');
     }
     if (body.categoryId) await requireExpenseCategory(tx, body.categoryId);
+    assertAttachments(body.attachments);
 
     await operationsRepository.insertExpense(tx, {
       id: body.id,
@@ -243,6 +247,7 @@ export function createExpense(body: CreateExpenseBody) {
       reference: body.reference ?? null,
       note: body.note ?? null,
       receiptObjectKey: body.receiptObjectKey ?? null,
+      attachments: body.attachments ?? [],
       spentAt: body.spentAt,
       spentBy: auth.userId,
     });

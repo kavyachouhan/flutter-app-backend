@@ -69,6 +69,16 @@ export const ErrorCode = {
   SALES_ORDER_CLOSED: 'SALES_ORDER_CLOSED',
   /** A line already invoiced keeps the item, price, tax and discount it was invoiced at. */
   ORDER_LINE_INVOICED: 'ORDER_LINE_INVOICED',
+  /** The estimate has already become a sales order or an invoice and is now fixed. */
+  ESTIMATE_ALREADY_CONVERTED: 'ESTIMATE_ALREADY_CONVERTED',
+  /** Only an open estimate can be edited, converted, closed or cancelled. */
+  ESTIMATE_NOT_OPEN: 'ESTIMATE_NOT_OPEN',
+  /** The estimate's validity date has passed, so it can no longer be converted. */
+  ESTIMATE_EXPIRED: 'ESTIMATE_EXPIRED',
+  /** The proforma invoice has already become an invoice and is now fixed. */
+  PROFORMA_INVOICE_ALREADY_CONVERTED: 'PROFORMA_INVOICE_ALREADY_CONVERTED',
+  /** Only an open proforma invoice can be edited, closed or cancelled. */
+  PROFORMA_INVOICE_NOT_OPEN: 'PROFORMA_INVOICE_NOT_OPEN',
   /** The advance has been applied to an invoice or refunded, so its amount is fixed. */
   ADVANCE_LOCKED: 'ADVANCE_LOCKED',
   /** The invoice has credit notes against it; void those first, or amend instead. */
@@ -110,6 +120,8 @@ export const ErrorCode = {
   SYNC_RESET_REQUIRED: 'SYNC_RESET_REQUIRED',
   /** An update carried a baseServerSeq older than the row on the server. */
   STALE_WRITE: 'STALE_WRITE',
+  /** A push reused an opId for a different operation or payload (a client bug, never a retry). */
+  OPERATION_KEY_REUSED: 'OPERATION_KEY_REUSED',
   SYNC_ENTITY_UNKNOWN: 'SYNC_ENTITY_UNKNOWN',
   SYNC_CURSOR_INVALID: 'SYNC_CURSOR_INVALID',
 
@@ -144,6 +156,16 @@ export const WarningCode = {
   RESERVATION_SHORTFALL: 'RESERVATION_SHORTFALL',
   /** A sale takes stock that open sales orders have reserved. */
   RESERVED_STOCK: 'RESERVED_STOCK',
+  /**
+   * A create was merged into a record that already existed, and the opening balance it carried
+   * was dropped rather than added a second time.
+   */
+  OPENING_BALANCE_IGNORED: 'OPENING_BALANCE_IGNORED',
+  /**
+   * An edit changed fields that someone else had changed since this device last saw the record;
+   * the later write was kept. `details.fields` names them; the old values are in the audit log.
+   */
+  FIELD_CONFLICT: 'FIELD_CONFLICT',
 } as const;
 
 export type WarningCodeValue = (typeof WarningCode)[keyof typeof WarningCode];

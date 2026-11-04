@@ -63,9 +63,7 @@ const order = registry.register(
     isReverseCharge: z.boolean(),
     taxableAmount: paise,
     totalTax: paise,
-    billDiscount: z
-      .object({ kind: z.enum(['amount', 'percent']), value: z.number() })
-      .nullable(),
+    billDiscount: z.object({ kind: z.enum(['amount', 'percent']), value: z.number() }).nullable(),
     billDiscountAmount: paise,
     billDiscountReason: z.string().nullable(),
     billDiscountRemaining: paise.openapi({
@@ -127,10 +125,7 @@ registry.registerPath({
   security: accessTokenSecurity,
   request: { body: { content: { 'application/json': { schema: createSaleOrderBody } } } },
   responses: {
-    201: jsonResponse(
-      'Taken.',
-      z.object({ data: order, replayed: z.boolean(), warnings }),
-    ),
+    201: jsonResponse('Taken.', z.object({ data: order, replayed: z.boolean(), warnings })),
     200: jsonResponse(
       'Already taken; the stored order is returned.',
       z.object({ data: order, replayed: z.boolean(), warnings }),

@@ -15,6 +15,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
+import { assertAttachments, checkAttachments, removeDroppedAttachments } from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   NotFoundError,
@@ -48,9 +49,11 @@ async function loadChallan(tx: Tx, id: string) {
   return { ...challan, lines };
 }
 
-export function createDeliveryChallan(body: CreateDeliveryChallanBody) {
+export async function createDeliveryChallan(body: CreateDeliveryChallanBody) {
   const auth = requireAuthContext();
   assertOutletAccess(body.outletId);
+  // Looks at the real files in storage, so before the transaction opens.
+  await checkAttachments(body.attachments);
 
   return withTransaction(async (tx) => {
     // Same id twice (a retried request after a dropped reply) returns what
@@ -87,6 +90,7 @@ export function createDeliveryChallan(body: CreateDeliveryChallanBody) {
       documentDate: body.documentDate,
       fyStartYear: number.fyStartYear,
       notes: body.notes ?? null,
+      attachments: body.attachments ?? [],
       createdBy: auth.userId,
     });
 
@@ -160,12 +164,29 @@ export function createDeliveryChallan(body: CreateDeliveryChallanBody) {
  * reference) still gives back the exact right amount even after several
  * edits.
  */
-export function updateDeliveryChallan(id: string, body: UpdateDeliveryChallanBody) {
+export async function updateDeliveryChallan(id: string, body: UpdateDeliveryChallanBody) {
+  await checkAttachments(body.attachments);
+  let previous: unknown;
+  const result = await updateChallanInTransaction(id, body, (a) => {
+    previous = a;
+  });
+  // After the commit: files the edit took off the challan are no longer referenced.
+  await removeDroppedAttachments(previous, body.attachments);
+  return result;
+}
+
+function updateChallanInTransaction(
+  id: string,
+  body: UpdateDeliveryChallanBody,
+  onPrevious: (attachments: unknown) => void,
+) {
   const auth = requireAuthContext();
 
   return withTransaction(async (tx) => {
     const challan = await deliveryChallansRepository.find(tx, id, true);
     if (!challan) throw new NotFoundError('Delivery challan');
+    onPrevious(challan.attachments);
+    assertAttachments(body.attachments);
     assertOutletAccess(challan.outletId);
     if (challan.status !== 'open') {
       throw new UnprocessableError(
@@ -236,6 +257,7 @@ export function updateDeliveryChallan(id: string, body: UpdateDeliveryChallanBod
     await deliveryChallansRepository.updateHeader(tx, id, {
       customerId: body.customerId,
       notes: body.notes,
+      attachments: body.attachments,
     });
     await deliveryChallansRepository.replaceLines(
       tx,

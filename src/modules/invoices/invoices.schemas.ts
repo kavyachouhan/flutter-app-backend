@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { discountApproval } from '../price-lists/price-lists.schemas.js';
@@ -85,6 +86,16 @@ export const createInvoiceBody = z.object({
   /** Fulfils (part of) this sales order; lines name which order lines they cover. */
   salesOrderId: z.string().uuid().optional(),
   /**
+   * Raised from this estimate. If it is still open it becomes converted in the same transaction;
+   * if not (already converted elsewhere, or gone) the link is dropped and the sale still issues.
+   */
+  estimateId: z.string().uuid().optional(),
+  /**
+   * Raised from this proforma invoice. Same rule as `estimateId`: converted if still open and in
+   * date, otherwise the link is dropped and the sale still issues.
+   */
+  proformaInvoiceId: z.string().uuid().optional(),
+  /**
    * Replaces this invoice. The original must already be fully credited: an
    * amendment is a credit note for the whole of it plus this new invoice.
    */
@@ -111,6 +122,11 @@ export const createInvoiceBody = z.object({
   termsId: z.string().uuid().nullable().optional(),
   /** Values for the tenant's user-defined fields (PO no, vehicle no...); write-once. */
   customFields: z.record(z.string()).optional(),
+  /**
+   * Photos and documents (a signed delivery note, a PO scan). Upload each first, then list
+   * the keys here; like everything else on an issued invoice they cannot change afterwards.
+   */
+  attachments: attachmentsField.optional(),
   /**
    * Approvals for discounts that breach the shop's policy, captured at the
    * till and travelling with the document so the authority and the discount

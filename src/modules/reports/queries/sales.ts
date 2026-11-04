@@ -222,7 +222,7 @@ export async function saleOrderStatus(tx: Tx, params: ReportParams): Promise<Rep
            COALESCE(SUM(l.quantity_fulfilled), 0)::bigint AS "invoicedQuantity",
            COALESCE(SUM(l.quantity - l.quantity_fulfilled), 0)::bigint AS "pendingQuantity"
     FROM sales_orders so
-    LEFT JOIN sales_order_lines l ON l.sales_order_id = so.id
+    LEFT JOIN sales_order_lines l ON l.sales_order_id = so.id AND l.deleted_at IS NULL
     WHERE so.deleted_at IS NULL AND so.status <> 'cancelled'
       AND ${outletScope(p, 'so', params)}
       AND ${dateRange(p, 'so.document_date', params)}

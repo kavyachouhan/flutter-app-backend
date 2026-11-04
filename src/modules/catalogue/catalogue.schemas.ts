@@ -5,7 +5,9 @@ import {
   booleanQuery,
   gstRate,
   hsnCode,
+  iconName,
   nonEmpty,
+  objectKey,
   paise,
   supplyCategory,
 } from '../../lib/validators.js';
@@ -14,6 +16,8 @@ export const createCategoryBody = z.object({
   id: clientId,
   name: nonEmpty,
   parentId: z.string().uuid().nullable().optional(),
+  /** Name of a bundled icon. The app ships the SVGs; nothing is uploaded. */
+  icon: iconName.nullable().optional(),
 });
 export type CreateCategoryBody = z.infer<typeof createCategoryBody>;
 
@@ -32,6 +36,8 @@ const itemFields = {
   unit: nonEmpty,
   mrp: paise.nullable().optional(),
   salePrice: paise,
+  /** Object key from `/uploads/sign` with kind `item_image`; null removes the photo. */
+  imageObjectKey: objectKey.nullable().optional(),
   /**
    * The discount to apply off sale price by default — a starting point for
    * billing, not something billing is forced to use; a till can still

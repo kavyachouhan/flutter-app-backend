@@ -29,6 +29,9 @@ export const categorySchema = registry.register(
     id: uuid,
     parentId: uuid.nullable(),
     name: z.string(),
+    icon: z.string().nullable().openapi({
+      description: 'Name of an icon the app bundles; null means the default icon.',
+    }),
     createdAt: timestamp,
     updatedAt: timestamp,
   }),
@@ -49,6 +52,10 @@ export const itemSchema = registry.register(
     unit: z.string(),
     mrp: paise.nullable(),
     salePrice: paise,
+    imageObjectKey: z.string().nullable().openapi({
+      description:
+        "The item's photo. Resolve it to a URL with `POST /v1/uploads/urls`; it is never a URL itself.",
+    }),
     purchasePrice: paise.nullable(),
     pricesIncludeTax: z.boolean(),
     trackStock: z.boolean(),

@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import {
+  iconName,
   isoDate,
   nonEmpty,
   paise,
@@ -56,11 +58,14 @@ export const createExpenseCategoryBody = z.object({
   name: nonEmpty,
   /** Direct costs sit above the gross-margin line in the daily P&L. */
   isDirect: z.boolean().optional(),
+  /** Name of a bundled icon. The app ships the SVGs; nothing is uploaded. */
+  icon: iconName.nullable().optional(),
 });
 export type CreateExpenseCategoryBody = z.infer<typeof createExpenseCategoryBody>;
 
 export const updateExpenseCategoryBody = z.object({
   name: nonEmpty.optional(),
+  icon: iconName.nullable().optional(),
   isDirect: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
@@ -80,6 +85,8 @@ export const createExpenseBody = z
     note: nonEmpty.optional(),
     /** Storage object key from `POST /uploads`, never a URL: URLs expire. */
     receiptObjectKey: nonEmpty.optional(),
+    /** Photos and documents (a bill, a delivery note). Upload first, then list the keys here. */
+    attachments: attachmentsField.optional(),
     spentAt: timestamp,
     /** Which Cash & Bank account this was paid from; required unless mode is 'cash'. */
     accountId: z.string().uuid().optional(),

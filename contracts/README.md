@@ -10,6 +10,9 @@ files are how both sides prove they agree before a device ever goes offline.
 | ------------------------ | ----------------------------------------------- | ------------------------------------------ |
 | `tax-vectors.json`       | `src/domain/tax/engine.ts` + `src/lib/money.ts` | `packages/khata_domain` (Dart) parity test |
 | `numbering-vectors.json` | `src/domain/numbering/series.ts`                | `packages/khata_domain` (Dart) parity test |
+| `costing-vectors.json`   | `src/domain/costing/*.ts`, `src/domain/purchases/due-date.ts` | `packages/khata_domain` (Dart) parity test |
+| `returns-vectors.json`   | `src/domain/tax/returns.ts`                     | `packages/khata_domain` (Dart) parity test |
+| `access-vectors.json`    | `permissions.ts`, `plans.ts`, `numbering.schemas.ts` | `packages/khata_domain` (Dart) access test |
 
 ## Rules
 

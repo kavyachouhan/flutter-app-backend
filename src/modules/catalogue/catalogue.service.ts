@@ -1,5 +1,6 @@
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
+import { remove as removeObject, verifyUploadedObject } from '../../lib/storage.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { diffFields, recordAudit } from '../audit/audit.js';
 import { assertQuota } from '../entitlements/entitlements.js';
@@ -62,6 +63,7 @@ export function createCategory(body: CreateCategoryBody) {
       id: body.id,
       name: body.name,
       parentId: body.parentId ?? null,
+      icon: body.icon ?? null,
     });
     return requireCategory(tx, body.id);
   });
@@ -123,9 +125,11 @@ export async function getItemByBarcode(barcode: string) {
   return item;
 }
 
-export function createItem(body: CreateItemBody) {
+export async function createItem(body: CreateItemBody) {
   const trackStock = body.trackStock ?? body.itemType === 'goods';
   assertStockTracking(body.itemType, trackStock);
+  // Looks at the real file, so before the transaction opens (see checkAttachments).
+  if (body.imageObjectKey) await verifyUploadedObject(body.imageObjectKey, ['item_image']);
 
   return withTransaction(async (tx) => {
     const existing = await catalogueRepository.findItem(tx, body.id);
@@ -149,6 +153,7 @@ export function createItem(body: CreateItemBody) {
       mrp: body.mrp ?? null,
       salePrice: body.salePrice,
       discountPercent: body.discountPercent ?? null,
+      imageObjectKey: body.imageObjectKey ?? null,
       purchasePrice: body.purchasePrice ?? null,
       pricesIncludeTax: body.pricesIncludeTax ?? settings.defaultPricesIncludeTax,
       trackStock,
@@ -162,7 +167,16 @@ export function createItem(body: CreateItemBody) {
   });
 }
 
-export function updateItem(id: string, patch: UpdateItemBody) {
+export async function updateItem(id: string, patch: UpdateItemBody) {
+  if (patch.imageObjectKey) await verifyUploadedObject(patch.imageObjectKey, ['item_image']);
+  const result = await updateItemInTransaction(id, patch);
+  // Best effort, after the commit: a replaced or removed photo is no longer
+  // referenced by anything, and a failed delete only leaves an orphan.
+  if (result.replacedImageKey) await removeObject(result.replacedImageKey);
+  return result.item;
+}
+
+function updateItemInTransaction(id: string, patch: UpdateItemBody) {
   return withTransaction(async (tx) => {
     const before = await requireItem(tx, id);
     assertStockTracking(patch.itemType ?? before.itemType, patch.trackStock ?? before.trackStock);
@@ -181,7 +195,14 @@ export function updateItem(id: string, patch: UpdateItemBody) {
         changes,
       });
     }
-    return requireItem(tx, id);
+    const item = await requireItem(tx, id);
+    const replacedImageKey =
+      patch.imageObjectKey !== undefined &&
+      before.imageObjectKey &&
+      before.imageObjectKey !== patch.imageObjectKey
+        ? before.imageObjectKey
+        : null;
+    return { item, replacedImageKey };
   });
 }
 

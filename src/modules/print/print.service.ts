@@ -23,12 +23,15 @@ import {
 import type { PrintDocument } from '../../domain/print/types.js';
 import type { TaxMode } from '../../domain/tax/types.js';
 import { ConflictError, ErrorCode, NotFoundError } from '../../lib/errors.js';
+import { remove as removeObject, verifyUploadedObject } from '../../lib/storage.js';
 import { assertOutletAccess } from '../../middleware/authorize.js';
 import { recordAudit } from '../audit/audit.js';
 import { creditNotesRepository } from '../credit-notes/credit-notes.repository.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository, type OutletRow } from '../outlets/outlets.repository.js';
 import { paymentsRepository } from '../payments/payments.repository.js';
+import { estimatesRepository } from '../estimates/estimates.repository.js';
+import { proformaInvoicesRepository } from '../proforma-invoices/proforma-invoices.repository.js';
 import { salesOrdersRepository } from '../sales-orders/sales-orders.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { tenantsRepository, type TenantRow } from '../tenants/tenants.repository.js';
@@ -376,7 +379,10 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
  * recognises it, but it is titled SALE ORDER and carries the advance and what is still due
  * rather than tenders: nothing has been supplied yet.
  */
-export function buildSaleOrderPayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+export function buildSaleOrderPayload(
+  id: string,
+  query: PrintPayloadQuery,
+): Promise<PrintDocument> {
   return withReadTransaction(async (tx) => {
     await assertFeature(tx, 'sales_orders');
     const order = await salesOrdersRepository.find(tx, id);
@@ -446,6 +452,155 @@ export function buildSaleOrderPayload(id: string, query: PrintPayloadQuery): Pro
       currencySymbol: tenant.currencySymbol,
       copyIndex,
       notes: order.notes,
+    };
+    return resolvePrintDocument(input);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Estimate
+// ---------------------------------------------------------------------------
+
+export function buildEstimatePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'sales_orders');
+    const estimate = await estimatesRepository.find(tx, id);
+    if (!estimate) throw new NotFoundError('Estimate');
+    assertOutletAccess(estimate.outletId);
+
+    const [tenant, outlet, profiles, lines] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, estimate.outletId),
+      printRepository.findProfilesForOutlet(tx, estimate.outletId),
+      estimatesRepository.findLines(tx, id),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+
+    const customFields = await resolveCustomFields(tx, 'estimate', estimate.customFields);
+
+    const input: ResolveInput = {
+      kind: 'estimate',
+      documentNumber: estimate.documentNumber,
+      documentDate: String(estimate.documentDate),
+      // An estimate's validity date prints where an order prints its due date.
+      dueDate: estimate.validUntil === null ? null : String(estimate.validUntil),
+      issuedAt: estimate.createdAt,
+      taxMode: estimate.taxMode as TaxMode,
+      isInterState: estimate.supplyType !== 'intra_state',
+      business: buildBusiness(outlet, tenant),
+      profile: withDocumentTerms(resolved.profile, estimate.termsSnapshot),
+      customer: await loadCustomer(tx, estimate.customerId, estimate.customerName, null),
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: line.lineDiscount + line.billDiscountShare,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: estimate.grossAmount,
+        totalDiscount: estimate.lineDiscountTotal + estimate.billDiscountAmount,
+        taxableAmount: estimate.taxableAmount,
+        totalCgst: estimate.totalCgst,
+        totalSgst: estimate.totalSgst,
+        totalIgst: estimate.totalIgst,
+        totalCess: estimate.totalCess,
+        charges: estimate.taxableCharges + estimate.nonTaxableCharges,
+        roundOff: estimate.roundOff,
+        grandTotal: estimate.grandTotal,
+        amountPaid: 0,
+      },
+      taxRows: toTaxRows(estimate.taxSummary),
+      tenders: [],
+      customFields,
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      notes: estimate.notes,
+    };
+    return resolvePrintDocument(input);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Proforma invoice
+// ---------------------------------------------------------------------------
+
+export function buildProformaInvoicePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'sales_orders');
+    const proformaInvoice = await proformaInvoicesRepository.find(tx, id);
+    if (!proformaInvoice) throw new NotFoundError('Proforma invoice');
+    assertOutletAccess(proformaInvoice.outletId);
+
+    const [tenant, outlet, profiles, lines] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, proformaInvoice.outletId),
+      printRepository.findProfilesForOutlet(tx, proformaInvoice.outletId),
+      proformaInvoicesRepository.findLines(tx, id),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+
+
+    const input: ResolveInput = {
+      kind: 'proforma_invoice',
+      documentNumber: proformaInvoice.documentNumber,
+      documentDate: String(proformaInvoice.documentDate),
+      // The validity date prints where an order prints its due date.
+      dueDate: proformaInvoice.validUntil === null ? null : String(proformaInvoice.validUntil),
+      issuedAt: proformaInvoice.createdAt,
+      taxMode: proformaInvoice.taxMode as TaxMode,
+      isInterState: proformaInvoice.supplyType !== 'intra_state',
+      business: buildBusiness(outlet, tenant),
+      profile: withDocumentTerms(resolved.profile, proformaInvoice.termsSnapshot),
+      customer: await loadCustomer(tx, proformaInvoice.customerId, proformaInvoice.customerName, null),
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.unitPrice,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: line.lineDiscount + line.billDiscountShare,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: proformaInvoice.grossAmount,
+        totalDiscount: proformaInvoice.lineDiscountTotal + proformaInvoice.billDiscountAmount,
+        taxableAmount: proformaInvoice.taxableAmount,
+        totalCgst: proformaInvoice.totalCgst,
+        totalSgst: proformaInvoice.totalSgst,
+        totalIgst: proformaInvoice.totalIgst,
+        totalCess: proformaInvoice.totalCess,
+        charges: proformaInvoice.taxableCharges + proformaInvoice.nonTaxableCharges,
+        roundOff: proformaInvoice.roundOff,
+        grandTotal: proformaInvoice.grandTotal,
+        amountPaid: 0,
+      },
+      taxRows: toTaxRows(proformaInvoice.taxSummary),
+      tenders: [],
+      customFields: [],
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      notes: proformaInvoice.notes,
     };
     return resolvePrintDocument(input);
   });
@@ -684,7 +839,25 @@ export function listPrintProfiles() {
 }
 
 /** `outletId` is null for the tenant-wide default. Upsert: a profile is settings, not a record. */
-export function upsertPrintProfile(outletId: string | null, body: UpsertPrintProfileBody) {
+export async function upsertPrintProfile(outletId: string | null, body: UpsertPrintProfileBody) {
+  // The real files are checked before the transaction opens (storage can be slow).
+  if (body.logoObjectKey) await verifyUploadedObject(body.logoObjectKey, ['logo']);
+  if (body.signatureObjectKey) await verifyUploadedObject(body.signatureObjectKey, ['signature']);
+
+  const replaced: { logo: string | null; signature: string | null } = { logo: null, signature: null };
+  const saved = await saveProfile(outletId, body, replaced);
+  // After the commit: a logo or signature that was replaced or removed is no longer used.
+  await Promise.all(
+    [replaced.logo, replaced.signature].filter((k): k is string => !!k).map((k) => removeObject(k)),
+  );
+  return saved;
+}
+
+function saveProfile(
+  outletId: string | null,
+  body: UpsertPrintProfileBody,
+  replaced: { logo: string | null; signature: string | null },
+) {
   return withTransaction(async (tx) => {
     if (outletId) {
       assertOutletAccess(outletId);
@@ -693,6 +866,15 @@ export function upsertPrintProfile(outletId: string | null, body: UpsertPrintPro
 
     const existing = await printRepository.findProfile(tx, outletId);
     if (existing) {
+      if (body.logoObjectKey !== undefined && existing.logoObjectKey !== body.logoObjectKey) {
+        replaced.logo = existing.logoObjectKey;
+      }
+      if (
+        body.signatureObjectKey !== undefined &&
+        existing.signatureObjectKey !== body.signatureObjectKey
+      ) {
+        replaced.signature = existing.signatureObjectKey;
+      }
       await printRepository.updateProfile(tx, existing.id, body);
     } else {
       await printRepository.insertProfile(tx, {
