@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
 import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
@@ -30,6 +31,14 @@ import { discountsRepository } from '../price-lists/discounts.repository.js';
 import { resolveLinePrices } from '../price-lists/price-lists.service.js';
 import { stockRepository } from '../stock/stock.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import {
+  claimEstimateForInvoice,
+  markEstimateConvertedByInvoice,
+} from '../estimates/estimates.service.js';
+import {
+  claimProformaInvoiceForInvoice,
+  markProformaInvoiceConvertedByInvoice,
+} from '../proforma-invoices/proforma-invoices.service.js';
 import {
   applyAdvanceToInvoice,
   applyFulfilment,
@@ -319,6 +328,13 @@ export async function createInvoice(body: CreateInvoiceBody) {
         })
       : undefined;
 
+    const estimateId = await claimEstimateForInvoice(tx, body.estimateId, body.documentDate);
+    const proformaInvoiceId = await claimProformaInvoiceForInvoice(
+      tx,
+      body.proformaInvoiceId,
+      body.documentDate,
+    );
+
     await invoicesRepository.insertHeader(tx, {
       id: body.id,
       outletId: body.outletId,
@@ -347,6 +363,8 @@ export async function createInvoice(body: CreateInvoiceBody) {
       attachments: body.attachments ?? [],
       salesOrderId: body.salesOrderId ?? null,
       amendsInvoiceId: body.amendsInvoiceId ?? null,
+      estimateId,
+      proformaInvoiceId,
       billDiscountReason: body.billDiscountReason ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
@@ -393,6 +411,10 @@ export async function createInvoice(body: CreateInvoiceBody) {
       };
     });
     await invoicesRepository.insertLines(tx, body.id, body.outletId, body.documentDate, lineRows);
+    if (estimateId) await markEstimateConvertedByInvoice(tx, estimateId, body.id, documentNumber);
+    if (proformaInvoiceId) {
+      await markProformaInvoiceConvertedByInvoice(tx, proformaInvoiceId, body.id, documentNumber);
+    }
     if (body.salesOrderId) await applyFulfilment(tx, body.salesOrderId, fulfilments);
 
     // A line billing a delivery challan already moved this stock when the
@@ -491,6 +513,19 @@ export async function createInvoice(body: CreateInvoiceBody) {
         tx,
         tenders.map((t) => ({ paymentId: t.id, invoiceId: body.id, amount: t.amount })),
       );
+      for (const t of tenders) {
+        await recordDocumentMoney(tx, {
+          accountId: t.mode === 'cash' ? null : (t.accountId ?? null),
+          amount: t.amount,
+          transactionType: 'sale',
+          sourceType: 'invoice_payment',
+          sourceId: t.id,
+          chequeNumber: t.mode === 'cheque' ? (t.reference ?? null) : null,
+          chequeDate: t.mode === 'cheque' ? body.issuedAt.slice(0, 10) : null,
+          note: t.reference ?? null,
+          occurredAt: body.issuedAt,
+        });
+      }
     }
     // What the customer already paid on the order counts toward this invoice. The khata
     // already nets it (the advance was a credit), so this changes no ledger entry; it is
@@ -689,6 +724,9 @@ export async function voidInvoice(id: string, reason: string) {
       reason,
       auth.userId,
     );
+    for (const t of voidedTenders) {
+      await voidDocumentMoney(tx, 'invoice_payment', t.id, 'sale');
+    }
 
     if (header.customerId) {
       const customerId = header.customerId;

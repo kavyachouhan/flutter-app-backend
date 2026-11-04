@@ -25,8 +25,9 @@ syncRouter.get('/changes', requirePermission('sync:read'), validate(pull), async
   res.json({ data: await syncService.pullChanges(query) });
 });
 
-// Always 200: the per-operation status is the contract. Idempotency-Key is
-// deliberately not used here — a batch is partially retryable.
+// Always 200: the per-operation status is the contract. There is no Idempotency-Key header —
+// a batch is partially retryable, so each operation carries its own key, its `opId`, which the
+// server stores with the operation's effects (operation_keys) and answers a repeat from.
 const push = { body: pushBody };
 syncRouter.post('/push', requirePermission('sync:write'), validate(push), async (req, res) => {
   const { body } = validated<typeof push>(req);

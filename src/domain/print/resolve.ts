@@ -152,6 +152,8 @@ function titleFor(kind: PrintDocumentKind, mode: TaxMode): string {
   if (kind === 'credit_note') return 'CREDIT NOTE';
   if (kind === 'payment_receipt') return 'RECEIPT';
   if (kind === 'estimate') return 'ESTIMATE';
+  // Preliminary, so it is never a tax invoice either.
+  if (kind === 'proforma_invoice') return 'PROFORMA INVOICE';
   // An order is a promise to supply, not a supply: it is never a tax invoice, whatever the tax mode.
   if (kind === 'sales_order') return 'SALE ORDER';
   return mode === 'gst' ? 'TAX INVOICE' : 'BILL OF SUPPLY';
@@ -255,7 +257,8 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
     });
   }
   const outstanding = t.grandTotal - t.amountPaid;
-  if (outstanding > 0) {
+  // An estimate or proforma invoice is not a sale: nothing is owed on it yet.
+  if (outstanding > 0 && input.kind !== 'estimate' && input.kind !== 'proforma_invoice') {
     tenders.push({
       label:
         input.kind === 'credit_note'
@@ -343,6 +346,8 @@ function labelForNumber(kind: PrintDocumentKind): string {
       return 'Receipt no.';
     case 'estimate':
       return 'Estimate no.';
+    case 'proforma_invoice':
+      return 'Proforma invoice no.';
     case 'sales_order':
       return 'Order no.';
     default:

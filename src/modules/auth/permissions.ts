@@ -45,6 +45,17 @@ export const PERMISSIONS = [
   // Cancelling or closing an order refunds its advance, which is money out.
   'sales_orders:cancel',
   'sales_orders:delete',
+  'estimates:read',
+  'estimates:create',
+  'estimates:update',
+  'estimates:delete',
+  // Turns an estimate into a sales order; creating that order needs sales_orders:create too.
+  'estimates:convert',
+  // A proforma invoice is invoiced from the till (invoices:create), so there is no convert permission.
+  'proforma_invoices:read',
+  'proforma_invoices:create',
+  'proforma_invoices:update',
+  'proforma_invoices:delete',
   'debit_notes:read',
   'debit_notes:create',
   'debit_notes:void',
@@ -55,6 +66,8 @@ export const PERMISSIONS = [
   'day_close:create',
   'stock:read',
   'stock:adjust',
+  'accounts:read',
+  'accounts:write',
   // Bulk import rewrites the price list wholesale, so it sits with the
   // owner/manager tier rather than with catalogue:write.
   'imports:read',
@@ -119,6 +132,12 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     // withheld because that reverses a payment.
     'sales_orders:read',
     'sales_orders:create',
+    // Quotes at the counter; changing, deleting or converting one is withheld.
+    'estimates:read',
+    'estimates:create',
+    // Writes proforma invoices at the counter; changing or deleting one is withheld.
+    'proforma_invoices:read',
+    'proforma_invoices:create',
     'payments:read',
     'payments:create',
     'credit_notes:read',
@@ -129,6 +148,9 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'day_close:read',
     'day_close:create',
     'stock:read',
+    // Read-only: picking which bank account a non-cash payment or expense
+    // moved through, at the till. Adding/editing accounts stays withheld.
+    'accounts:read',
     // Needed to price a customer correctly at the till. Writing a list and
     // approving a breach are both withheld — that is the point of the cap.
     'price_lists:read',

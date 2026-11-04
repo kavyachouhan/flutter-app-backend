@@ -18,7 +18,7 @@ import { discountApproval } from '../price-lists/price-lists.schemas.js';
 
 export const SALES_ORDER_STATUSES = ['open', 'partial', 'closed', 'cancelled'] as const;
 
-const orderLine = z
+export const orderLine = z
   .object({
     id: clientId,
     itemId: z.string().uuid().nullable().optional(),
@@ -37,9 +37,6 @@ const orderLine = z
     message: 'itemName is required without itemId',
     path: ['itemName'],
   });
-
-// Attachments use the shared shape in `lib/attachments.ts`: the same one every
-// other document takes, so an order's files look like a bill's.
 
 /** The order is stored whole; an edit replaces the same shape. */
 export const saleOrderBody = z.object({
@@ -90,7 +87,15 @@ export const saleOrderBody = z.object({
   }),
 });
 
-export const createSaleOrderBody = saleOrderBody.extend({ id: clientId });
+export const createSaleOrderBody = saleOrderBody.extend({
+  id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
+});
 export type CreateSaleOrderBody = z.infer<typeof createSaleOrderBody>;
 
 export const updateSaleOrderBody = saleOrderBody;

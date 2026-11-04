@@ -1,3 +1,4 @@
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
@@ -87,6 +88,17 @@ export function createReceipt(body: CreateReceiptBody) {
       tx,
       allocations.map((a) => ({ paymentId: body.id, invoiceId: a.invoiceId, amount: a.amount })),
     );
+    await recordDocumentMoney(tx, {
+      accountId: body.mode === 'cash' ? null : (body.accountId ?? null),
+      amount: body.amount,
+      transactionType: 'receipt',
+      sourceType: 'receipt',
+      sourceId: body.id,
+      chequeNumber: body.mode === 'cheque' ? (body.reference ?? null) : null,
+      chequeDate: body.mode === 'cheque' ? body.receivedAt.slice(0, 10) : null,
+      note: body.reference ?? null,
+      occurredAt: body.receivedAt,
+    });
     await customersRepository.insertLedgerEntries(tx, [
       {
         customerId: body.customerId,
@@ -144,6 +156,7 @@ export function voidReceipt(id: string, reason: string) {
     if (payment.status === 'void') return loadPayment(tx, id);
 
     await paymentsRepository.markVoid(tx, id, reason, auth.userId);
+    await voidDocumentMoney(tx, 'receipt', id, 'receipt');
     if (payment.customerId) {
       await customersRepository.insertLedgerEntries(tx, [
         {

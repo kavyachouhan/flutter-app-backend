@@ -11,6 +11,7 @@ import {
   paise,
   positivePaise,
   quantity,
+  requireAccountForNonCashMode,
   stateCode,
   supplyCategory,
   timestamp,
@@ -46,6 +47,8 @@ export const createPurchaseBillBody = z.object({
   supplierId: z.string().uuid(),
   purchaseOrderId: z.string().uuid().optional(),
   seriesId: z.string().uuid().optional(),
+  /** With `seriesId`: the number a device leased and used offline. */
+  sequenceNo: z.number().int().positive().optional(),
   documentDate: isoDate,
   /** The number printed on the supplier's own bill. */
   supplierInvoiceNo: nonEmpty.max(64),
@@ -111,25 +114,29 @@ export const voidPurchaseBillBody = z.object({ reason: nonEmpty.max(200) });
 
 // --- Supplier payments -----------------------------------------------------
 
-export const createSupplierPaymentBody = z.object({
-  id: clientId,
-  outletId: z.string().uuid(),
-  supplierId: z.string().uuid(),
-  mode: z.enum(['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque']),
-  amount: positivePaise,
-  reference: nonEmpty.max(100).optional(),
-  paidAt: timestamp,
-  notes: nonEmpty.max(200).optional(),
-  /**
-   * Which bills this settles. Omitting it leaves the payment on account,
-   * reducing the supplier's balance without being tied to a bill — which is
-   * what an advance is.
-   */
-  allocations: z
-    .array(z.object({ purchaseBillId: z.string().uuid(), amount: positivePaise }))
-    .max(200)
-    .optional(),
-});
+export const createSupplierPaymentBody = z
+  .object({
+    id: clientId,
+    outletId: z.string().uuid(),
+    supplierId: z.string().uuid(),
+    mode: z.enum(['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque']),
+    amount: positivePaise,
+    reference: nonEmpty.max(100).optional(),
+    paidAt: timestamp,
+    notes: nonEmpty.max(200).optional(),
+    /**
+     * Which bills this settles. Omitting it leaves the payment on account,
+     * reducing the supplier's balance without being tied to a bill — which is
+     * what an advance is.
+     */
+    allocations: z
+      .array(z.object({ purchaseBillId: z.string().uuid(), amount: positivePaise }))
+      .max(200)
+      .optional(),
+    /** Which Cash & Bank account this was paid from; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 export type CreateSupplierPaymentBody = z.infer<typeof createSupplierPaymentBody>;
 
 export const listSupplierPaymentsQuery = pageQuery.extend({
@@ -145,6 +152,12 @@ export const voidSupplierPaymentBody = z.object({ reason: nonEmpty.max(200) });
 
 export const createPurchaseOrderBody = z.object({
   id: clientId,
+  /**
+   * A device that made this offline numbers it from a block leased to it, as an invoice does:
+   * the series and sequence it used. Omitted, the server takes the next number.
+   */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
   outletId: z.string().uuid(),
   supplierId: z.string().uuid(),
   documentDate: isoDate,
@@ -171,7 +184,11 @@ export const createPurchaseOrderBody = z.object({
 export type CreatePurchaseOrderBody = z.infer<typeof createPurchaseOrderBody>;
 
 /** An edit replaces the order's header and lines, so it takes the create shape without the id. */
-export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({ id: true });
+export const updatePurchaseOrderBody = createPurchaseOrderBody.omit({
+  id: true,
+  seriesId: true,
+  sequenceNo: true,
+});
 export type UpdatePurchaseOrderBody = z.infer<typeof updatePurchaseOrderBody>;
 
 export const listPurchaseOrdersQuery =pageQuery.extend({

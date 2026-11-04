@@ -16,6 +16,9 @@ export const DEBIT_NOTE_REASONS = [
 export const createDebitNoteBody = z.object({
   id: clientId,
   purchaseBillId: z.string().uuid(),
+  /** A device that made this offline numbers it from a block leased to it. */
+  seriesId: z.string().uuid().optional(),
+  sequenceNo: z.number().int().positive().optional(),
   documentDate: isoDate,
   reasonCode: z.enum(DEBIT_NOTE_REASONS),
   /**

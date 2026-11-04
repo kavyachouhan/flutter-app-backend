@@ -12,12 +12,18 @@ import { describe, expect, it } from 'vitest';
 import type { TaxInvoiceResult } from '../../src/domain/tax/types.js';
 import {
   buildAccessVectors,
+  buildCostingVectors,
   buildNumberingVectors,
+  buildReturnsVectors,
   buildTaxVectors,
+  evaluateCostingCase,
   evaluateNumberingCase,
+  evaluateReturnsCase,
   evaluateTaxCase,
   type AccessVectorsFile,
+  type CostingVectorsFile,
   type NumberingVectorsFile,
+  type ReturnsVectorsFile,
   type TaxVectorsFile,
 } from './build.js';
 
@@ -74,6 +80,68 @@ describe('numbering contract vectors', () => {
 
   it('is byte-for-byte what the generator would write now', () => {
     expect(buildNumberingVectors()).toEqual(file);
+  });
+});
+
+describe('costing contract vectors', () => {
+  const file = load<CostingVectorsFile>('costing-vectors.json');
+
+  it('covers every operation, including the doubles-above-2^53 cases', () => {
+    const ops = new Set(file.cases.map((c) => c.op));
+    expect([...ops].sort()).toEqual(
+      ['apportionLandedCost', 'applyReceipt', 'costOfGoodsSold', 'dueDateFor', 'reverseReceipt'].sort(),
+    );
+    expect(file.cases.length).toBeGreaterThan(300);
+    expect(file.cases.some((c) => c.name.includes('2^53'))).toBe(true);
+  });
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateCostingCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildCostingVectors()).toEqual(file);
+  });
+
+  // Freight is split across the lines; whatever the basis, the shares must add up to it.
+  it('apportions exactly the freight it was given', () => {
+    for (const c of file.cases) {
+      if (c.op !== 'apportionLandedCost' || !('result' in c.expected)) continue;
+      if (c.input.lines.length === 0) continue;
+      const shares = (c.expected.result as { landedCostShare: number }[]).reduce(
+        (sum, l) => sum + l.landedCostShare,
+        0,
+      );
+      expect(shares, c.name).toBe(c.input.basis === 'none' ? 0 : c.input.additionalCost);
+    }
+  });
+});
+
+describe('returns contract vectors', () => {
+  const file = load<ReturnsVectorsFile>('returns-vectors.json');
+
+  it('covers refusals and every supply category', () => {
+    expect(file.cases.length).toBeGreaterThan(150);
+    expect(file.cases.filter((c) => 'error' in c.expected).length).toBeGreaterThanOrEqual(3);
+    const categories = new Set(file.cases.map((c) => c.input.sold.supplyCategory));
+    expect([...categories].sort()).toEqual(['exempt', 'nil_rated', 'non_gst', 'taxable']);
+  });
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateReturnsCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildReturnsVectors()).toEqual(file);
+  });
+
+  it('never loses the supply category of the line it reverses', () => {
+    for (const c of file.cases) {
+      if (!('result' in c.expected)) continue;
+      expect((c.expected.result as { supplyCategory: string }).supplyCategory, c.name).toBe(
+        c.input.sold.supplyCategory,
+      );
+    }
   });
 });
 

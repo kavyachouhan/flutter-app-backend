@@ -11,6 +11,7 @@ import {
   paise,
   positivePaise,
   quantity,
+  requireAccountForNonCashMode,
   stateCode,
   supplyCategory,
   timestamp,
@@ -61,13 +62,17 @@ export const additionalCharge = z.object({
 
 export const TENDER_MODES = ['cash', 'card', 'upi', 'wallet', 'bank_transfer', 'cheque'] as const;
 
-const tender = z.object({
-  id: clientId,
-  mode: z.enum(TENDER_MODES),
-  amount: positivePaise,
-  tenderedAmount: paise.optional(),
-  reference: nonEmpty.optional(),
-});
+const tender = z
+  .object({
+    id: clientId,
+    mode: z.enum(TENDER_MODES),
+    amount: positivePaise,
+    tenderedAmount: paise.optional(),
+    reference: nonEmpty.max(100).optional(),
+    /** Which Cash & Bank account this payment moved through; required unless mode is 'cash'. */
+    accountId: z.string().uuid().optional(),
+  })
+  .superRefine(requireAccountForNonCashMode);
 
 export const createInvoiceBody = z.object({
   id: clientId,
@@ -80,6 +85,16 @@ export const createInvoiceBody = z.object({
   customerId: z.string().uuid().nullable().optional(),
   /** Fulfils (part of) this sales order; lines name which order lines they cover. */
   salesOrderId: z.string().uuid().optional(),
+  /**
+   * Raised from this estimate. If it is still open it becomes converted in the same transaction;
+   * if not (already converted elsewhere, or gone) the link is dropped and the sale still issues.
+   */
+  estimateId: z.string().uuid().optional(),
+  /**
+   * Raised from this proforma invoice. Same rule as `estimateId`: converted if still open and in
+   * date, otherwise the link is dropped and the sale still issues.
+   */
+  proformaInvoiceId: z.string().uuid().optional(),
   /**
    * Replaces this invoice. The original must already be fully credited: an
    * amendment is a credit note for the whole of it plus this new invoice.

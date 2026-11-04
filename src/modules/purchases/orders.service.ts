@@ -23,7 +23,7 @@ import { outletsRepository } from '../outlets/outlets.repository.js';
 import { suppliersRepository } from '../suppliers/suppliers.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
-import { allocateNumber } from './numbering.js';
+import { numberForDocument } from './numbering.js';
 import { ordersRepository, type PurchaseOrderRow } from './orders.repository.js';
 import type {
   CreatePurchaseOrderBody,
@@ -64,11 +64,13 @@ export async function createPurchaseOrder(body: CreatePurchaseOrderBody) {
     const unknown = itemIds.filter((id) => !items.has(id));
     if (unknown.length > 0) throw new NotFoundError('Item', { details: { itemIds: unknown } });
 
-    const number = await allocateNumber(tx, {
+    const number = await numberForDocument(tx, {
       outletId: body.outletId,
       documentType: 'purchase_order',
       documentDate: body.documentDate,
       fyStartMonth: settings.fyStartMonth,
+      seriesId: body.seriesId,
+      sequenceNo: body.sequenceNo,
     });
 
     // Indicative only — the bill decides the real figure. Rounded through

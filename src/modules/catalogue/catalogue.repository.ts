@@ -234,15 +234,22 @@ export const catalogueRepository = {
    * index is what lets the same barcode be inserted again afterwards.
    */
   async replaceBarcodes(tx: Tx, itemId: string, barcodes: readonly string[]): Promise<void> {
+    const wanted = [...new Set(barcodes)];
+    // Only what changed: a barcode that stays keeps its row, so an item edit does not send every
+    // device a delete and a brand-new row for a barcode nobody touched.
     await tx.query(
-      'UPDATE item_barcodes SET deleted_at = now() WHERE item_id = $1 AND deleted_at IS NULL',
-      [itemId],
+      `UPDATE item_barcodes SET deleted_at = now()
+       WHERE item_id = $1 AND deleted_at IS NULL AND NOT (barcode = ANY($2::text[]))`,
+      [itemId, wanted],
     );
-    if (barcodes.length === 0) return;
+    if (wanted.length === 0) return;
     await tx.query(
       `INSERT INTO item_barcodes (id, tenant_id, item_id, barcode)
-       SELECT gen_random_uuid(), app.current_tenant_id(), $1, code FROM unnest($2::text[]) AS code`,
-      [itemId, [...new Set(barcodes)]],
+       SELECT gen_random_uuid(), app.current_tenant_id(), $1, code FROM unnest($2::text[]) AS code
+       WHERE NOT EXISTS (
+         SELECT 1 FROM item_barcodes b
+         WHERE b.item_id = $1 AND b.barcode = code AND b.deleted_at IS NULL)`,
+      [itemId, wanted],
     );
   },
 

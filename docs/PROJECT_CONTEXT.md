@@ -512,7 +512,11 @@ Entities in the feed: tenants, outlets, counters, memberships, subscriptions,
 categories, items, item_barcodes, customers, customer_balances, document_series,
 invoices, invoice_lines, credit_notes, credit_note_lines, payments,
 payment_allocations, customer_ledger_entries, stock_ledger_entries,
-stock_balances, held_bills, expense_categories, expenses, day_closes.
+stock_balances, held_bills, expense_categories, expenses, day_closes, terms_conditions,
+estimates, estimate_lines, proforma_invoices, proforma_invoice_lines, sales_orders, sales_order_lines,
+purchase_orders, purchase_order_lines, suppliers, supplier_balances. The `*_lines` tables carry
+`deletedAt`: an order edit hides a dropped line instead of deleting it, so the removal
+reaches every device (migration 0032).
 
 **Push.** Send up to `SYNC_PUSH_MAX_OPERATIONS` operations in outbox order:
 
@@ -554,7 +558,29 @@ header-scoped cache would make a partly failed batch non-retryable.
 Operation types: `invoice.create|void|printed`, `credit_note.create|void|printed`,
 `payment.create|void`, `customer.create|update`, `item.create|update`,
 `category.create|update`, `stock.adjust`, `held_bill.upsert|release`,
-`expense.create|void`, `day_close.create`.
+`expense.create|void`, `day_close.create`, `estimate.create|update|delete|cancel|close|convert`,
+`proforma_invoice.create|update|delete|cancel|close`,
+`sale_order.create|update|delete|cancel|close`, `purchase_order.create|update|delete|cancel`,
+`supplier.create|update|delete`.
+
+**Offline documents.** Estimates, proforma invoices, sale orders and purchase orders are numbered on the
+phone from leased blocks, like invoices: the create payload carries `seriesId` and
+`sequenceNo` (and `estimate.convert` carries them for the new order, plus `lineIds` so
+the phone and server agree on the order's line ids; a proforma invoice has no convert operation,
+it is converted by the `invoice.create` that carries `proformaInvoiceId`). Without them the REST create
+still allocates a number on the server. Blocks for the `EST`, `PI`, `SO` and `PO` series are
+leased on pull only to a device whose plan has the feature and whose role may create
+the document. A pushed order whose discount is over policy is accepted with a warning
+(the person already agreed it offline), not refused as on REST.
+
+**Offers and expiry (estimates, proforma invoices).** Migration `0033_proforma_invoices.sql` adds
+`proforma_invoices` / `proforma_invoice_lines`, `invoices.proforma_invoice_id`, and widens the
+`document_series` and T&C type checks. "Expired" is derived, never stored, by
+`src/modules/sales-docs/expiry.ts` (`isExpired`, `effectiveStatus`, `todayIn`): open and `validUntil`
+before the shop's today. The list filter and summary treat an expired offer as closed, and the invoice
+claim (`claimEstimateForInvoice`, `claimProformaInvoiceForInvoice`) judges validity on the invoice's
+`documentDate` and drops a stale link rather than refusing the sale. The new `proforma_invoices:*`
+permissions mirror the estimate ones (cashier: read and create) and reuse the `sales_orders` plan feature.
 
 ### 4.14 Audit and health
 

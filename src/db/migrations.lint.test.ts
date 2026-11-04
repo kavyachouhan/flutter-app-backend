@@ -1,6 +1,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  FIRST_STRICT_MIGRATION,
+  tenantTableProblems,
+  unapprovedDestructive,
+} from './migration-lint.js';
 
 /**
  * Rules a new migration must follow, found out the hard way.
@@ -41,7 +46,14 @@ describe('migrations from 0023 on', () => {
       expect(statements.endsWith('SELECT app.grant_runtime_privileges();')).toBe(true);
     });
 
+    const strict = Number(/^(\d+)_/.exec(file)?.[1]) >= FIRST_STRICT_MIGRATION;
+
     it(`${file} sets up every tenant table it creates`, () => {
+      if (strict) {
+        // From 0035: setup_tenant_table, or an explicit opt-out with hand-written RLS.
+        expect(tenantTableProblems(sql)).toEqual([]);
+        return;
+      }
       const created = [...sql.matchAll(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?([a-z_]+)\s*\(/gi)].map(
         (m) => m[1],
       );
@@ -52,6 +64,14 @@ describe('migrations from 0023 on', () => {
         ).toBe(true);
       }
     });
+
+    if (strict) {
+      it(`${file} removes or rewrites no existing data without saying so`, () => {
+        // Drops, deletes, un-WHERE'd updates, renames and type changes each need an explicit
+        // `-- destructive-ok: <KIND> — <reason>` line, so a reviewer sees the decision.
+        expect(unapprovedDestructive(sql)).toEqual([]);
+      });
+    }
 
     it(`${file} never edits an earlier migration's objects destructively without saying so`, () => {
       // A DROP TABLE or TRUNCATE in a forward-only migration loses data; it must be a decision.

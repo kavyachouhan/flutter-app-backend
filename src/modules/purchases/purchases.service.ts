@@ -22,6 +22,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
+import { recordDocumentMoney, voidDocumentMoney } from '../accounts/accounts.service.js';
 import { assertAttachments, checkAttachments } from '../../lib/attachments.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { apportionLandedCost } from '../../domain/costing/landed-cost.js';
@@ -51,7 +52,8 @@ import {
 } from '../suppliers/suppliers.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
-import { allocateNumber } from './numbering.js';
+import { dueDateFor } from '../../domain/purchases/due-date.js';
+import { numberForDocument } from './numbering.js';
 import { ordersRepository } from './orders.repository.js';
 import { assertReceiptFits } from './orders.service.js';
 import { purchasesRepository, type PurchaseBillLineInsert } from './purchases.repository.js';
@@ -119,12 +121,13 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const itcCategory = itcEligible ? (body.itcCategory ?? 'inputs') : 'ineligible';
     const itcIneligibleReason = itcEligible ? null : (body.itcIneligibleReason ?? null);
 
-    const number = await allocateNumber(tx, {
+    const number = await numberForDocument(tx, {
       outletId: body.outletId,
       documentType: 'purchase_bill',
       documentDate: body.documentDate,
       fyStartMonth: settings.fyStartMonth,
       seriesId: body.seriesId,
+      sequenceNo: body.sequenceNo,
     });
 
     const duplicate = await purchasesRepository.findBySupplierInvoice(
@@ -427,14 +430,6 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
   return result;
 }
 
-/** Supplier terms decide the due date unless the bill states one. */
-function dueDateFor(documentDate: string, termsDays: number | null): string | null {
-  if (termsDays === null) return null;
-  const date = new Date(`${documentDate}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + termsDays);
-  return date.toISOString().slice(0, 10);
-}
-
 export function getPurchaseBill(id: string) {
   return withReadTransaction(async (tx) => {
     const bill = await loadBill(tx, id);
@@ -654,6 +649,18 @@ export function createSupplierPayment(body: CreateSupplierPaymentBody) {
       );
     }
 
+    await recordDocumentMoney(tx, {
+      accountId: body.mode === 'cash' ? null : (body.accountId ?? null),
+      amount: -body.amount,
+      transactionType: 'supplier_payment',
+      sourceType: 'supplier_payment',
+      sourceId: body.id,
+      chequeNumber: body.mode === 'cheque' ? (body.reference ?? null) : null,
+      chequeDate: body.mode === 'cheque' ? body.paidAt.slice(0, 10) : null,
+      note: body.notes ?? body.reference ?? null,
+      occurredAt: body.paidAt,
+    });
+
     // The full amount hits the ledger whether or not it was allocated: an
     // unallocated payment is an advance, and it still reduces what is owed.
     await suppliersRepository.insertLedgerEntries(tx, [
@@ -705,6 +712,7 @@ export function voidSupplierPayment(id: string, reason: string) {
     if (payment.status === 'void') return payment;
 
     await purchasesRepository.markPaymentVoid(tx, id, reason, auth.userId);
+    await voidDocumentMoney(tx, 'supplier_payment', id, 'supplier_payment');
     await suppliersRepository.insertLedgerEntries(tx, [
       {
         supplierId: payment.supplierId,
