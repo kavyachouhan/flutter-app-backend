@@ -21,7 +21,7 @@ export async function salesSummary(tx: Tx, params: ReportParams): Promise<Report
       SELECT i.document_date AS "date",
              count(*)::int AS "billCount",
              SUM(i.taxable_amount)::bigint AS "taxableAmount",
-             SUM(i.total_tax)::bigint AS "taxAmount",
+             SUM(CASE WHEN i.is_reverse_charge THEN 0 ELSE i.total_tax END)::bigint AS "taxAmount",
              SUM(i.line_discount_total + i.bill_discount_amount)::bigint AS "discount",
              SUM(i.grand_total)::bigint AS "grandTotal"
       FROM invoices i
@@ -59,7 +59,7 @@ export async function billRegister(tx: Tx, params: ReportParams): Promise<Report
            COALESCE(i.customer_name, 'Walk-in') AS "customer",
            i.customer_gstin AS "customerGstin",
            i.taxable_amount AS "taxableAmount",
-           i.total_tax AS "taxAmount",
+           CASE WHEN i.is_reverse_charge THEN 0 ELSE i.total_tax END AS "taxAmount",
            i.grand_total AS "grandTotal",
            i.status
     FROM invoices i
@@ -84,7 +84,7 @@ export async function itemWiseSales(tx: Tx, params: ReportParams): Promise<Repor
            cat.name AS "category",
            SUM(l.quantity)::bigint AS "quantity",
            SUM(l.taxable_amount)::bigint AS "taxableAmount",
-           SUM(l.cgst + l.sgst + l.igst + l.cess)::bigint AS "taxAmount",
+           SUM(CASE WHEN i.is_reverse_charge THEN 0 ELSE l.cgst + l.sgst + l.igst + l.cess END)::bigint AS "taxAmount",
            SUM(l.line_total)::bigint AS "lineTotal",
            SUM(l.line_discount + l.bill_discount_share)::bigint AS "discount"
     FROM invoice_lines l

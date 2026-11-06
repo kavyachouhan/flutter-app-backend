@@ -356,7 +356,8 @@ export const gstRepository = {
   ): Promise<{ taxableAmount: number; tax: number }[]> {
     return tx.many(
       `SELECT SUM(l.taxable_amount)::bigint AS "taxableAmount",
-              SUM(round(l.taxable_amount * (l.tax_rate_percent + l.cess_rate_percent) / 100))::bigint
+              SUM(CASE WHEN l.cgst + l.sgst + l.igst + l.cess > 0 THEN l.cgst + l.sgst + l.igst + l.cess
+                       ELSE round(l.taxable_amount * (l.tax_rate_percent + l.cess_rate_percent) / 100) END)::bigint
                 AS tax
        FROM purchase_bill_lines l
        JOIN purchase_bills b ON b.id = l.purchase_bill_id

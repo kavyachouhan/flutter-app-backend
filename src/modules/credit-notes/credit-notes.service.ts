@@ -8,6 +8,7 @@ import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import { deriveReturnLine } from '../../domain/tax/returns.js';
 import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
@@ -174,7 +175,7 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
         // reverse-charge supply carries no tax for the same reason the invoice
         // did not — GSTR-1 reports the pair together.
         supplyType: invoice['supplyType'] as SupplyType,
-        isReverseCharge: invoice['isReverseCharge'] as boolean,
+        taxPayableBy: taxPayableByFor(invoice['isReverseCharge'] as boolean),
         pricesIncludeTax: invoice['pricesIncludeTax'] as boolean,
         roundOff: invoice['roundOffEnabled'] as boolean,
         lines: taxInput,

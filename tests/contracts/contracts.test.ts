@@ -16,6 +16,9 @@ import {
   buildGstinVectors,
   buildRegistrationVectors,
   buildRuleSetVectors,
+  buildTosVectors,
+  evaluateTosCase,
+  type TosVectorsFile,
   evaluateEntityCase,
   evaluateGstinCase,
   evaluateRegistrationCase,
@@ -71,12 +74,44 @@ describe('tax-engine contract vectors', () => {
       if (!('result' in c.expected)) continue;
       const r = c.expected.result as TaxInvoiceResult;
       const lineSum = r.lines.reduce((acc, l) => acc + l.lineTotal, 0);
+      if (r.taxPayableBy === 'recipient') {
+        // The tax is the recipient's: the document is its value and nothing more.
+        expect(lineSum + r.taxableCharges + r.nonTaxableCharges + r.roundOff, c.name).toBe(r.grandTotal);
+        continue;
+      }
       const lineTax = r.lines.reduce((acc, l) => acc + l.cgst + l.sgst + l.igst + l.cess, 0);
       const chargeTax = r.totalTax - lineTax;
       expect(
         lineSum + r.taxableCharges + chargeTax + r.nonTaxableCharges + r.roundOff,
         c.name,
       ).toBe(r.grandTotal);
+    }
+  });
+});
+
+describe('rounding policy (D4), on every tax vector', () => {
+  const file = load<TaxVectorsFile>('tax-vectors.json');
+  const results = file.cases.flatMap((c) =>
+    'result' in c.expected ? [{ name: c.name, input: c.input, r: c.expected.result as TaxInvoiceResult }] : [],
+  );
+
+  it('always splits intra-state tax into equal halves and IGST into two of them', () => {
+    for (const { name, r } of results) {
+      for (const l of r.lines) {
+        expect(l.cgst, name).toBe(l.sgst);
+        expect(l.igst % 2, name).toBe(0);
+        expect(l.igst > 0 && l.cgst > 0, name).toBe(false);
+      }
+    }
+  });
+
+  it('makes every tax-inclusive line total exactly what the customer was quoted', () => {
+    for (const { name, input, r } of results) {
+      if (!input.pricesIncludeTax || r.taxPayableBy === 'recipient' || r.mode !== 'gst') continue;
+      for (const l of r.lines) {
+        expect(l.lineTotal, name).toBe(l.grossAmount - l.lineDiscount - l.apportionedBillDiscount);
+        expect(l.taxableAmount, name).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 });
@@ -225,5 +260,17 @@ describe('gst entity contract vectors', () => {
 
   it('is byte-for-byte what the generator would write now', () => {
     expect(buildEntityVectors()).toEqual(file);
+  });
+});
+
+describe('gst time-of-supply contract vectors', () => {
+  const file = load<TosVectorsFile>('tos-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateTosCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildTosVectors()).toEqual(file);
   });
 });

@@ -38,7 +38,7 @@ export async function dailyProfitAndLoss(tx: Tx, params: ReportParams): Promise<
     WITH sales AS (
       SELECT i.document_date AS "date",
              SUM(i.taxable_amount)::bigint AS "netSales",
-             SUM(i.total_tax)::bigint AS "taxCollected"
+             SUM(CASE WHEN i.is_reverse_charge THEN 0 ELSE i.total_tax END)::bigint AS "taxCollected"
       FROM invoices i
       WHERE i.status = 'issued' AND ${outletScope(p, 'i', params)} AND ${dateRange(p, 'i.document_date', params)}
       GROUP BY 1

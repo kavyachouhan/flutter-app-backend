@@ -697,7 +697,7 @@ Dated entries also carry `effectiveFrom: IsoDate` and `effectiveTo: IsoDate | nu
 - Zero rating is **not** a taxability value: it comes from the supply type (export / SEZ), as today.
 
 **Other keys:**
-- `ThresholdKey`: `einvoice_aato`, `irn_30day_aato`, `hsn_6digit_aato`, `b2cl_invoice_value`, `rule46_unregistered_taxable`, `ewb_interstate_value`.
+- `ThresholdKey`: `einvoice_aato`, `irn_30day_aato`, `hsn_6digit_aato`, `b2cl_invoice_value`, `rule46_unregistered_taxable`, `ewb_interstate_value`, and (added in A1) the time-of-supply day limits `tos_service_invoice_days`, `tos_rcm_goods_days`, `tos_rcm_services_days`.
 - `ValidationCheckKey` and `TaxRateConditionKey` values are fixed in code, one function each. The rule set only switches them on, sets parameters and sets enforcement.
 
 ### 6.3 HSN/SAC master — descriptive only

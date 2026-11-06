@@ -19,7 +19,7 @@ describe('tenant isolation', () => {
 
   beforeAll(async () => {
     a = await createTenant({ name: 'Shop A', stateCode: '27' });
-    b = await createTenant({ name: 'Shop B', stateCode: '29', gstin: '29AAAPA1234A1ZP' });
+    b = await createTenant({ name: 'Shop B', stateCode: '29' });
 
     itemAId = randomUUID();
     await a

@@ -6,14 +6,18 @@
  *   1. line gross = unitPrice × quantity
  *   2. line discount
  *   3. bill discount, apportioned by post-line-discount value (largest remainder)
- *   4. back tax out of inclusive prices: taxable = net × 100 / (100 + rate + cess)
- *   5. tax per line; CGST/SGST halves intra-state, IGST inter-state
- *   6. additional charges
- *   7. round-off to the rupee, reported separately
+ *   4. tax heads per line (`computeHeads`, the only place tax is worked out)
+ *   5. additional charges
+ *   6. round-off to the rupee, reported separately
  *
- * Rounding is half away from zero, once per line, and totals are summed from
- * rounded lines. Rounding the total independently leaves printed lines that do
- * not add up to the printed total.
+ * Rounding (D4) is half away from zero, once per line, and totals are summed
+ * from rounded lines. Rounding the total independently leaves printed lines
+ * that do not add up to the printed total. Each half of the tax is rounded once,
+ * so CGST always equals SGST and IGST is exactly twice a half: moving a sale
+ * across a state border never changes what it costs.
+ *
+ * Which rates exist and when is not decided here: `TaxEngineRules` is supplied
+ * by the caller from the dated GST rule set, so a new notification is data.
  */
 import {
   distribute,
@@ -35,6 +39,7 @@ import type {
   TaxInvoiceInput,
   TaxInvoiceResult,
   TaxLineResult,
+  TaxPayableBy,
   TaxRateSummary,
 } from './types.js';
 
@@ -75,19 +80,41 @@ function supplyTypeChargesTax(supplyType: SupplyType): boolean {
   return supplyType !== 'export_without_tax' && supplyType !== 'sez_without_tax';
 }
 
-/** The odd paisa goes to CGST. The rule must match the client and every credit note. */
-function splitCgstSgst(tax: number): { cgst: number; sgst: number } {
-  const cgst = roundHalfAwayFromZero(tax / 2);
-  return { cgst, sgst: tax - cgst };
+interface TaxHeads {
+  readonly taxable: number;
+  readonly cgst: number;
+  readonly sgst: number;
+  readonly igst: number;
+  readonly cess: number;
 }
 
-function extractTaxable(
-  inclusive: number,
+/**
+ * The single statement of how tax is computed (D4), used by lines and charges.
+ *
+ * Exclusive: the amount is the taxable value and tax goes on top.
+ * Inclusive: the amount is what the customer pays, so taxable value takes up
+ * whatever rounding is left. A line therefore always totals its shelf price.
+ */
+function computeHeads(
+  amount: number,
   taxRatePercent: number,
   cessRatePercent: number,
-): number {
-  const totalRate = taxRatePercent + cessRatePercent;
-  return totalRate === 0 ? inclusive : roundHalfAwayFromZero((inclusive * 100) / (100 + totalRate));
+  inclusive: boolean,
+  supplyType: SupplyType,
+): TaxHeads {
+  const base = inclusive
+    ? roundHalfAwayFromZero((amount * 100) / (100 + taxRatePercent + cessRatePercent))
+    : amount;
+  const half = percentOf(base, taxRatePercent / 2);
+  const cess = percentOf(base, cessRatePercent);
+  const intra = isIntraState(supplyType);
+  return {
+    taxable: inclusive ? amount - 2 * half - cess : amount,
+    cgst: intra ? half : 0,
+    sgst: intra ? half : 0,
+    igst: intra ? 0 : 2 * half,
+    cess,
+  };
 }
 
 function assertRate(rate: number, rules: TaxEngineRules, details: Record<string, unknown>): void {
@@ -124,20 +151,29 @@ function validateInput(input: TaxInvoiceInput, rules: TaxEngineRules): void {
     }
   }
 
-  // An export or SEZ supply leaves the state, so a declared one that resolves
-  // intra-state means the place of supply and the declaration disagree — and
-  // whichever is wrong, the return would be too.
-  if (
-    input.supplyType &&
-    input.supplyType !== 'intra_state' &&
-    input.supplyType !== 'inter_state' &&
-    resolveSupplyType(input.supplierStateCode, input.placeOfSupplyStateCode) === 'intra_state' &&
-    input.placeOfSupplyStateCode !== undefined
-  ) {
-    throw new ValidationError(
-      'An export or SEZ supply cannot have a place of supply in the supplier state.',
-      { details: { supplyType: input.supplyType, placeOfSupply: input.placeOfSupplyStateCode } },
-    );
+  assertSupplyTypeConsistent(input);
+}
+
+/**
+ * A declared supply type must agree with the place of supply, or the return would
+ * be wrong whichever of the two is. A supply to an SEZ is exempt from this: it is
+ * inter-state by law wherever the SEZ is (IGST Act s.7(5)(b)), including the
+ * supplier's own state.
+ */
+function assertSupplyTypeConsistent(input: TaxInvoiceInput): void {
+  const declared = input.supplyType;
+  if (!declared || declared === 'sez_with_tax' || declared === 'sez_without_tax') return;
+  const pos = input.placeOfSupplyStateCode;
+  const sameState = pos === undefined || pos === input.supplierStateCode;
+  const details = { supplyType: declared, placeOfSupply: pos };
+  if (declared === 'intra_state' && !sameState) {
+    throw new ValidationError('An intra-state supply must have a place of supply in the supplier state.', { details });
+  }
+  if (declared === 'inter_state' && sameState) {
+    throw new ValidationError('An inter-state supply must have a place of supply in another state.', { details });
+  }
+  if ((declared === 'export_with_tax' || declared === 'export_without_tax') && pos === input.supplierStateCode) {
+    throw new ValidationError('An export cannot have a place of supply in the supplier state.', { details });
   }
 }
 
@@ -156,6 +192,16 @@ function computeCharge(
   taxesApply: boolean,
   rules: TaxEngineRules,
 ): ChargeResult {
+  if (!Number.isSafeInteger(charge.amount)) {
+    throw new ValidationError(`Additional charge "${charge.label}" must be a whole number of paise.`, {
+      details: { chargeId: charge.id },
+    });
+  }
+  if (!Number.isSafeInteger(charge.amount)) {
+    throw new ValidationError(`Additional charge "${charge.label}" must be a whole number of paise.`, {
+      details: { chargeId: charge.id },
+    });
+  }
   if (!charge.taxable || !taxesApply) {
     return { taxable: false, taxRatePercent: 0, amount: charge.amount, cgst: 0, sgst: 0, igst: 0 };
   }
@@ -169,16 +215,8 @@ function computeCharge(
   }
   assertRate(charge.taxRatePercent, rules, { chargeId: charge.id });
 
-  const tax = percentOf(charge.amount, charge.taxRatePercent);
-  const { cgst, sgst } = supplyType === 'intra_state' ? splitCgstSgst(tax) : { cgst: 0, sgst: 0 };
-  return {
-    taxable: true,
-    taxRatePercent: charge.taxRatePercent,
-    amount: charge.amount,
-    cgst,
-    sgst,
-    igst: isIntraState(supplyType) ? 0 : tax,
-  };
+  const { cgst, sgst, igst } = computeHeads(charge.amount, charge.taxRatePercent, 0, false, supplyType);
+  return { taxable: true, taxRatePercent: charge.taxRatePercent, amount: charge.amount, cgst, sgst, igst };
 }
 
 export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): TaxInvoiceResult {
@@ -186,12 +224,12 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
 
   const supplyType =
     input.supplyType ?? resolveSupplyType(input.supplierStateCode, input.placeOfSupplyStateCode);
-  // Three independent reasons a document carries no tax: the shop is not a
-  // regular registered dealer, the supply is zero-rated, or the recipient
-  // pays under reverse charge. Values are still reported in every case.
-  const isReverseCharge = input.isReverseCharge ?? false;
-  const taxesApply =
-    input.mode === 'gst' && supplyTypeChargesTax(supplyType) && !isReverseCharge;
+  // Two reasons no tax arises: the shop is not a regular registered dealer, or
+  // the supply is zero-rated. Reverse charge is different: tax arises but the
+  // recipient pays it, so it is computed and left out of what the document asks for.
+  const taxPayableBy: TaxPayableBy = input.taxPayableBy ?? 'supplier';
+  const supplierPays = taxPayableBy === 'supplier';
+  const taxesApply = input.mode === 'gst' && supplyTypeChargesTax(supplyType);
 
   const grossAmounts = input.lines.map((line) => lineAmount(line.unitPrice, line.quantity));
   const lineDiscounts = input.lines.map((line, i) =>
@@ -212,11 +250,16 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
     const taxRate = lineTaxesApply ? line.taxRatePercent : 0;
     const cessRate = lineTaxesApply ? (line.cessRatePercent ?? 0) : 0;
 
-    const taxableAmount = input.pricesIncludeTax ? extractTaxable(net, taxRate, cessRate) : net;
-    const tax = percentOf(taxableAmount, taxRate);
-    const cess = percentOf(taxableAmount, cessRate);
-    const { cgst, sgst } = isIntraState(supplyType) ? splitCgstSgst(tax) : { cgst: 0, sgst: 0 };
-    const igst = isIntraState(supplyType) ? 0 : tax;
+    // A price cannot contain tax the supplier does not collect, so reverse-charge
+    // amounts are taxable value even on a tax-inclusive document.
+    const inclusive = input.pricesIncludeTax && supplierPays;
+    const {
+      taxable: taxableAmount,
+      cgst,
+      sgst,
+      igst,
+      cess,
+    } = computeHeads(net, taxRate, cessRate, inclusive, supplyType);
 
     return {
       id: line.id,
@@ -230,7 +273,7 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
       sgst,
       igst,
       cess,
-      lineTotal: taxableAmount + cgst + sgst + igst + cess,
+      lineTotal: supplierPays ? taxableAmount + cgst + sgst + igst + cess : taxableAmount,
       hsnCode: line.hsnCode,
       supplyCategory,
     };
@@ -248,7 +291,7 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
   const totalCess = sum(lines.map((l) => l.cess));
   const totalTax = totalCgst + totalSgst + totalIgst + totalCess;
   const taxableAmount = sum(lines.map((l) => l.taxableAmount)) + taxableCharges;
-  const subTotal = taxableAmount + totalTax + nonTaxableCharges;
+  const subTotal = taxableAmount + (supplierPays ? totalTax : 0) + nonTaxableCharges;
 
   const { rounded, adjustment } = input.roundOff
     ? roundToNearestRupee(subTotal)
@@ -279,7 +322,8 @@ export function computeInvoice(input: TaxInvoiceInput, rules: TaxEngineRules): T
       lines,
     ),
     categoryTotals: buildCategoryTotals(lines),
-    isReverseCharge,
+    taxPayableBy,
+    isReverseCharge: !supplierPays,
   };
 }
 

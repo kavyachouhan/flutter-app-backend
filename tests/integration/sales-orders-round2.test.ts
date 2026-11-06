@@ -890,10 +890,10 @@ describe('parity with invoices', () => {
   it('supports reverse charge and additional charges', async () => {
     // A line id belongs to one order for ever, so each order gets its own lines.
     const lines = () => [orderLine({ itemId, quantity: 2000, unitPrice: 10_000 })];
-    // Reverse charge: the value is reported but the order carries no tax.
+    // Reverse charge: the tax is computed for the buyer to pay, and left out of the total.
     const rc = await createOrder(t, lines(), { isReverseCharge: true }, {
       taxableAmount: 20_000,
-      totalTax: 0,
+      totalTax: 3600,
       grandTotal: 20_000,
     });
     expect(rc.grandTotal).toBe(20_000);

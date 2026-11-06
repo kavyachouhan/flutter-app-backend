@@ -262,6 +262,10 @@ export const THRESHOLD_KEYS = [
   'b2cl_invoice_value',
   'rule46_unregistered_taxable',
   'ewb_interstate_value',
+  // Statutory day limits used by the time-of-supply resolver.
+  'tos_service_invoice_days',
+  'tos_rcm_goods_days',
+  'tos_rcm_services_days',
 ] as const;
 export type ThresholdKey = (typeof THRESHOLD_KEYS)[number];
 

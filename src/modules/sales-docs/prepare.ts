@@ -13,6 +13,7 @@ import type { Tx } from '../../db/tx.js';
 import { capBreaches, type CapBreach } from '../../domain/pricing/resolve.js';
 import { costOfGoodsSold } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import type {
   AdditionalCharge,
   Discount,
@@ -106,7 +107,7 @@ export function computeSaleTotals(input: SaleTotalsInput): TaxInvoiceResult {
       supplierStateCode: outlet.stateCode ?? settings.stateCode,
       placeOfSupplyStateCode: input.placeOfSupplyStateCode ?? customer?.stateCode ?? undefined,
       supplyType: input.supplyType,
-      isReverseCharge: input.isReverseCharge,
+      taxPayableBy: taxPayableByFor(input.isReverseCharge),
       pricesIncludeTax: input.pricesIncludeTax,
       roundOff: input.roundOff,
       billDiscount: input.billDiscount,

@@ -128,6 +128,7 @@ export function manualTotals(mode: TaxMode, amount: number): TaxInvoiceResult {
     taxSummary: [],
     hsnSummary: [],
     categoryTotals: { taxable: amount, exempt: 0, nilRated: 0, nonGst: 0 },
+    taxPayableBy: 'supplier',
     isReverseCharge: false,
   };
 }

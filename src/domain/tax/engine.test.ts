@@ -57,10 +57,25 @@ describe('basic GST', () => {
     });
   });
 
-  it('gives the odd paisa to CGST so the halves sum to the tax', () => {
-    // 3333 at 5% = 166.65 -> 167
+  it('rounds each half once, so CGST always equals SGST', () => {
     const result = compute(invoice({ lines: [line({ unitPrice: 3333, taxRatePercent: 5 })] }));
-    expect([result.totalCgst, result.totalSgst]).toEqual([84, 83]);
+    expect([result.totalCgst, result.totalSgst]).toEqual([83, 83]);
+    expect(result.totalTax).toBe(166);
+  });
+
+  it('keeps a tax-inclusive line at exactly its shelf price', () => {
+    const result = compute(
+      invoice({ pricesIncludeTax: true, lines: [line({ unitPrice: 10000, taxRatePercent: 18 })] }),
+    );
+    expect(result.lines[0]).toMatchObject({ taxableAmount: 8474, cgst: 763, sgst: 763, lineTotal: 10000 });
+    expect(result.grandTotal).toBe(10000);
+  });
+
+  it('allows a supply to an SEZ in the supplier state, under IGST', () => {
+    const result = compute(
+      invoice({ supplyType: 'sez_with_tax', placeOfSupplyStateCode: '27', lines: [line({ taxRatePercent: 18 })] }),
+    );
+    expect(result).toMatchObject({ totalCgst: 0, totalIgst: 1800 });
   });
 });
 
@@ -276,15 +291,16 @@ describe('summaries and consistency', () => {
     ).toBe(result.taxableAmount);
   });
 
-  it('charges no tax under reverse charge but still reports the value', () => {
+  it('computes reverse-charge tax but leaves it out of what the document asks for', () => {
     const result = compute(
-      invoice({ isReverseCharge: true, lines: [line({ taxRatePercent: 18 })] }),
+      invoice({ taxPayableBy: 'recipient', lines: [line({ taxRatePercent: 18 })] }),
     );
-    expect(result.totalTax).toBe(0);
+    expect(result.totalTax).toBe(1800);
     expect(result.taxableAmount).toBe(10000);
+    expect(result.lines[0]?.lineTotal).toBe(10000);
+    expect(result.grandTotal).toBe(10000);
+    expect(result.taxPayableBy).toBe('recipient');
     expect(result.isReverseCharge).toBe(true);
-    // The rate stays on the line: the recipient computes its liability from it.
-    expect(result.lines[0]?.taxRatePercent).toBe(18);
   });
 
   it('puts tax under IGST for an export with payment and none without', () => {
@@ -318,7 +334,7 @@ describe('summaries and consistency', () => {
           lines: [line({})],
         }),
       ),
-    ).toThrow(/export or SEZ/);
+    ).toThrow(/An export cannot/);
   });
 
   it('has line totals plus round-off equal to the grand total', () => {

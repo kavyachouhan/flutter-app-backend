@@ -8,6 +8,7 @@ import type { EinvoiceDocumentKind, EntityFacts } from '../../src/domain/gst/ent
 import type { GstTreatment } from '../../src/domain/gst/enums.js';
 import { gstinCheckCharacter } from '../../src/domain/gst/gstin.js';
 import type { RegistrationFacts } from '../../src/domain/gst/registration.js';
+import type { TaxPointFacts, TaxPointKind } from '../../src/domain/gst/time-of-supply.js';
 import type { GstRuleSet, GstRuleSetContent, LineRateInput } from '../../src/domain/gst/rule-set.js';
 import type { SupplyType } from '../../src/domain/tax/types.js';
 import { Rng } from './prng.js';
@@ -63,6 +64,9 @@ function content(variant: 'base' | 'gst2' | 'nov26' | 'nov26fix'): GstRuleSetCon
       { key: 'b2cl_invoice_value', value: 2.5 * LAKH, ...span('2017-07-01', '2024-08-01'), ...ref },
       { key: 'rule46_unregistered_taxable', value: 50_000 * 100, ...span('2017-07-01'), ...ref },
       { key: 'ewb_interstate_value', value: 50_000 * 100, ...span('2018-04-01'), ...ref },
+      { key: 'tos_service_invoice_days', value: 30, ...span('2017-07-01'), ...ref },
+      { key: 'tos_rcm_goods_days', value: 30, ...span('2017-07-01'), ...ref },
+      { key: 'tos_rcm_services_days', value: 60, ...span('2017-07-01'), ...ref },
     ],
     stateCodes: [
       { code: '04', name: 'Chandigarh', isUnionTerritoryWithoutLegislature: true },
@@ -448,5 +452,66 @@ export function entityCases(): EntityCase[] {
     h('HSN: at or below ₹5 cr, B2C optional', 'small', 'b2c'),
     h('HSN: unknown turnover treated as small', 'unknown', 'b2b'),
     h('HSN: only the preceding FY counts', 'crossed-once-long-ago', 'b2b'),
+  ];
+}
+
+// --- Time of supply ----------------------------------------------------------------
+
+export type TosCase =
+  | {
+      readonly name: string;
+      readonly op: 'resolveTaxPoint';
+      readonly input: { readonly facts: TaxPointFacts; readonly kind: TaxPointKind; readonly ruleSetVersion: string };
+    }
+  | { readonly name: string; readonly op: 'supplierReportedTaxPoint'; readonly input: { readonly date: string } }
+  | { readonly name: string; readonly op: 'rateChangeDates'; readonly input: { readonly ruleSetVersion: string } }
+  | { readonly name: string; readonly op: 'addDays'; readonly input: { readonly date: string; readonly days: number } };
+
+export function tosCases(): TosCase[] {
+  const V = '2026-11-01.2';
+  const t = (name: string, kind: TaxPointKind, facts: TaxPointFacts): TosCase => ({
+    name,
+    op: 'resolveTaxPoint',
+    input: { facts, kind, ruleSetVersion: V },
+  });
+  return [
+    { name: 'rate changes come from the rule set, without its first date', op: 'rateChangeDates', input: { ruleSetVersion: V } },
+    { name: 'days across a month end', op: 'addDays', input: { date: '2026-01-31', days: 30 } },
+    { name: 'days across a leap day', op: 'addDays', input: { date: '2028-02-28', days: 1 } },
+    { name: 'days across a year end', op: 'addDays', input: { date: '2026-12-15', days: 60 } },
+    { name: 'an ordinary purchase keeps the supplier date', op: 'supplierReportedTaxPoint', input: { date: '2026-10-30' } },
+
+    t('counter sale: invoice at the till', 'outward_goods', { invoiceDate: '2026-06-10' }),
+    t('goods removed before the invoice: removal', 'outward_goods', { invoiceDate: '2026-06-12', removalDate: '2026-06-10' }),
+    t('invoice before removal: invoice', 'outward_goods', { invoiceDate: '2026-06-10', removalDate: '2026-06-12' }),
+    t('no movement: delivery decides the due date', 'outward_goods', { invoiceDate: '2026-06-12', deliveryDate: '2026-06-11' }),
+    t('an explicit due date wins over removal', 'outward_goods', { invoiceDate: '2026-06-12', removalDate: '2026-06-11', invoiceDueDate: '2026-06-09' }),
+    t('an advance on goods does not move the date', 'outward_goods', { invoiceDate: '2026-06-12', paymentDate: '2026-06-01' }),
+
+    t('service invoiced in time: invoice', 'outward_services', { invoiceDate: '2026-06-20', serviceCompletionDate: '2026-06-01' }),
+    t('service invoiced in time, paid earlier: payment', 'outward_services', { invoiceDate: '2026-06-20', serviceCompletionDate: '2026-06-01', paymentDate: '2026-05-25' }),
+    t('service invoiced on the last day is still in time', 'outward_services', { invoiceDate: '2026-07-01', serviceCompletionDate: '2026-06-01' }),
+    t('service invoiced late: completion', 'outward_services', { invoiceDate: '2026-07-02', serviceCompletionDate: '2026-06-01' }),
+    t('service invoiced late, paid before completion: payment', 'outward_services', { invoiceDate: '2026-07-20', serviceCompletionDate: '2026-06-01', paymentDate: '2026-05-20' }),
+
+    t('RCM goods: receipt first', 'inward_rcm_goods', { invoiceDate: '2026-06-20', supplierInvoiceDate: '2026-06-01', receiptDate: '2026-06-05', paymentDate: '2026-06-10' }),
+    t('RCM goods: payment first', 'inward_rcm_goods', { invoiceDate: '2026-06-20', supplierInvoiceDate: '2026-06-01', receiptDate: '2026-06-10', paymentDate: '2026-06-05' }),
+    t('RCM goods: 30 days after the supplier invoice', 'inward_rcm_goods', { invoiceDate: '2026-08-20', supplierInvoiceDate: '2026-06-01', receiptDate: '2026-08-10' }),
+    t('RCM goods: nothing known, entry in the books', 'inward_rcm_goods', { invoiceDate: '2026-06-20' }),
+    t('RCM services: payment first', 'inward_rcm_services', { invoiceDate: '2026-06-20', supplierInvoiceDate: '2026-06-01', paymentDate: '2026-06-10' }),
+    t('RCM services: 60 days after the supplier invoice', 'inward_rcm_services', { invoiceDate: '2026-09-01', supplierInvoiceDate: '2026-06-01' }),
+
+    t('s.14(a)(i): supplied before, invoice and payment after: earlier of the two', 'outward_goods', { invoiceDate: '2026-11-03', removalDate: '2026-10-30', paymentDate: '2026-11-05' }),
+    t('s.14(a)(i): unpaid counts as after', 'outward_goods', { invoiceDate: '2026-11-03', removalDate: '2026-10-30' }),
+    t('s.14(a)(ii): supplied and invoiced before, paid after: invoice', 'outward_goods', { invoiceDate: '2026-10-28', removalDate: '2026-10-30', paymentDate: '2026-11-05' }),
+    t('s.14(a)(iii): supplied and paid before, invoiced after: payment', 'outward_goods', { invoiceDate: '2026-11-03', removalDate: '2026-10-30', paymentDate: '2026-10-29' }),
+    t('s.14(b)(i): supplied after, invoiced before, paid after: payment', 'outward_goods', { invoiceDate: '2026-10-28', removalDate: '2026-11-03', paymentDate: '2026-11-05' }),
+    t('s.14(b)(i): unpaid: the supply date stands in', 'outward_goods', { invoiceDate: '2026-10-28', removalDate: '2026-11-03' }),
+    t('s.14(b)(ii): supplied after, invoiced and paid before: earlier of the two', 'outward_goods', { invoiceDate: '2026-10-28', removalDate: '2026-11-03', paymentDate: '2026-10-25' }),
+    t('s.14(b)(iii): supplied and invoiced after, paid before: invoice', 'outward_goods', { invoiceDate: '2026-11-04', removalDate: '2026-11-03', paymentDate: '2026-10-25' }),
+    t('a change on the event day counts as after it', 'outward_goods', { invoiceDate: '2026-11-01', removalDate: '2026-10-31' }),
+    t('all events after the last change: no s.14', 'outward_goods', { invoiceDate: '2026-11-04', removalDate: '2026-11-03', paymentDate: '2026-11-05' }),
+    t('s.14 for reverse charge uses receipt and the supplier invoice', 'inward_rcm_goods', { invoiceDate: '2026-11-20', supplierInvoiceDate: '2026-10-28', receiptDate: '2026-11-03' }),
+    t('a bad document date is refused', 'outward_goods', { invoiceDate: 'soon' }),
   ];
 }

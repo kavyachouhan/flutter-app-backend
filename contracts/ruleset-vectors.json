@@ -531,6 +531,30 @@
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
           }
         ],
         "stateCodes": [
@@ -1066,6 +1090,30 @@
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
           }
         ],
         "stateCodes": [
@@ -1598,6 +1646,30 @@
             "key": "ewb_interstate_value",
             "value": 5000000,
             "effectiveFrom": "2018-04-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"
@@ -2154,6 +2226,30 @@
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
           }
         ],
         "stateCodes": [
@@ -2707,6 +2803,30 @@
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
           }
         ],
         "stateCodes": [
@@ -3257,6 +3377,30 @@
             "key": "ewb_interstate_value",
             "value": 5000000,
             "effectiveFrom": "2018-04-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_service_invoice_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_goods_days",
+            "value": 30,
+            "effectiveFrom": "2017-07-01",
+            "effectiveTo": null,
+            "notificationRef": "TEST",
+            "verificationStatus": "primary_verified"
+          },
+          {
+            "key": "tos_rcm_services_days",
+            "value": 60,
+            "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
             "notificationRef": "TEST",
             "verificationStatus": "primary_verified"

@@ -254,13 +254,19 @@ export async function gstr3bSummary(tx: Tx, params: ReportParams): Promise<Repor
   const sql = `
     WITH outward AS (
       SELECT l.supply_category, i.supply_type, l.taxable_amount,
-             l.cgst, l.sgst, l.igst, l.cess
+             CASE WHEN i.is_reverse_charge THEN 0 ELSE l.cgst END AS cgst,
+             CASE WHEN i.is_reverse_charge THEN 0 ELSE l.sgst END AS sgst,
+             CASE WHEN i.is_reverse_charge THEN 0 ELSE l.igst END AS igst,
+             CASE WHEN i.is_reverse_charge THEN 0 ELSE l.cess END AS cess
       FROM invoice_lines l JOIN invoices i ON i.id = l.invoice_id
       WHERE i.status = 'issued' AND ${gstinScope(p, 'i', params)}
         AND ${dateRange(p, 'l.document_date', params)}
       UNION ALL
       SELECT l.supply_category, c.supply_type, -l.taxable_amount,
-             -l.cgst, -l.sgst, -l.igst, -l.cess
+             CASE WHEN c.is_reverse_charge THEN 0 ELSE -l.cgst END,
+             CASE WHEN c.is_reverse_charge THEN 0 ELSE -l.sgst END,
+             CASE WHEN c.is_reverse_charge THEN 0 ELSE -l.igst END,
+             CASE WHEN c.is_reverse_charge THEN 0 ELSE -l.cess END
       FROM credit_note_lines l JOIN credit_notes c ON c.id = l.credit_note_id
       WHERE c.status = 'issued' AND ${gstinScope(p, 'c', params)}
         AND ${dateRange(p, 'l.document_date', params)}
@@ -277,13 +283,13 @@ export async function gstr3bSummary(tx: Tx, params: ReportParams): Promise<Repor
              SUM(igst)::bigint AS igst, SUM(cess)::bigint AS cess
       FROM outward GROUP BY 1
       UNION ALL
-      -- Inward, not outward: the shop owes this tax itself. The liability is
-      -- computed from the line rates because a reverse-charge bill carries no
-      -- tax — the supplier charged none.
+      -- Inward, not outward: the shop owes this tax itself. Bills from before D15
+      -- stored no tax, so those still work it out from the line rates.
       SELECT '3.1(d) Inward liable to reverse charge' AS section,
              SUM(l.taxable_amount)::bigint,
              0::bigint, 0::bigint, 0::bigint,
-             SUM(round(l.taxable_amount * (l.tax_rate_percent + l.cess_rate_percent) / 100))::bigint
+             SUM(CASE WHEN l.cgst + l.sgst + l.igst + l.cess > 0 THEN l.cgst + l.sgst + l.igst + l.cess
+                       ELSE round(l.taxable_amount * (l.tax_rate_percent + l.cess_rate_percent) / 100) END)::bigint
       FROM purchase_bill_lines l JOIN purchase_bills b ON b.id = l.purchase_bill_id
       WHERE b.is_reverse_charge AND b.status <> 'void'
         AND ${dateRange(p, 'l.document_date', params)}

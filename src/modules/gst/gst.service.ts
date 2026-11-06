@@ -463,6 +463,8 @@ async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings
     );
   }
   for (const document of documents) {
+    // Tax on a reverse-charge sale is the buyer's to pay, not this shop's liability.
+    if (document.isReverseCharge) continue;
     const sign = document.kind === 'credit_note' ? -1 : 1;
     const zeroRated =
       document.supplyType.startsWith('export') || document.supplyType.startsWith('sez');

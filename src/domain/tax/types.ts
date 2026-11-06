@@ -3,6 +3,15 @@
  * Amounts are integer paise; quantities are thousandths of a unit.
  */
 
+import type { TaxPayableBy } from '../gst/enums.js';
+
+export type { TaxPayableBy };
+
+/** The wire and old columns still say `isReverseCharge` (freeze §9a). */
+export function taxPayableByFor(isReverseCharge: boolean | undefined): TaxPayableBy {
+  return isReverseCharge ? 'recipient' : 'supplier';
+}
+
 /**
  * Where the supply goes, which decides which tax heads apply.
  *
@@ -73,11 +82,12 @@ export interface TaxInvoiceInput {
    */
   readonly supplyType?: SupplyType;
   /**
-   * Reverse charge: the recipient pays the tax, so the document carries none
-   * while still reporting the value. Rates stay on the lines, because the
-   * recipient computes its liability from them.
+   * Who pays the tax to the government (D15). Omitted means the supplier. On
+   * `recipient` (reverse charge) the tax is still computed, because it is the
+   * recipient's liability and later its credit, but it is not part of what the
+   * document asks to be paid.
    */
-  readonly isReverseCharge?: boolean;
+  readonly taxPayableBy?: TaxPayableBy;
   readonly pricesIncludeTax: boolean;
   readonly lines: readonly TaxLineInput[];
   readonly billDiscount?: Discount;
@@ -102,6 +112,7 @@ export interface TaxLineResult {
   readonly sgst: number;
   readonly igst: number;
   readonly cess: number;
+  /** What the line adds to the document: excludes tax the recipient pays. */
   readonly lineTotal: number;
   readonly hsnCode: string | undefined;
   readonly supplyCategory: SupplyCategory;
@@ -147,6 +158,7 @@ export interface TaxInvoiceResult {
   readonly totalSgst: number;
   readonly totalIgst: number;
   readonly totalCess: number;
+  /** All tax computed, including tax the recipient pays. It is in `subTotal` only when the supplier pays it. */
   readonly totalTax: number;
   readonly taxableCharges: number;
   readonly nonTaxableCharges: number;
@@ -156,5 +168,7 @@ export interface TaxInvoiceResult {
   readonly taxSummary: readonly TaxRateSummary[];
   readonly hsnSummary: readonly HsnSummary[];
   readonly categoryTotals: SupplyCategoryTotals;
+  readonly taxPayableBy: TaxPayableBy;
+  /** True when `taxPayableBy` is `recipient`; kept for readers of the older field. */
   readonly isReverseCharge: boolean;
 }

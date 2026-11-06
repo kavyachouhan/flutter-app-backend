@@ -16,6 +16,7 @@ import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { reverseReceipt } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, InternalError, NotFoundError, UnprocessableError } from '../../lib/errors.js';
@@ -148,7 +149,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
         // purchase reverses the same self-assessed liability, so the two have
         // to be reported on the same footing.
         supplyType: bill.supplyType,
-        isReverseCharge: bill.isReverseCharge,
+        taxPayableBy: taxPayableByFor(bill.isReverseCharge),
         pricesIncludeTax: bill.pricesIncludeTax,
         roundOff: bill.roundOffEnabled,
         lines: body.lines.map((line) => {

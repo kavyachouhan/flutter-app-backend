@@ -28,6 +28,7 @@ import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { apportionLandedCost } from '../../domain/costing/landed-cost.js';
 import { applyReceipt, reverseReceipt } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import type { TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
@@ -160,7 +161,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
         supplierStateCode: supplier.stateCode ?? outlet.stateCode ?? settings.stateCode,
         placeOfSupplyStateCode:
           body.placeOfSupplyStateCode ?? outlet.stateCode ?? settings.stateCode,
-        isReverseCharge: body.isReverseCharge,
+        taxPayableBy: taxPayableByFor(body.isReverseCharge),
         pricesIncludeTax: body.pricesIncludeTax,
         roundOff: body.roundOff,
         billDiscount: body.billDiscount,
