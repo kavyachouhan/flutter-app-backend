@@ -96,6 +96,9 @@ export interface GstRuleSetContent {
       readonly code: string;
       readonly description: string;
       readonly direction: 'goods' | 'services';
+      /** HSN/SAC prefixes this reverse-charge category covers. */
+      readonly codePrefixes: readonly string[];
+      readonly supplierMustBe: string;
       readonly recipientMustBe: string;
     })[];
   readonly blockedCredits: readonly (RuleRef &

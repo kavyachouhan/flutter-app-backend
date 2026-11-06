@@ -88,6 +88,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -601,6 +605,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -1160,6 +1168,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -1719,6 +1731,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -2296,6 +2312,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -2873,6 +2893,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,
@@ -3450,6 +3474,10 @@
             "code": "gta",
             "description": "Goods transport agency services",
             "direction": "services",
+            "codePrefixes": [
+              "9965"
+            ],
+            "supplierMustBe": "any",
             "recipientMustBe": "registered",
             "effectiveFrom": "2017-07-01",
             "effectiveTo": null,

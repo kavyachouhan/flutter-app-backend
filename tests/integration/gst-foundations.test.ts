@@ -7,13 +7,12 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeOwnerClient, ownerClient } from './setup/database.js';
 import { app, createTenant, type TenantFixture } from './setup/tenant.js';
 import { closePool } from '../../src/db/pool.js';
 import { gstinCheckCharacter } from '../../src/domain/gst/gstin.js';
-
-void app;
 
 function validGstin(state: string): string {
   const letters = randomUUID().replace(/[^a-f]/g, '').toUpperCase().padEnd(5, 'A').slice(0, 5);
@@ -172,6 +171,26 @@ describe('GST foundations', () => {
     } finally {
       await db.query('ROLLBACK');
     }
+  });
+
+  it('serves the HSN master and refuses it to nobody signed in', async () => {
+    const full = (await shop.get('/v1/gst/hsn-master').expect(200)).body as {
+      data: { version: string; codes: [string, string, string, string | null][] };
+    };
+    expect(full.data.codes.length).toBeGreaterThan(20_000);
+    const coffee = full.data.codes.find((c) => c[0] === '090121');
+    expect(coffee?.slice(0, 2)).toEqual(['090121', 'goods']);
+    expect(full.data.codes.some((c) => c[0] === '90121')).toBe(false);
+    const again = (await shop.get(`/v1/gst/hsn-master?version=${full.data.version}`).expect(200)).body as {
+      data: { codes: unknown[] };
+    };
+    expect(again.data.codes).toEqual([]);
+    await request(app).get('/v1/gst/hsn-master').expect(401);
+  });
+
+  it('serves no drafts as rule sets', async () => {
+    const res = (await shop.get('/v1/gst/rule-sets').expect(200)).body as { data: { status: string }[] };
+    expect(res.data.every((r) => r.status === 'published' || r.status === 'withdrawn')).toBe(true);
   });
 
   it('keeps published and legacy rule sets immutable', async () => {

@@ -8,6 +8,7 @@ import { validate, validated } from '../../middleware/validate.js';
 import * as exportService from './export.service.js';
 import * as reconciliation from './reconciliation.service.js';
 import * as service from './gst.service.js';
+import * as ruleSets from './rule-sets.service.js';
 import {
   acceptMatchBody,
   createGstr2bImportBody,
@@ -19,6 +20,21 @@ import {
 } from './gst.schemas.js';
 
 export const gstRouter: Router = Router();
+
+// --- Rule sets and the HSN/SAC master ----------------------------------------
+
+// Every device bills with these, so any signed-in member may read them.
+const ruleSetsQuery = { query: z.object({ since: z.string().datetime({ offset: true }).optional() }) };
+gstRouter.get('/rule-sets', validate(ruleSetsQuery), async (req, res) => {
+  const { query } = validated<typeof ruleSetsQuery>(req);
+  res.json({ data: await ruleSets.listRuleSets(query.since) });
+});
+
+const hsnQuery = { query: z.object({ version: z.string().max(64).optional() }) };
+gstRouter.get('/hsn-master', validate(hsnQuery), async (req, res) => {
+  const { query } = validated<typeof hsnQuery>(req);
+  res.json({ data: await ruleSets.hsnMaster(query.version) });
+});
 
 // --- Return periods --------------------------------------------------------
 

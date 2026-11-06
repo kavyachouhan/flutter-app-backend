@@ -29,7 +29,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "ci:env": "tsx tests/integration/setup/write-env-file.ts",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "contracts:generate": "tsx tests/contracts/generate.ts"
+    "contracts:generate": "tsx tests/contracts/generate.ts",
+    "gst:rules": "tsx --env-file=.env.development src/db/gst/rules-cli.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",

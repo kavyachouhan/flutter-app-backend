@@ -26,6 +26,39 @@ import {
   RETURN_TYPES,
 } from './gst.schemas.js';
 
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/rule-sets',
+  tags: ['GST'],
+  summary: 'Published GST rule sets',
+  description:
+    'Dated, complete snapshots of the GST rules, including withdrawn ones so a device can drop them. Pass `since` (the latest `changedAt` held) to fetch only what changed. A device selects by date: latest effectiveFrom on or before it, then highest revision.',
+  security: accessTokenSecurity,
+  request: { query: z.object({ since: z.string().datetime({ offset: true }).optional() }) },
+  responses: {
+    200: jsonResponse('Rule set versions.', dataEnvelope(z.array(z.record(z.unknown())))),
+    ...errorResponses(401),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/hsn-master',
+  tags: ['GST'],
+  summary: 'The HSN/SAC master',
+  description:
+    'Codes and descriptions only: rates come from the rule set. `codes` is empty when `version` is what the device already holds. Each code is [code, kind, description, parentCode].',
+  security: accessTokenSecurity,
+  request: { query: z.object({ version: z.string().max(64).optional() }) },
+  responses: {
+    200: jsonResponse(
+      'The master, or just its version.',
+      dataEnvelope(z.object({ version: z.string().nullable(), codes: z.array(z.array(z.string().nullable())) })),
+    ),
+    ...errorResponses(401),
+  },
+});
+
 const returnPeriod = registry.register(
   'GstReturnPeriod',
   z.object({

@@ -79,7 +79,7 @@ function content(variant: 'base' | 'gst2' | 'nov26' | 'nov26fix'): GstRuleSetCon
       { code: 'KGS', description: 'Kilograms', unitAliases: ['kg'] },
     ],
     rcmCategories: [
-      { code: 'gta', description: 'Goods transport agency services', direction: 'services', recipientMustBe: 'registered', ...span('2017-07-01'), ...ref },
+      { code: 'gta', description: 'Goods transport agency services', direction: 'services', codePrefixes: ['9965'], supplierMustBe: 'any', recipientMustBe: 'registered', ...span('2017-07-01'), ...ref },
     ],
     blockedCredits: [
       { code: 'motor_vehicles', description: 'Motor vehicles for passenger transport', section: '17(5)(a)', ...span('2017-07-01'), ...ref },

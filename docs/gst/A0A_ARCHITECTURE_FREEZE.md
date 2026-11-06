@@ -668,7 +668,7 @@ Dated entries also carry `effectiveFrom: IsoDate` and `effectiveTo: IsoDate | nu
   thresholds:              { key: ThresholdKey, value: number, effectiveFrom, effectiveTo, ...Ref }[];
   stateCodes:              { code, name, isUnionTerritoryWithoutLegislature }[];
   uqc:                     { code, description, unitAliases: string[] }[];
-  rcmCategories:           { code, description, direction: 'goods' | 'services', recipientMustBe: string, effectiveFrom, effectiveTo, ...Ref }[];
+  rcmCategories:           { code, description, direction: 'goods' | 'services', codePrefixes: string[], supplierMustBe: string, recipientMustBe: string, effectiveFrom, effectiveTo, ...Ref }[];
   blockedCredits:          { code, description, section: '17(5)(...)', effectiveFrom, effectiveTo, ...Ref }[];
   einvoiceExclusions:      { category: EinvoiceExemptionCategory, effectiveFrom, effectiveTo, ...Ref }[];
   validationRules:         { id, returnType, check: ValidationCheckKey, enforcement: 'warn' | 'block', effectiveFrom, effectiveTo, ...Ref }[];
