@@ -9,6 +9,7 @@ import {
   type NotificationFile,
   type RuleBaseFile,
 } from './rule-set-compose.js';
+import { RULE_46_UNREGISTERED_TAXABLE_PAISE } from './invoice-rules.js';
 import { ratesFor, selectRuleSet, type GstRuleSet } from './rule-set.js';
 
 const base: RuleBaseFile = { stateCodes: [], uqc: [], gstr1aAmendableFields: {} };
@@ -100,7 +101,15 @@ describe('the rule files in this repository', () => {
   it('account for every notification in data/CBIC, and stay unpublishable until the verified foundation exists', () => {
     // Slabs, thresholds and the cess rule were removed until their primary text is verified.
     // When they return, this becomes `toEqual([])`.
-    expect(checkRuleFiles(files)).toEqual(['2026-11-01: No cess rule in force on 2026-11-01']);
+    expect(checkRuleFiles(files)).toEqual([
+      '2017-07-01: No cess rule in force on 2017-07-01',
+      '2026-11-01: No cess rule in force on 2026-11-01',
+    ]);
+  });
+
+  it('record the same Rule 46 limit the invoice check uses', () => {
+    const rule46 = files.notifications.find((f) => f.notification === 'CGST Rule 46');
+    expect(rule46?.add?.thresholds?.[0]?.['value']).toBe(RULE_46_UNREGISTERED_TAXABLE_PAISE);
   });
 
   it('evaluate the verified 2026 notifications from the date they take effect', () => {

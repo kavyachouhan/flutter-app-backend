@@ -1,5 +1,6 @@
 import type { Tx } from '../../db/tx.js';
 import { buildSet, likeContains } from '../../db/sql.js';
+import type { GstTreatment } from '../../domain/gst/enums.js';
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface SupplierRow {
@@ -8,6 +9,9 @@ export interface SupplierRow {
   phone: string | null;
   email: string | null;
   gstin: string | null;
+  gstTreatment: GstTreatment;
+  uin: string | null;
+  countryCode: string;
   stateCode: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
@@ -23,7 +27,10 @@ export interface SupplierRow {
   updatedAt: Date;
 }
 
-export type NewSupplier = Omit<SupplierRow, 'balance' | 'createdAt' | 'updatedAt'>;
+/** A null treatment is worked out by the database from the GSTIN, UIN and country. */
+export type NewSupplier = Omit<SupplierRow, 'balance' | 'createdAt' | 'updatedAt' | 'gstTreatment'> & {
+  gstTreatment: GstTreatment | null;
+};
 
 export type SupplierLedgerEntryType =
   | 'opening_balance'
@@ -70,7 +77,8 @@ export interface AgeingBucketRow {
 }
 
 const SUPPLIER_COLUMNS = `
-  s.id, s.name, s.phone, s.email, s.gstin, s.state_code AS "stateCode",
+  s.id, s.name, s.phone, s.email, s.gstin, s.gst_treatment AS "gstTreatment", s.uin, s.country_code AS "countryCode",
+  s.state_code AS "stateCode",
   s.address_line1 AS "addressLine1", s.address_line2 AS "addressLine2", s.city, s.pincode,
   s.payment_terms_days AS "paymentTermsDays", s.lead_time_days AS "leadTimeDays", s.notes,
   s.is_active AS "isActive", COALESCE(b.balance, 0) AS balance,
@@ -83,6 +91,9 @@ const UPDATABLE = {
   phone: 'phone',
   email: 'email',
   gstin: 'gstin',
+  gstTreatment: 'gst_treatment',
+  uin: 'uin',
+  countryCode: 'country_code',
   stateCode: 'state_code',
   addressLine1: 'address_line1',
   addressLine2: 'address_line2',
@@ -145,8 +156,9 @@ export const suppliersRepository = {
   async insert(tx: Tx, s: NewSupplier): Promise<void> {
     await tx.query(
       `INSERT INTO suppliers (id, tenant_id, name, phone, email, gstin, state_code, address_line1,
-         address_line2, city, pincode, payment_terms_days, lead_time_days, notes, is_active)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+         address_line2, city, pincode, payment_terms_days, lead_time_days, notes, is_active,
+         gst_treatment, uin, country_code)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
       [
         s.id,
         s.name,
@@ -162,6 +174,9 @@ export const suppliersRepository = {
         s.leadTimeDays,
         s.notes,
         s.isActive,
+        s.gstTreatment,
+        s.uin,
+        s.countryCode,
       ],
     );
   },

@@ -14,9 +14,11 @@ import {
 } from '../../openapi/registry.js';
 import {
   createCustomerBody,
+  customerAddressParams,
   ledgerQuery,
   listCustomersQuery,
   updateCustomerBody,
+  upsertCustomerAddressBody,
 } from './customers.schemas.js';
 
 export const customerSchema = registry.register(
@@ -27,6 +29,9 @@ export const customerSchema = registry.register(
     phone: z.string().nullable(),
     email: z.string().nullable(),
     gstin: z.string().nullable(),
+    gstTreatment: z.string(),
+    uin: z.string().nullable(),
+    countryCode: z.string(),
     stateCode: z.string().nullable(),
     addressLine1: z.string().nullable(),
     addressLine2: z.string().nullable(),
@@ -56,6 +61,60 @@ export const ledgerEntrySchema = registry.register(
 );
 
 const body = (schema: z.ZodTypeAny) => ({ content: { 'application/json': { schema } } });
+
+const customerAddressSchema = registry.register(
+  'CustomerAddress',
+  z.object({
+    id: uuid,
+    customerId: uuid,
+    label: z.string().nullable(),
+    line1: z.string(),
+    line2: z.string().nullable(),
+    city: z.string(),
+    countryCode: z.string(),
+    stateCode: z.string().nullable(),
+    postalCode: z.string().nullable(),
+    shipToGstin: z.string().nullable(),
+    isDefault: z.boolean(),
+  }),
+);
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/customers/{id}/addresses',
+  tags: ['Customers'],
+  summary: 'List a customer\'s delivery addresses',
+  security: accessTokenSecurity,
+  request: { params: idParams },
+  responses: {
+    200: jsonResponse('The delivery addresses.', dataEnvelope(z.array(customerAddressSchema))),
+    ...errorResponses(401, 403, 404),
+  },
+});
+
+registry.registerPath({
+  method: 'put',
+  path: '/v1/customers/{id}/addresses/{addressId}',
+  tags: ['Customers'],
+  summary: 'Create or replace a delivery address',
+  security: accessTokenSecurity,
+  request: { params: customerAddressParams, body: body(upsertCustomerAddressBody) },
+  responses: {
+    200: jsonResponse('The delivery address.', dataEnvelope(customerAddressSchema)),
+    ...errorResponses(400, 401, 403, 404),
+  },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: '/v1/customers/{id}/addresses/{addressId}',
+  tags: ['Customers'],
+  summary: 'Remove a delivery address',
+  description: 'Bills that used it keep the copy they were issued with.',
+  security: accessTokenSecurity,
+  request: { params: customerAddressParams },
+  responses: { 204: noContent('Removed.'), ...errorResponses(401, 403, 404) },
+});
 
 registry.registerPath({
   method: 'get',

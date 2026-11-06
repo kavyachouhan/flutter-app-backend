@@ -1,3 +1,4 @@
+import type { InvoiceSupplyColumns } from '../invoices/invoices.repository.js';
 import type { Tx } from '../../db/tx.js';
 import { jsonParam } from '../../db/sql.js';
 import type {
@@ -8,6 +9,8 @@ import type {
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface CreditNoteHeaderInsert {
+  /** Copied from the invoice: a note adjusting a supply keeps its parties and place of supply. */
+  supply: InvoiceSupplyColumns;
   id: string;
   outletId: string;
   counterId: string | null;
@@ -213,14 +216,17 @@ export const creditNotesRepository = {
          round_off_enabled, gross_amount, line_discount_total, bill_discount_amount, taxable_amount, total_cgst,
          total_sgst, total_igst, total_cess, total_tax, sub_total, round_off, grand_total, tax_summary, hsn_summary,
          reason_code, refund_mode, refund_amount, restock, custom_fields, notes, status, issued_at, issued_by,
-         is_reverse_charge)
+         is_reverse_charge, supply_scenario, pos_provision, pos_override, sez_authorised_operations,
+         lut_reference, buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
+         dispatch_from_snapshot)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
          $15, $16, $17, $18, $19, $20,
          $21, $22, $23, $24, $25, $26,
          $27, $28, $29, $30, $31, $32, $33, $34, $35,
-         $36, $37, $38, $39, $40, $41, 'issued', $42, $43, $44)`,
+         $36, $37, $38, $39, $40, $41, 'issued', $42, $43, $44,
+         $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55)`,
       [
         h.id,
         h.outletId,
@@ -266,6 +272,17 @@ export const creditNotesRepository = {
         h.issuedAt,
         h.issuedBy,
         t.isReverseCharge,
+        h.supply.scenario,
+        h.supply.provision,
+        jsonParam(h.supply.override),
+        h.supply.sezAuthorisedOperations,
+        h.supply.lutReference,
+        h.supply.buyerGstTreatment,
+        h.supply.customerUin,
+        jsonParam(h.supply.seller),
+        jsonParam(h.supply.buyer),
+        jsonParam(h.supply.shipTo),
+        jsonParam(h.supply.dispatchFrom),
       ],
     );
   },

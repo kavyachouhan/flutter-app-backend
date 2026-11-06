@@ -18,6 +18,12 @@ import {
   buildRuleSetVectors,
   buildTosVectors,
   evaluateTosCase,
+  buildPosVectors,
+  buildInvoiceRulesVectors,
+  evaluatePosCase,
+  evaluateInvoiceRulesCase,
+  type PosVectorsFile,
+  type InvoiceRulesVectorsFile,
   type TosVectorsFile,
   evaluateEntityCase,
   evaluateGstinCase,
@@ -272,5 +278,29 @@ describe('gst time-of-supply contract vectors', () => {
 
   it('is byte-for-byte what the generator would write now', () => {
     expect(buildTosVectors()).toEqual(file);
+  });
+});
+
+describe('gst place-of-supply contract vectors', () => {
+  const file = load<PosVectorsFile>('pos-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluatePosCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildPosVectors()).toEqual(file);
+  });
+});
+
+describe('gst invoice-rules contract vectors', () => {
+  const file = load<InvoiceRulesVectorsFile>('invoice-rules-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateInvoiceRulesCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildInvoiceRulesVectors()).toEqual(file);
   });
 });

@@ -121,7 +121,7 @@ describe('offline purchasing through sync', () => {
     t = await createTenant({ name: 'Offline Purchases Shop' });
     itemId = (await createItem(t, { trackStock: true })).id;
     supplierId = randomUUID();
-    await push(t, 'supplier.create', { id: supplierId, name: 'Fresh Foods' });
+    await push(t, 'supplier.create', { id: supplierId, name: 'Fresh Foods', stateCode: '27' });
     first = await firstSync(t);
   });
 

@@ -950,7 +950,7 @@ describe('parity with invoices', () => {
 
   it('searches purchase orders and bills the same way', async () => {
     const supplierId = randomUUID();
-    await t.post('/v1/suppliers').send({ id: supplierId, name: 'Quicksilver Wholesale' }).expect(201);
+    await t.post('/v1/suppliers').send({ id: supplierId, name: 'Quicksilver Wholesale', stateCode: '27' }).expect(201);
     const poId = randomUUID();
     await t
       .post('/v1/purchase-orders')

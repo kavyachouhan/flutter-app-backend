@@ -28,6 +28,9 @@ export const pan = z
   .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'must be a valid PAN');
 
 export const stateCode = z.string().regex(/^[0-9]{2}$/, 'must be a two-digit GST state code');
+/** Freeze open item U1: 15 characters, uppercase, no checksum, until the GSTN structure is confirmed. */
+export const uin = z.string().regex(/^[0-9A-Z]{15}$/, 'must be a 15-character UIN');
+export const countryCode = z.string().regex(/^[A-Z]{2}$/, 'must be a two-letter country code');
 
 export const hsnCode = z.string().regex(/^[0-9]{4,8}$/, 'must be a 4-8 digit HSN/SAC code');
 

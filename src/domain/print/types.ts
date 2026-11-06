@@ -85,6 +85,10 @@ export interface PrintDocument {
   readonly title: string;
   readonly business: PrintBusiness;
   readonly customer?: PrintParty;
+  /** The address of delivery, when it is not the customer's. */
+  readonly shipTo?: PrintParty;
+  /** "UTGST" where a union territory without a legislature charges it; else absent. */
+  readonly stateTaxLabel?: string;
   readonly meta: readonly PrintField[];
   readonly items: readonly PrintLineItem[];
   readonly totals: readonly PrintAmountRow[];

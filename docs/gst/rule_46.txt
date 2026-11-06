@@ -1,0 +1,234 @@
+*Rule 46. Tax invoice.-*
+
+Subject to rule 54 <http://taxinformation.cbic.gov.in/content-page/
+explore-rules/1000145/1000001>, a tax invoice referred to in section 31
+<http://taxinformation.cbic.gov.in/content-page/explore-
+act/1000300/1000001> shall be issued by the registered person containing
+the following particulars, namely,-
+
+(a) name, address and Goods and Services Tax Identification Number of
+the supplier;
+
+(b) a consecutive serial number not exceeding sixteen characters, in one
+or multiple series, containing alphabets or numerals or special
+characters- hyphen or dash and slash symbolised as "-'' and "/"
+respectively, and any combination thereof, unique for a financial year;
+
+(c) date of its issue;
+
+(d) name, address and Goods and Services Tax Identification Number or
+Unique Identity Number, if registered, of the recipient;
+
+(e) name and address of the recipient and the address of delivery, along
+with the name of the State and its code, if such recipient is un-
+registered and where the value of the taxable supply is fifty thousand
+rupees or more;
+
+(f) name and address of the recipient and the address of delivery, along
+with the name of the State and its code, if such recipient is un-
+registered and where the value of the taxable supply is less than fifty
+thousand rupees and the recipient requests that such details be recorded
+in the tax invoice 
+
+^8 [*Provided* ^10 [in cases involving supply of online money gaming or
+in cases] that where any taxable service is supplied by or through an
+electronic commerce operator or by a supplier of online information and
+database access or retrieval services to a recipient who is un-
+registered, irrespective of the value of such supply, a tax invoice
+issued by the registered person shall contain the ^9 [name of the state
+of the recipient and the same shall be deemed to be the address on
+record of the recipient]]; 
+
+(g) Harmonised System of Nomenclature code for goods or services;
+
+(h) description of goods or services;
+
+(i) quantity in case of goods and unit or Unique Quantity Code thereof;
+
+(j) total value of supply of goods or services or both;
+
+(k) taxable value of the supply of goods or services or both taking into
+account discount or abatement, if any;
+
+(l) rate of tax (central tax, State tax, integrated tax, Union territory
+tax or cess );
+
+(m) amount of tax charged in respect of taxable goods or services
+(central tax, State tax, integrated tax, Union territory tax or cess );
+
+(n) place of supply along with the name of the State, in the case of a
+supply in the course of inter-State trade or commerce;
+
+(o) address of delivery where the same is different from the place
+of supply;
+
+(p) whether the tax is payable on reverse charge basis; and
+
+(q) signature or digital signature of the supplier or
+his authorised representative; and
+
+^1 [(r) ^Quick Response code, having embedded Invoice Reference Number
+(IRN) in it, in case invoice has been issued in the manner prescribed
+under sub-rule (4) of rule 48 <http://taxinformation.cbic.gov.in/
+content-page/explore-rules/1000139/1000001>].
+
+^2 [(s) a declaration as below, that invoice is not required to be
+issued in the manner specified under sub-rule (4) of rule 48 <http://
+taxinformation.cbic.gov.in/content-page/explore-rules/1000139/1000001>,
+in all cases where an invoice is issued, other than in the manner so
+specified under the said sub-rule (4) of rule 48 <http://
+taxinformation.cbic.gov.in/content-page/explore-rules/1000139/1000001>,
+by the taxpayer having aggregate turnover in any preceding financial
+year from 2017-18 onwards more than the aggregate turnover as notified
+under the said sub-rule (4) of rule 48 <http://
+taxinformation.cbic.gov.in/content-page/explore-rules/1000139/1000001>-
+"I/We hereby declare that though our aggregate turnover in any preceding
+financial year from 2017-18 onwards is more than the aggregate turnover
+notified under sub-rule (4) of rule 48 <http://
+taxinformation.cbic.gov.in/content-page/explore-rules/1000139/1000001>,
+we are not required to prepare an invoice in terms of the provisions of
+the said sub-rule."]
+
+^3 [*Provided *that the Board may, on the recommendations of the
+Council, by notification, specify-
+
+(i) the number of digits of Harmonised System of Nomenclature code for
+goods or services that a class of registered persons shall be required
+to mention; or
+
+(ii) a class of supply of goods or services for which specified number
+of digits of Harmonised System of Nomenclature code shall be required to
+be mentioned by all registered taxpayers; and
+
+(iii) the class of registered persons that would not be required to
+mention the Harmonised System of Nomenclature code for goods or services:]
+
+**
+
+*^11 [****]
+*
+
+^
+
+^4 [*Provided*^12 [further that in the case of] the export of goods or
+services, the invoice shall carry an endorsement "SUPPLY MEANT FOR
+EXPORT/SUPPLY TO SEZ UNIT OR SEZ DEVELOPER FOR AUTHORISED OPERATIONS ON
+PAYMENT OF INTEGRATED TAX" or "SUPPLY MEANT FOR EXPORT/SUPPLY TO SEZ
+UNIT OR SEZ DEVELOPER FOR AUTHORISED OPERATIONS UNDER BOND OR LETTER OF
+UNDERTAKING WITHOUT PAYMENT OF INTEGRATED TAX", as the case maybe, and
+shall, in lieu of the details specified in clause (e), contain the
+following details, namely,-
+
+(i) name and address of the recipient;
+
+(ii) address of delivery; and
+
+(iii) name of the country of destination:]
+
+*Provided *also that a registered person ^5 [other than the supplier
+engaged in making supply of services by way of admission to exhibition
+of cinematograph films in multiplex screens,] may no tissue a tax
+invoice in accordance with the provisions of clause (b) of sub-section
+(3) of section 31 <http://taxinformation.cbic.gov.in/content-page/
+explore-act/1000300/1000001> subject to the following conditions, namely,-
+
+(a) the recipient is not a registered person; and
+
+(b) the recipient does not require such invoice, and
+
+shall issue a consolidated tax invoice for such supplies at the close of
+each day in respect of all such supplies.
+
+^6 [*Provided *also that the signature or digital signature of the
+supplier or his authorised representative shall not be required in the
+case of issuance of an electronic invoice in accordance with the
+provisions of the Information Technology Act,2000 (21 of 2000):]
+
+^
+
+^7 [*Provided *also that the Government may, by notification, on the
+recommendations of the Council, and subject to such conditions and
+restrictions as mentioned therein, specify that the tax invoice shall
+have Quick Response (QR) code.]
+
+1. Inserted (w.e.f. 30.09.2020) ) vide Notification No. 72/2020-CT
+<http://taxinformation.cbic.gov.in/content-page/explore-
+notification/1000559> dated 30.09.2020. [Corrected by Corrigendum GSR
+611(E), dated 01.10.2020].
+
+2. Inserted vide Notification No. 14/2022-CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1009417> dated 05.07.2022.
+
+3. Substituted vide Notification No. 79/2020-CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000552> dated 15.10.2020 for "Provided that the Board may,
+on the recommendations of the Council, by notification, specify-
+
+(i) the number of digits of Harmonised System of Nomenclature code for
+goods or services that a class of registered persons shall be required
+to mention, for such period as may be specified in the said
+notification; and
+
+(ii) the class of registered persons that would not be required to
+mention the Harmonised System of Nomenclature code for goods or
+services, for such period as may be specified in the said notification:"
+
+4. Substituted vide Notification No. 17/2017-CT  <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000857>dated 27.07.2017. Till then it read as follows -
+
+Provided also that in the case of the export of goods or services, the
+invoice shall carry an endorsement
+
+"SUPPLY MEANT FOR EXPORT ON PAYMENT OF INTEGRATED TAX" or "SUPPLY MEANT
+FOR EXPORT UNDER BOND OR LETTER OF UNDERTAKING WITHOUT PAYMENT OF
+INTEGRATED TAX", as the case may be, and shall, in lieu of the details
+specified in clause (e), contain the following details, namely,-
+
+(i) name and address of the recipient;
+
+(ii) address of delivery; and
+
+(iii) name of the country of destination.
+
+5. Inserted vide Notification No. 33/2019-CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000682> dated 18.07.2019 with effect from 01.09.2019
+
+6. Inserted vide Notification No. 74/2018-CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000723> dated 31.12.2018
+
+7. Inserted vide Notification No. 31/2019 - CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000684> dated 28.06.2019 with effect from 01.04.2020 as
+notified by Notification No. 71/2019 dated 13.12.2019.
+
+8. Inserted vide Notification No. 26/2022-CT <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1009584> dated 26.12.2022.
+
+9. Substituted vide Notification No. 38/2023-CT  <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000857>dated 04.08.2023.
+
+10. Inserted vide Notification No. 51/2023-CT  <http://
+taxinformation.cbic.gov.in/content-page/explore-
+notification/1000857>dated 29.09.2023.
+
+11. Omitted (w.e.f. 01.11.2024) "*Provided *further that where an
+invoice is required to be issued under clause (f) of sub-section (3)
+of section 31 <http://taxinformation.cbic.gov.in/content-page/explore-
+act/1000300/1000001>, a registered person may issue a consolidated
+invoice at the end of a month for supplies covered under sub-section (4)
+of section 9 <http://taxinformation.cbic.gov.in/content-page/explore-
+act/1000278/1000001>, the aggregate value of such supplies exceeds
+rupees five thousand in a day from any or all the suppliers:" vide
+Notification No. 20/2024-CT  <http://taxinformation.cbic.gov.in/content-
+page/explore-notification/1000857>dated 08.10.2024.
+
+12. Substituted (w.e.f. 01.11.2024) vide Notification No. 20/2024-CT 
+<http://taxinformation.cbic.gov.in/content-page/explore-
+notification/1000857>dated 08.10.2024.
+

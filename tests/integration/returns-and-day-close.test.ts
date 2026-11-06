@@ -93,7 +93,7 @@ describe('returns against the real application role', () => {
   it('issues a debit note against a purchase bill', async () => {
     const item = await createItem(t);
     const supplierId = randomUUID();
-    await t.post('/v1/suppliers').send({ id: supplierId, name: 'Wholesale Co' }).expect(201);
+    await t.post('/v1/suppliers').send({ id: supplierId, name: 'Wholesale Co', stateCode: '27' }).expect(201);
 
     const bill = data<{ id: string; lines: { id: string }[] }>(
       await t

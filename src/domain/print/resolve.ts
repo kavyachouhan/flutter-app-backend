@@ -12,7 +12,7 @@
  *   wrong is a compliance problem, and it should not depend on which build of
  *   the app a till happens to be running.
  */
-import type { TaxMode } from '../tax/types.js';
+import type { SupplyType, TaxMode } from '../tax/types.js';
 import {
   amountInWords,
   formatCurrency,
@@ -31,6 +31,8 @@ import type {
   PrintLineItem,
   PrintTaxRow,
 } from './types.js';
+import { stateTaxLabel, zeroRatedEndorsement } from '../gst/invoice-rules.js';
+import { stateLabelFor } from './states.js';
 
 export interface PrintableBusiness {
   readonly name: string;
@@ -113,6 +115,17 @@ export interface ResolveInput {
   readonly business: PrintableBusiness;
   readonly profile: PrintProfile;
   readonly customer: PrintableCustomer | null;
+  /** The address of delivery, when different from the customer's. */
+  readonly shipTo?: PrintableCustomer | null;
+  /** What a tax invoice or a note against one must state; absent on other documents. */
+  readonly gst?: {
+    readonly placeOfSupply: string | null;
+    readonly supplyType: SupplyType;
+    readonly isReverseCharge: boolean;
+    readonly sezAuthorisedOperations: boolean | null;
+    /** Decides whether HSN must print whatever the template says. */
+    readonly registeredBuyer: boolean;
+  };
   readonly lines: readonly PrintableLine[];
   readonly totals: PrintableTotals;
   readonly taxRows: readonly PrintableTaxRow[];
@@ -162,7 +175,11 @@ function titleFor(kind: PrintDocumentKind, mode: TaxMode): string {
 export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   const money = (paise: number): string => formatCurrency(paise, { symbol: input.currencySymbol });
   const template = input.template;
+  const gst = input.taxMode === 'gst' ? input.gst : undefined;
   const showTax = template.showTaxColumn && input.taxMode === 'gst';
+  // Rule 46(g): HSN is required on a registered buyer's invoice, whatever layout the shop chose.
+  const showHsn = template.showHsn || gst?.registeredBuyer === true;
+  const taxLabel = stateTaxLabel(gst?.placeOfSupply ?? null);
 
   const meta: PrintField[] = [
     { label: labelForNumber(input.kind), value: input.documentNumber },
@@ -175,6 +192,12 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   if (input.dueDate) {
     meta.push({ label: 'Due date', value: formatDocumentDate(input.dueDate, input.timezone) });
   }
+  if (gst) {
+    const place = stateLabelFor(gst.placeOfSupply);
+    if (place) meta.push({ label: 'Place of supply', value: place });
+    // Rule 46(p): the invoice says whether reverse charge applies, either way.
+    meta.push({ label: 'Tax payable on reverse charge', value: gst.isReverseCharge ? 'Yes' : 'No' });
+  }
   if (input.counterName) meta.push({ label: 'Counter', value: input.counterName });
   if (input.cashierName) meta.push({ label: 'Billed by', value: input.cashierName });
 
@@ -183,7 +206,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
     quantity: formatQuantity(line.quantity),
     rate: formatCurrency(line.unitPrice),
     amount: formatCurrency(line.lineTotal),
-    ...(template.showHsn && line.hsnCode ? { hsnCode: line.hsnCode } : {}),
+    ...(showHsn && line.hsnCode ? { hsnCode: line.hsnCode } : {}),
     ...(line.unit ? { unit: line.unit } : {}),
     ...(line.discount > 0 ? { discount: formatCurrency(line.discount) } : {}),
     ...(showTax ? { taxRate: formatPercent(line.taxRatePercent) } : {}),
@@ -210,7 +233,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
       totals.push({ label: 'IGST', amount: money(t.totalIgst), paise: t.totalIgst });
     } else {
       totals.push({ label: 'CGST', amount: money(t.totalCgst), paise: t.totalCgst });
-      totals.push({ label: 'SGST', amount: money(t.totalSgst), paise: t.totalSgst });
+      totals.push({ label: taxLabel, amount: money(t.totalSgst), paise: t.totalSgst });
     }
     if (t.totalCess > 0) {
       totals.push({ label: 'Cess', amount: money(t.totalCess), paise: t.totalCess });
@@ -272,8 +295,9 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
     });
   }
 
+  // Rule 46(l): a tax invoice states the rate, even on a layout that hides the summary.
   const taxRows: PrintTaxRow[] =
-    template.showTaxSummary && input.taxMode === 'gst'
+    (template.showTaxSummary || gst !== undefined) && input.taxMode === 'gst'
       ? input.taxRows.map((row) => ({
           rate: formatPercent(row.taxRatePercent),
           taxable: formatCurrency(row.taxableAmount),
@@ -290,6 +314,8 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   if (input.taxMode === 'composition') {
     termsLines.unshift('Composition taxable person, not eligible to collect tax on supplies.');
   }
+  const endorsement = gst ? zeroRatedEndorsement(gst.supplyType, gst.sezAuthorisedOperations) : null;
+  if (endorsement) termsLines.unshift(endorsement);
   if (input.notes) termsLines.push(input.notes);
   if (input.profile.bankLines.length > 0) termsLines.push(...input.profile.bankLines);
 
@@ -319,6 +345,17 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
           },
         }
       : {}),
+    ...(input.shipTo
+      ? {
+          shipTo: {
+            name: input.shipTo.name,
+            ...(input.shipTo.gstin ? { gstin: input.shipTo.gstin } : {}),
+            addressLines: input.shipTo.addressLines,
+            ...(input.shipTo.stateName ? { stateName: input.shipTo.stateName } : {}),
+          },
+        }
+      : {}),
+    ...(taxLabel === 'UTGST' ? { stateTaxLabel: taxLabel } : {}),
     meta,
     items,
     totals,
@@ -333,7 +370,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
       ? { signatureLabel: input.profile.signatureLabel }
       : {}),
     ...(copyLabel ? { copyLabel } : {}),
-    showHsn: template.showHsn,
+    showHsn,
     showTaxColumn: showTax,
   };
 }

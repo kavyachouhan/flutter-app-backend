@@ -1,5 +1,6 @@
 import type { Tx } from '../../db/tx.js';
 import { buildSet, likeContains } from '../../db/sql.js';
+import type { GstTreatment } from '../../domain/gst/enums.js';
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface CustomerRow {
@@ -8,6 +9,9 @@ export interface CustomerRow {
   phone: string | null;
   email: string | null;
   gstin: string | null;
+  gstTreatment: GstTreatment;
+  uin: string | null;
+  countryCode: string;
   stateCode: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
@@ -23,7 +27,29 @@ export interface CustomerRow {
   updatedAt: Date;
 }
 
-export type NewCustomer = Omit<CustomerRow, 'balance' | 'createdAt' | 'updatedAt'>;
+/** A null treatment is worked out by the database from the GSTIN, UIN and country. */
+export type NewCustomer = Omit<CustomerRow, 'balance' | 'createdAt' | 'updatedAt' | 'gstTreatment'> & {
+  gstTreatment: GstTreatment | null;
+};
+
+export interface CustomerAddressRow {
+  id: string;
+  customerId: string;
+  label: string | null;
+  line1: string;
+  line2: string | null;
+  city: string;
+  countryCode: string;
+  stateCode: string | null;
+  postalCode: string | null;
+  shipToGstin: string | null;
+  isDefault: boolean;
+}
+
+const ADDRESS_COLUMNS = `
+  id, customer_id AS "customerId", label, line1, line2, city, country_code AS "countryCode",
+  state_code AS "stateCode", postal_code AS "postalCode", ship_to_gstin AS "shipToGstin",
+  is_default AS "isDefault"`;
 
 export type LedgerEntryType =
   | 'opening_balance'
@@ -61,7 +87,8 @@ export interface LedgerEntryRow {
 }
 
 const CUSTOMER_COLUMNS = `
-  c.id, c.name, c.phone, c.email, c.gstin, c.state_code AS "stateCode", c.address_line1 AS "addressLine1",
+  c.id, c.name, c.phone, c.email, c.gstin, c.gst_treatment AS "gstTreatment", c.uin, c.country_code AS "countryCode",
+  c.state_code AS "stateCode", c.address_line1 AS "addressLine1",
   c.address_line2 AS "addressLine2", c.city, c.pincode, c.credit_limit AS "creditLimit",
   c.price_list_id AS "priceListId", c.notes,
   COALESCE(b.balance, 0) AS balance, c.created_at AS "createdAt", c.updated_at AS "updatedAt"`;
@@ -73,6 +100,9 @@ const UPDATABLE = {
   phone: 'phone',
   email: 'email',
   gstin: 'gstin',
+  gstTreatment: 'gst_treatment',
+  uin: 'uin',
+  countryCode: 'country_code',
   stateCode: 'state_code',
   addressLine1: 'address_line1',
   addressLine2: 'address_line2',
@@ -117,8 +147,8 @@ export const customersRepository = {
   async insert(tx: Tx, c: NewCustomer): Promise<void> {
     await tx.query(
       `INSERT INTO customers (id, tenant_id, name, phone, email, gstin, state_code, address_line1, address_line2,
-         city, pincode, credit_limit, price_list_id, notes)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+         city, pincode, credit_limit, price_list_id, notes, gst_treatment, uin, country_code)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         c.id,
         c.name,
@@ -133,8 +163,47 @@ export const customersRepository = {
         c.creditLimit,
         c.priceListId,
         c.notes,
+        c.gstTreatment,
+        c.uin,
+        c.countryCode,
       ],
     );
+  },
+
+  /** Includes deleted addresses: an offline bill may name one removed since. */
+  findAddress(tx: Tx, id: string): Promise<CustomerAddressRow | undefined> {
+    return tx.one<CustomerAddressRow>(`SELECT ${ADDRESS_COLUMNS} FROM customer_addresses WHERE id = $1`, [id]);
+  },
+
+  listAddresses(tx: Tx, customerId: string): Promise<CustomerAddressRow[]> {
+    return tx.many<CustomerAddressRow>(
+      `SELECT ${ADDRESS_COLUMNS} FROM customer_addresses
+       WHERE customer_id = $1 AND deleted_at IS NULL ORDER BY is_default DESC, created_at, id`,
+      [customerId],
+    );
+  },
+
+  async upsertAddress(tx: Tx, a: CustomerAddressRow): Promise<void> {
+    // One default per customer: the unique index would otherwise refuse the second.
+    if (a.isDefault) {
+      await tx.query(
+        `UPDATE customer_addresses SET is_default = false
+         WHERE customer_id = $1 AND id <> $2 AND is_default AND deleted_at IS NULL`,
+        [a.customerId, a.id],
+      );
+    }
+    await tx.query(
+      `INSERT INTO customer_addresses (id, tenant_id, customer_id, label, line1, line2, city, country_code,
+         state_code, postal_code, ship_to_gstin, is_default)
+       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (id) DO UPDATE SET label = $3, line1 = $4, line2 = $5, city = $6, country_code = $7,
+         state_code = $8, postal_code = $9, ship_to_gstin = $10, is_default = $11, deleted_at = NULL`,
+      [a.id, a.customerId, a.label, a.line1, a.line2, a.city, a.countryCode, a.stateCode, a.postalCode, a.shipToGstin, a.isDefault],
+    );
+  },
+
+  async softDeleteAddress(tx: Tx, id: string): Promise<void> {
+    await tx.query('UPDATE customer_addresses SET deleted_at = now(), is_default = false WHERE id = $1', [id]);
   },
 
   async update(tx: Tx, id: string, patch: Record<string, unknown>): Promise<void> {

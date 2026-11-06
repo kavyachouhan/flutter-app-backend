@@ -1,0 +1,18 @@
+{
+  "notification": "CGST Rule 46",
+  "issued": null,
+  "effectiveFrom": "2017-07-01",
+  "sourceFile": "docs/gst/rule_46.txt",
+  "verificationStatus": "primary_verified",
+  "treatment": "encoded",
+  "reason": "Clause (e): an unregistered recipient's details are required at a taxable value of fifty thousand rupees or more. The footnotes in the source show no amendment to that clause.",
+  "add": {
+    "thresholds": [
+      {
+        "id": "rule46-unregistered-taxable",
+        "key": "rule46_unregistered_taxable",
+        "value": 5000000
+      }
+    ]
+  }
+}

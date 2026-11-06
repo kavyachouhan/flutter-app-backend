@@ -7,6 +7,13 @@
 import type { EinvoiceDocumentKind, EntityFacts } from '../../src/domain/gst/entity.js';
 import type { GstTreatment } from '../../src/domain/gst/enums.js';
 import { gstinCheckCharacter } from '../../src/domain/gst/gstin.js';
+import {
+  RULE_46_UNREGISTERED_TAXABLE_PAISE,
+  type PartySnapshot,
+  type Rule46Input,
+  type SnapshotAddress,
+} from '../../src/domain/gst/invoice-rules.js';
+import type { PosAddress, PosInput } from '../../src/domain/gst/place-of-supply.js';
 import type { RegistrationFacts } from '../../src/domain/gst/registration.js';
 import type { TaxPointFacts, TaxPointKind } from '../../src/domain/gst/time-of-supply.js';
 import type { GstRuleSet, GstRuleSetContent, LineRateInput } from '../../src/domain/gst/rule-set.js';
@@ -513,5 +520,134 @@ export function tosCases(): TosCase[] {
     t('all events after the last change: no s.14', 'outward_goods', { invoiceDate: '2026-11-04', removalDate: '2026-11-03', paymentDate: '2026-11-05' }),
     t('s.14 for reverse charge uses receipt and the supplier invoice', 'inward_rcm_goods', { invoiceDate: '2026-11-20', supplierInvoiceDate: '2026-10-28', receiptDate: '2026-11-03' }),
     t('a bad document date is refused', 'outward_goods', { invoiceDate: 'soon' }),
+  ];
+}
+
+// --- Place of supply (D24) ---------------------------------------------------------
+
+const MH: PosAddress = { stateCode: '27', countryCode: 'IN' };
+const KA: PosAddress = { stateCode: '29', countryCode: 'IN' };
+const NO_STATE: PosAddress = { stateCode: null, countryCode: 'IN' };
+const US: PosAddress = { stateCode: null, countryCode: 'US' };
+
+export interface PosCase {
+  readonly name: string;
+  readonly op: 'resolvePlaceOfSupply';
+  readonly input: PosInput;
+}
+
+export function posCases(): PosCase[] {
+  const c = (name: string, input: Partial<PosInput> & Pick<PosInput, 'scenario'>): PosCase => ({
+    name,
+    op: 'resolvePlaceOfSupply',
+    input: { supplierStateCode: '27', buyerTreatment: 'consumer', billTo: null, shipTo: null, ...input },
+  });
+  return [
+    c('walk-in at the counter stays in the seller state', { scenario: 'counter_sale', buyerTreatment: null }),
+    c('out-of-state customer at the counter stays in the seller state', { scenario: 'counter_sale', billTo: KA }),
+    c('visitor from abroad at the counter is taxed here', { scenario: 'counter_sale', buyerTreatment: 'overseas', billTo: US }),
+    c('delivered in the same state', { scenario: 'delivered', billTo: MH }),
+    c('delivered to the bill-to state', { scenario: 'delivered', billTo: KA }),
+    c('the ship-to state wins on delivery', { scenario: 'delivered', billTo: MH, shipTo: KA }),
+    c('delivery with no state is refused', { scenario: 'delivered', billTo: NO_STATE }),
+    c('delivery with no address is refused', { scenario: 'delivered' }),
+    c('delivery abroad must be an export', { scenario: 'delivered', buyerTreatment: 'consumer', billTo: US }),
+    c('bill-to-ship-to follows the buyer, not the goods', { scenario: 'bill_to_ship_to', buyerTreatment: 'registered_regular', billTo: KA, shipTo: MH }),
+    c('bill-to-ship-to needs a ship-to', { scenario: 'bill_to_ship_to', billTo: KA }),
+    c('goods without movement follow the goods', { scenario: 'goods_without_movement', billTo: MH, goodsLocationStateCode: '29' }),
+    c('goods without movement need a location', { scenario: 'goods_without_movement', billTo: MH }),
+    c('installation follows the site', { scenario: 'installation_at_site', billTo: MH, shipTo: KA }),
+    c('export with payment', { scenario: 'export_goods_with_payment', buyerTreatment: 'overseas', billTo: US }),
+    c('export under LUT', { scenario: 'export_goods_under_lut', buyerTreatment: 'overseas', billTo: US }),
+    c('export needs a foreign destination', { scenario: 'export_goods_under_lut', billTo: MH }),
+    c('overseas buyer cannot take a domestic delivery', { scenario: 'delivered', buyerTreatment: 'overseas', billTo: US }),
+    c('SEZ in the same state is still inter-state, with payment', { scenario: 'supply_to_sez', buyerTreatment: 'sez_unit', billTo: MH, sezAuthorisedOperations: true, sezUnderLut: false }),
+    c('SEZ under LUT', { scenario: 'supply_to_sez', buyerTreatment: 'sez_developer', billTo: KA, sezAuthorisedOperations: true, sezUnderLut: true }),
+    c('SEZ outside authorised operations is taxed', { scenario: 'supply_to_sez', buyerTreatment: 'sez_unit', billTo: KA, sezAuthorisedOperations: false }),
+    c('SEZ outside authorised operations cannot go under LUT', { scenario: 'supply_to_sez', buyerTreatment: 'sez_unit', billTo: KA, sezAuthorisedOperations: false, sezUnderLut: true }),
+    c('SEZ must say about authorised operations', { scenario: 'supply_to_sez', buyerTreatment: 'sez_unit', billTo: KA }),
+    c('SEZ scenario needs an SEZ buyer', { scenario: 'supply_to_sez', buyerTreatment: 'registered_regular', billTo: KA, sezAuthorisedOperations: true }),
+    c('an SEZ buyer cannot use another scenario', { scenario: 'delivered', buyerTreatment: 'sez_unit', billTo: KA }),
+    c('service to a registered recipient', { scenario: 'services_general', buyerTreatment: 'registered_regular', billTo: KA }),
+    c('service to a UIN holder', { scenario: 'services_general', buyerTreatment: 'uin_holder', billTo: KA }),
+    c('service to a registered recipient needs a state', { scenario: 'services_general', buyerTreatment: 'registered_regular', billTo: NO_STATE }),
+    c('service to an unregistered person with an address', { scenario: 'services_general', billTo: KA }),
+    c('service to an unregistered person with no address', { scenario: 'services_general' }),
+    c('service abroad is not supported', { scenario: 'services_general', buyerTreatment: 'overseas', billTo: US }),
+    c('reserved: supply from an SEZ', { scenario: 'supply_from_sez' }),
+    c('reserved: cross-border services', { scenario: 'cross_border_services' }),
+    c('reserved: deemed export', { scenario: 'deemed_export' }),
+    c('reserved: on board a conveyance', { scenario: 'on_board_conveyance' }),
+    c('reserved: services with their own rules', { scenario: 'services_specific' }),
+    c('the migration label is refused', { scenario: 'legacy_unclassified' }),
+  ];
+}
+
+// --- Invoice rules (Rule 46, docs/gst/rule_46.txt) ----------------------------------
+
+const party = (over: Partial<PartySnapshot>, address: Partial<SnapshotAddress> = {}): PartySnapshot => ({
+  name: 'A Buyer',
+  legalName: null,
+  gstin: null,
+  uin: null,
+  gstTreatment: 'consumer',
+  phone: null,
+  email: null,
+  ...over,
+  address: { line1: '12 MG Road', line2: null, city: 'Pune', postalCode: '411001', stateCode: '27', countryCode: 'IN', ...address },
+});
+
+export type InvoiceRulesCase =
+  | { readonly name: string; readonly op: 'rule46MissingFields'; readonly input: Rule46Input }
+  | { readonly name: string; readonly op: 'zeroRatedEndorsement'; readonly input: { readonly supplyType: SupplyType; readonly sezAuthorisedOperations: boolean | null } }
+  | { readonly name: string; readonly op: 'stateTaxLabel'; readonly input: { readonly placeOfSupply: string | null } }
+  | { readonly name: string; readonly op: 'usesIgst'; readonly input: { readonly supplyType: SupplyType } };
+
+export function invoiceRulesCases(): InvoiceRulesCase[] {
+  const r = (name: string, over: Partial<Rule46Input>): InvoiceRulesCase => ({
+    name,
+    op: 'rule46MissingFields',
+    input: {
+      documentType: 'tax_invoice',
+      supplyType: 'intra_state',
+      buyer: party({}),
+      shipTo: null,
+      taxableValue: 5_000_000,
+      unregisteredThreshold: RULE_46_UNREGISTERED_TAXABLE_PAISE,
+      ...over,
+    },
+  });
+  const noAddress = { line1: null, stateCode: null };
+  const registered = { gstTreatment: 'registered_regular', gstin: '27AAPFU0939F1ZV' } as const;
+  return [
+    r('walk-in at ₹49,999.99 needs nothing', { buyer: null, taxableValue: 4_999_999 }),
+    r('walk-in at exactly ₹50,000 needs everything', { buyer: null }),
+    r('unregistered at ₹50,000 with no address', { buyer: party({ gstTreatment: 'unregistered' }, noAddress) }),
+    r('consumer at ₹50,000 complete', {}),
+    r('consumer with a blank name', { buyer: party({ name: '  ' }) }),
+    r('a ship-to supplies the delivery address, not the bill-to', { buyer: party({}, noAddress), shipTo: party({}) }),
+    r('a ship-to with no state', { shipTo: party({}, { stateCode: null }) }),
+    r('registered with an address, at any value', { buyer: party(registered), taxableValue: 100 }),
+    r('registered needs an address, at any value', { buyer: party(registered, noAddress), taxableValue: 100 }),
+    r('UIN holder identified by UIN', { buyer: party({ gstTreatment: 'uin_holder', uin: '0717UNO00157UNF' }) }),
+    r('SEZ unit needs an address', { buyer: party({ gstTreatment: 'sez_unit', gstin: '27AAPFU0939F1ZV' }, noAddress), supplyType: 'sez_with_tax' }),
+    r('export complete, at any value', { supplyType: 'export_without_tax', taxableValue: 100, buyer: party({ gstTreatment: 'overseas' }, { stateCode: null, countryCode: 'US' }) }),
+    r('export with no buyer', { supplyType: 'export_with_tax', buyer: null, taxableValue: 100 }),
+    r('export with an Indian destination', { supplyType: 'export_with_tax', taxableValue: 100 }),
+    r('a bill of supply is not tested here', { documentType: 'bill_of_supply', buyer: null }),
+    r('a non-GST document is not tested', { documentType: null, buyer: null }),
+    ...(['intra_state', 'inter_state', 'export_with_tax', 'export_without_tax'] as const).map(
+      (supplyType): InvoiceRulesCase => ({ name: `endorsement: ${supplyType}`, op: 'zeroRatedEndorsement', input: { supplyType, sezAuthorisedOperations: null } }),
+    ),
+    { name: 'endorsement: SEZ with payment', op: 'zeroRatedEndorsement', input: { supplyType: 'sez_with_tax', sezAuthorisedOperations: true } },
+    { name: 'endorsement: SEZ under LUT', op: 'zeroRatedEndorsement', input: { supplyType: 'sez_without_tax', sezAuthorisedOperations: true } },
+    { name: 'endorsement: SEZ outside authorised operations has none', op: 'zeroRatedEndorsement', input: { supplyType: 'sez_with_tax', sezAuthorisedOperations: false } },
+    ...['04', '26', '31', '35', '38', '27', '07', '34', '96'].map(
+      (placeOfSupply): InvoiceRulesCase => ({ name: `tax label: ${placeOfSupply}`, op: 'stateTaxLabel', input: { placeOfSupply } }),
+    ),
+    { name: 'tax label: unknown', op: 'stateTaxLabel', input: { placeOfSupply: null } },
+    ...(['intra_state', 'inter_state', 'export_with_tax', 'sez_without_tax'] as const).map(
+      (supplyType): InvoiceRulesCase => ({ name: `head: ${supplyType}`, op: 'usesIgst', input: { supplyType } }),
+    ),
   ];
 }

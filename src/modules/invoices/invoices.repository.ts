@@ -55,6 +55,22 @@ export interface InvoiceHeaderInsert {
   billDiscountReason: string | null;
   issuedAt: string;
   issuedBy: string;
+  supply: InvoiceSupplyColumns;
+}
+
+/** D8, D24: what the document froze about the supply and the parties. */
+export interface InvoiceSupplyColumns {
+  scenario: string | null;
+  provision: string | null;
+  override: unknown;
+  sezAuthorisedOperations: boolean | null;
+  lutReference: string | null;
+  buyerGstTreatment: string | null;
+  customerUin: string | null;
+  seller: unknown;
+  buyer: unknown;
+  shipTo: unknown;
+  dispatchFrom: unknown;
 }
 
 export interface InvoiceLineInsert {
@@ -148,6 +164,11 @@ const HEADER_COLUMNS = `
   i.custom_fields AS "customFields", i.attachments, i.is_reverse_charge AS "isReverseCharge",
   i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId", i.proforma_invoice_id AS "proformaInvoiceId",
   i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
+  i.supply_scenario AS "supplyScenario", i.pos_provision AS "posProvision", i.pos_override AS "posOverride",
+  i.sez_authorised_operations AS "sezAuthorisedOperations", i.lut_reference AS "lutReference",
+  i.buyer_gst_treatment AS "buyerGstTreatment", i.customer_uin AS "customerUin",
+  i.seller_snapshot AS "sellerSnapshot", i.buyer_snapshot AS "buyerSnapshot",
+  i.ship_to_snapshot AS "shipToSnapshot", i.dispatch_from_snapshot AS "dispatchFromSnapshot",
   (SELECT r.id FROM invoices r WHERE r.amends_invoice_id = i.id AND r.status = 'issued' LIMIT 1)
     AS "amendedByInvoiceId",
   ${AMOUNT_PAID} AS "amountPaid"`;
@@ -201,7 +222,10 @@ export const invoicesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, taxable_charges, non_taxable_charges,
          additional_charges, sub_total, round_off, grand_total, tax_summary, hsn_summary, notes, status,
          issued_at, issued_by, custom_fields, is_reverse_charge, terms_id, terms_snapshot, sales_order_id,
-         amends_invoice_id, bill_discount_reason, estimate_id, attachments, proforma_invoice_id)
+         amends_invoice_id, bill_discount_reason, estimate_id, attachments, proforma_invoice_id,
+         supply_scenario, pos_provision, pos_override, sez_authorised_operations, lut_reference,
+         buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
+         dispatch_from_snapshot)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -209,7 +233,8 @@ export const invoicesRepository = {
          $20, $21, $22, $23, $24,
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
-         $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb, $50)`,
+         $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb, $50,
+         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61)`,
       [
         h.id,
         h.outletId,
@@ -261,6 +286,17 @@ export const invoicesRepository = {
         h.estimateId ?? null,
         JSON.stringify(h.attachments),
         h.proformaInvoiceId ?? null,
+        h.supply.scenario,
+        h.supply.provision,
+        jsonParam(h.supply.override),
+        h.supply.sezAuthorisedOperations,
+        h.supply.lutReference,
+        h.supply.buyerGstTreatment,
+        h.supply.customerUin,
+        jsonParam(h.supply.seller),
+        jsonParam(h.supply.buyer),
+        jsonParam(h.supply.shipTo),
+        jsonParam(h.supply.dispatchFrom),
       ],
     );
   },

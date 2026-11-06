@@ -37,6 +37,7 @@ import {
   InternalError,
   NotFoundError,
   UnprocessableError,
+  ValidationError,
 } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
@@ -52,6 +53,7 @@ import {
   type NewSupplierLedgerEntry,
 } from '../suppliers/suppliers.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
+import { sellerSnapshot } from '../invoices/invoice-supply.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { dueDateFor } from '../../domain/purchases/due-date.js';
 import { numberForDocument } from './numbering.js';
@@ -152,6 +154,11 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const unknown = itemIds.filter((id) => !items.has(id));
     if (unknown.length > 0) throw new NotFoundError('Item', { details: { itemIds: unknown } });
 
+    // Guessing "our own state" here would put tax under the wrong head without anyone seeing.
+    if (taxMode === 'gst' && !supplier.stateCode && body.lines.some((l) => l.taxRatePercent > 0)) {
+      throw new ValidationError('Add this supplier\'s state: it decides IGST or CGST and SGST on the bill.');
+    }
+
     const totals = computeInvoice(
       {
         mode: taxMode,
@@ -196,7 +203,27 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase');
     assertAttachments(body.attachments);
 
+    const tenant = await tenantsRepository.findCurrent(tx);
+    if (!tenant) throw new NotFoundError('Tenant');
     await purchasesRepository.insertBill(tx, {
+      sellerSnapshot: {
+        name: supplier.name,
+        legalName: null,
+        gstin: supplier.gstin,
+        uin: supplier.uin,
+        gstTreatment: supplier.gstTreatment,
+        address: {
+          line1: supplier.addressLine1,
+          line2: supplier.addressLine2,
+          city: supplier.city,
+          postalCode: supplier.pincode,
+          stateCode: supplier.stateCode,
+          countryCode: supplier.countryCode,
+        },
+        phone: supplier.phone,
+        email: supplier.email,
+      },
+      buyerSnapshot: sellerSnapshot(tenant, outlet, taxMode),
       id: body.id,
       outletId: body.outletId,
       supplierId: supplier.id,

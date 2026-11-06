@@ -5,9 +5,11 @@ import { idParams } from '../../lib/validators.js';
 import * as customersService from './customers.service.js';
 import {
   createCustomerBody,
+  customerAddressParams,
   ledgerQuery,
   listCustomersQuery,
   updateCustomerBody,
+  upsertCustomerAddressBody,
 } from './customers.schemas.js';
 
 export const customersRouter: Router = Router();
@@ -37,6 +39,41 @@ customersRouter.get(
   async (req, res) => {
     const { params, query } = validated<typeof statement>(req);
     res.json(await customersService.getStatement(params.id, query));
+  },
+);
+
+customersRouter.get(
+  '/:id/addresses',
+  requirePermission('customers:read'),
+  validate(byId),
+  async (req, res) => {
+    const { params } = validated<typeof byId>(req);
+    res.json({ data: await customersService.listCustomerAddresses(params.id) });
+  },
+);
+
+const putAddress = { params: customerAddressParams, body: upsertCustomerAddressBody };
+customersRouter.put(
+  '/:id/addresses/:addressId',
+  requirePermission('customers:write'),
+  validate(putAddress),
+  async (req, res) => {
+    const { params, body } = validated<typeof putAddress>(req);
+    res.json({
+      data: await customersService.upsertCustomerAddress({ ...body, id: params.addressId, customerId: params.id }),
+    });
+  },
+);
+
+const addressById = { params: customerAddressParams };
+customersRouter.delete(
+  '/:id/addresses/:addressId',
+  requirePermission('customers:write'),
+  validate(addressById),
+  async (req, res) => {
+    const { params } = validated<typeof addressById>(req);
+    await customersService.deleteCustomerAddress(params.id, params.addressId);
+    res.status(204).end();
   },
 );
 

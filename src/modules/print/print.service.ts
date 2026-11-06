@@ -13,7 +13,9 @@ import {
   type PrintProfile,
   type ResolveInput,
 } from '../../domain/print/resolve.js';
-import { stateNameFor } from '../../domain/print/states.js';
+import type { PartySnapshot } from '../../domain/gst/invoice-rules.js';
+import { usesIgst } from '../../domain/gst/invoice-rules.js';
+import { stateLabelFor, stateNameFor } from '../../domain/print/states.js';
 import {
   resolveTemplate,
   TEMPLATES,
@@ -21,7 +23,7 @@ import {
   type TemplateKey,
 } from '../../domain/print/templates.js';
 import type { PrintDocument } from '../../domain/print/types.js';
-import type { TaxMode } from '../../domain/tax/types.js';
+import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { ConflictError, ErrorCode, NotFoundError } from '../../lib/errors.js';
 import { remove as removeObject, verifyUploadedObject } from '../../lib/storage.js';
 import { assertOutletAccess } from '../../middleware/authorize.js';
@@ -148,7 +150,13 @@ interface DocumentPrintHeader {
   readonly customerName: string | null;
   readonly customerGstin: string | null;
   readonly taxMode: TaxMode;
-  readonly supplyType: 'intra_state' | 'inter_state';
+  readonly supplyType: SupplyType;
+  readonly placeOfSupplyStateCode: string | null;
+  readonly isReverseCharge: boolean;
+  readonly sezAuthorisedOperations: boolean | null;
+  readonly sellerSnapshot: unknown;
+  readonly buyerSnapshot: unknown;
+  readonly shipToSnapshot: unknown;
   readonly grossAmount: number;
   readonly lineDiscountTotal: number;
   readonly billDiscountAmount: number;
@@ -229,6 +237,55 @@ function buildBusiness(outlet: OutletRow, tenant: TenantRow) {
   };
 }
 
+/** A snapshot to print from. Documents from before A3 hold a stub, or nothing. */
+function usableSnapshot(value: unknown): PartySnapshot | null {
+  if (value === null || value === undefined) return null;
+  const snapshot = value as PartySnapshot & { legacy?: boolean };
+  return snapshot.legacy === true || snapshot.address === undefined ? null : snapshot;
+}
+
+function addressLinesOf(address: PartySnapshot['address']): string[] {
+  return compact([address.line1, address.line2, [address.city, address.postalCode].filter(Boolean).join(' ')]);
+}
+
+function countryName(code: string): string {
+  return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code;
+}
+
+function printableParty(party: PartySnapshot) {
+  const { stateCode, countryCode } = party.address;
+  return {
+    name: party.name,
+    phone: party.phone,
+    gstin: party.gstin ?? party.uin,
+    addressLines: addressLinesOf(party.address),
+    // Rule 46: the state's name and code, or the country of destination on an export.
+    stateName: countryCode === 'IN' ? stateLabelFor(stateCode) : countryName(countryCode),
+  };
+}
+
+function businessFromSnapshot(seller: PartySnapshot) {
+  return {
+    name: seller.name,
+    legalName: seller.legalName,
+    addressLines: addressLinesOf(seller.address),
+    phone: seller.phone,
+    email: seller.email,
+    gstin: seller.gstin,
+  };
+}
+
+/** What a tax invoice or a note against one states about the supply: all as issued. */
+function gstFacts(header: DocumentPrintHeader, buyer: PartySnapshot | null) {
+  return {
+    placeOfSupply: header.placeOfSupplyStateCode,
+    supplyType: header.supplyType,
+    isReverseCharge: header.isReverseCharge,
+    sezAuthorisedOperations: header.sezAuthorisedOperations,
+    registeredBuyer: Boolean(buyer?.gstin ?? buyer?.uin ?? header.customerGstin),
+  };
+}
+
 function pickTemplate(
   resolved: ResolvedProfile,
   requested: TemplateKey | undefined,
@@ -274,7 +331,7 @@ async function loadCustomer(
       details?.addressLine2,
       [details?.city, details?.pincode].filter(Boolean).join(' '),
     ]),
-    stateName: stateNameFor(details?.stateCode),
+    stateName: stateLabelFor(details?.stateCode) ?? stateNameFor(details?.stateCode),
   };
 }
 
@@ -306,6 +363,9 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
 
     const context = await printRepository.findContext(tx, header.issuedBy, header.counterId);
     const customFields = await resolveCustomFields(tx, 'invoice', header.customFields);
+    const seller = usableSnapshot(header.sellerSnapshot);
+    const buyer = usableSnapshot(header.buyerSnapshot);
+    const shipTo = usableSnapshot(header.shipToSnapshot);
 
     const input: ResolveInput = {
       kind: 'invoice',
@@ -316,15 +376,14 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
       // would rewrite history if the business later registered for GST or the
       // outlet moved state.
       taxMode: header.taxMode,
-      isInterState: header.supplyType === 'inter_state',
-      business: buildBusiness(outlet, tenant),
+      isInterState: usesIgst(header.supplyType),
+      business: seller ? businessFromSnapshot(seller) : buildBusiness(outlet, tenant),
       profile: withDocumentTerms(resolved.profile, header.termsSnapshot),
-      customer: await loadCustomer(
-        tx,
-        header.customerId,
-        header.customerName,
-        header.customerGstin,
-      ),
+      customer: buyer
+        ? printableParty(buyer)
+        : await loadCustomer(tx, header.customerId, header.customerName, header.customerGstin),
+      shipTo: shipTo ? printableParty(shipTo) : null,
+      gst: gstFacts(header, buyer),
       lines: lines.map((line) => ({
         name: line.itemName,
         quantity: line.quantity,
@@ -636,6 +695,9 @@ export function buildCreditNotePayload(
 
     const context = await printRepository.findContext(tx, header.issuedBy, header.counterId);
     const customFields = await resolveCustomFields(tx, 'credit_note', header.customFields);
+    const seller = usableSnapshot(header.sellerSnapshot);
+    const buyer = usableSnapshot(header.buyerSnapshot);
+    const shipTo = usableSnapshot(header.shipToSnapshot);
 
     const input: ResolveInput = {
       kind: 'credit_note',
@@ -643,15 +705,14 @@ export function buildCreditNotePayload(
       documentDate: String(header.documentDate),
       issuedAt: header.issuedAt,
       taxMode: header.taxMode,
-      isInterState: header.supplyType === 'inter_state',
-      business: buildBusiness(outlet, tenant),
+      isInterState: usesIgst(header.supplyType),
+      business: seller ? businessFromSnapshot(seller) : buildBusiness(outlet, tenant),
       profile: resolved.profile,
-      customer: await loadCustomer(
-        tx,
-        header.customerId,
-        header.customerName,
-        header.customerGstin,
-      ),
+      customer: buyer
+        ? printableParty(buyer)
+        : await loadCustomer(tx, header.customerId, header.customerName, header.customerGstin),
+      shipTo: shipTo ? printableParty(shipTo) : null,
+      gst: gstFacts(header, buyer),
       lines: lines.map((line) => ({
         name: line.itemName,
         quantity: line.quantity,

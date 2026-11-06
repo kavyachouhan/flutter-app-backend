@@ -69,6 +69,16 @@ export const printDocumentSchema = registry.register(
           stateName: z.string().optional(),
         })
         .optional(),
+      shipTo: z
+        .object({
+          name: z.string(),
+          gstin: z.string().optional(),
+          addressLines: z.array(z.string()),
+          stateName: z.string().optional(),
+        })
+        .optional()
+        .openapi({ description: 'The address of delivery, when it is not the customer address.' }),
+      stateTaxLabel: z.string().optional().openapi({ description: 'UTGST where it replaces SGST.' }),
       meta: z.array(printField),
       items: z.array(
         z.object({

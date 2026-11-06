@@ -56,6 +56,9 @@ interface BillForReturn {
   readonly itcCategory: string | null;
   readonly supplyType: SupplyType;
   readonly isReverseCharge: boolean;
+  readonly supplierStateCode: string | null;
+  readonly sellerSnapshot: unknown;
+  readonly buyerSnapshot: unknown;
   readonly placeOfSupplyStateCode: string | null;
   readonly pricesIncludeTax: boolean;
   readonly roundOffEnabled: boolean;
@@ -143,7 +146,8 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
     const totals = computeInvoice(
       {
         mode: bill.taxMode,
-        supplierStateCode: supplier.stateCode ?? settings.stateCode,
+        // The return reverses the bill as it was: a supplier edited since changes nothing here.
+        supplierStateCode: bill.supplierStateCode ?? bill.placeOfSupplyStateCode ?? settings.stateCode,
         placeOfSupplyStateCode: bill.placeOfSupplyStateCode ?? settings.stateCode,
         // Both carried over from the bill: a return of a reverse-charge
         // purchase reverses the same self-assessed liability, so the two have
@@ -184,6 +188,8 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       id: body.id,
       outletId: bill.outletId,
       supplierId: bill.supplierId,
+      sellerSnapshot: bill.sellerSnapshot ?? null,
+      buyerSnapshot: bill.buyerSnapshot ?? null,
       purchaseBillId: body.purchaseBillId,
       originalDocumentNumber: bill.documentNumber,
       seriesId: number.seriesId,
@@ -192,7 +198,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       documentDate: body.documentDate,
       fyStartYear: number.fyStartYear,
       supplierGstin: supplier.gstin,
-      supplierStateCode: supplier.stateCode,
+      supplierStateCode: bill.supplierStateCode,
       placeOfSupplyStateCode: bill.placeOfSupplyStateCode,
       pricesIncludeTax: bill.pricesIncludeTax,
       roundOffEnabled: bill.roundOffEnabled,

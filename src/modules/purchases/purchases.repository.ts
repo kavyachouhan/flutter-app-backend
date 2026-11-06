@@ -10,6 +10,9 @@ import type { Cursor } from '../../lib/pagination.js';
 import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
 export interface PurchaseBillHeaderInsert {
+  /** D8: who supplied, and who received, as they were on this bill. */
+  sellerSnapshot: unknown;
+  buyerSnapshot: unknown;
   id: string;
   outletId: string;
   supplierId: string;
@@ -116,6 +119,7 @@ const HEADER_COLUMNS = `
   pb.supplier_invoice_no AS "supplierInvoiceNo", pb.supplier_invoice_date AS "supplierInvoiceDate",
   pb.due_date AS "dueDate", pb.supplier_gstin AS "supplierGstin",
   pb.supplier_state_code AS "supplierStateCode",
+  pb.seller_snapshot AS "sellerSnapshot", pb.buyer_snapshot AS "buyerSnapshot",
   pb.place_of_supply_state_code AS "placeOfSupplyStateCode", pb.tax_mode AS "taxMode",
   pb.supply_type AS "supplyType", pb.prices_include_tax AS "pricesIncludeTax",
   pb.round_off_enabled AS "roundOffEnabled", pb.itc_eligible AS "itcEligible",
@@ -224,7 +228,8 @@ export const purchasesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
          grand_total, tax_summary, hsn_summary, freight_amount, other_charges_amount,
          landed_cost_basis, notes, status, received_at, created_by, is_reverse_charge,
-         itc_category, itc_ineligible_reason, terms_id, terms_snapshot, attachments)
+         itc_category, itc_ineligible_reason, terms_id, terms_snapshot, attachments,
+         seller_snapshot, buyer_snapshot)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6,
          $7, $8, $9, $10, $11,
@@ -233,7 +238,7 @@ export const purchasesRepository = {
          $21, $22, $23, $24, $25,
          $26, $27, $28, $29, $30, $31, $32,
          $33, $34, $35, $36, $37,
-         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46, $47::jsonb)`,
+         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46, $47::jsonb, $48, $49)`,
       [
         h.id,
         h.outletId,
@@ -282,6 +287,8 @@ export const purchasesRepository = {
         h.termsId,
         jsonParam(h.termsSnapshot),
         JSON.stringify(h.attachments),
+        jsonParam(h.sellerSnapshot),
+        jsonParam(h.buyerSnapshot),
       ],
     );
   },

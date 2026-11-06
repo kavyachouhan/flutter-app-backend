@@ -909,6 +909,12 @@ Named GST constraints that bad input can reach are reported as `VALIDATION_FAILE
 
 **Parties' domestic address rule (clarifying §3).** On `customers` and `suppliers`, the overseas half of the rule is enforced: `country_code <> 'IN'` ⇒ `overseas`, no state, no GSTIN, no UIN. The domestic half is not, because today's walk-in customers legitimately have no pincode. Domestic address completeness is enforced where the law needs it: at issue, by the Rule 46 check (D7), and on `customer_addresses`, which is new and enforced in full. Existing malformed values are covered by `NOT VALID` CHECKs.
 
+**A3 as built (7 Nov 2026):**
+- Invoices, credit notes, purchase bills and debit notes store their snapshots; printing reads them. Rows from before A3 hold a stub or nothing, and print from the live records as before.
+- `supply_scenario` and `pos_provision` are stored on invoices and credit notes. A client that names no scenario gets a declared export or SEZ supply as declared, a known other state as `delivered`, and otherwise `counter_sale`; the app always names one.
+- A supply to an SEZ outside authorised operations is stored as `sez_with_tax` with `sez_authorised_operations = false`: it charges IGST and carries no endorsement. The A5 return engine must report it by that flag, not as zero-rated.
+- **Not done in A3:** the tenant and outlet APIs still write the old columns, so the direction flip above is still to come. Estimates, sales orders, proforma invoices and delivery challans have no snapshot columns and print live records; they are not tax documents, and delivery challans should gain them with the e-way bill work (B4). Per-registration round-off (D5) needs registrations on the device, so the bill's own round-off choice stays, defaulting on. `tax_point_*` and `rule_set_version` wait for a published rule set (A2).
+
 **Series families for BillBanao's own voucher types.** `payment_receipt` and `refund_voucher` map to `non_gst` for now. They record payments against invoices and refunds of returns, not s.31(3)(d)/(e) advance receipt and refund vouchers. Open item **V1** (A5): confirm before they are counted in Table 13.
 
 ## 10. Keys frozen for later milestones

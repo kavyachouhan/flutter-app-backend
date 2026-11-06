@@ -1,10 +1,13 @@
 import { z } from 'zod';
+import { GST_TREATMENTS, RESERVED_SUPPLY_SCENARIOS, SUPPLY_SCENARIOS } from '../../domain/gst/enums.js';
 import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { discountApproval } from '../price-lists/price-lists.schemas.js';
 import {
+  countryCode,
   declaredSupplyType,
+  gstin,
   hsnCode,
   isoDate,
   nonEmpty,
@@ -15,6 +18,7 @@ import {
   stateCode,
   supplyCategory,
   timestamp,
+  uin,
 } from '../../lib/validators.js';
 
 export const discount = z.discriminatedUnion('kind', [
@@ -74,6 +78,25 @@ const tender = z
   })
   .superRefine(requireAccountForNonCashMode);
 
+/** Freeze §4.3: the frozen shape of a party on a document. */
+const partySnapshot = z.object({
+  name: nonEmpty.max(200),
+  legalName: z.string().max(200).nullable(),
+  gstin: gstin.nullable(),
+  uin: uin.nullable(),
+  gstTreatment: z.enum(GST_TREATMENTS).nullable(),
+  address: z.object({
+    line1: z.string().max(200).nullable(),
+    line2: z.string().max(200).nullable(),
+    city: z.string().max(100).nullable(),
+    postalCode: z.string().max(16).nullable(),
+    stateCode: stateCode.nullable(),
+    countryCode,
+  }),
+  phone: z.string().max(32).nullable(),
+  email: z.string().max(200).nullable(),
+});
+
 export const createInvoiceBody = z.object({
   id: clientId,
   outletId: z.string().uuid(),
@@ -102,6 +125,22 @@ export const createInvoiceBody = z.object({
   amendsInvoiceId: z.string().uuid().optional(),
   /** Why the bill discount was given, kept with the document. */
   billDiscountReason: nonEmpty.max(280).optional(),
+  /** What physically happened (D24). The server re-resolves the place of supply from it. */
+  // Reserved scenarios pass here so the resolver can refuse them with its typed error.
+  supplyScenario: z.enum([...SUPPLY_SCENARIOS, ...RESERVED_SUPPLY_SCENARIOS]).optional(),
+  /** Only for `goods_without_movement`: the state the goods are in. */
+  goodsLocationStateCode: stateCode.optional(),
+  /** Only for `supply_to_sez`. */
+  sezAuthorisedOperations: z.boolean().optional(),
+  sezUnderLut: z.boolean().optional(),
+  lutReference: nonEmpty.max(64).optional(),
+  /** The bill-to as the till held it when billing. Omitted, it comes from the customer. */
+  buyerSnapshot: partySnapshot.optional(),
+  /** Omitted with no `shipToAddressId`, the goods go to the bill-to or leave over the counter. */
+  shipToSnapshot: partySnapshot.optional(),
+  shipToAddressId: z.string().uuid().optional(),
+  /** Needs `gst:manage`. Recorded with who and why. */
+  posOverride: z.object({ placeOfSupply: stateCode, reason: nonEmpty.max(280) }).optional(),
   placeOfSupplyStateCode: stateCode.optional(),
   /**
    * Declares an export or SEZ supply, which no state code implies. Omitted,

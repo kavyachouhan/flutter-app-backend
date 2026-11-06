@@ -52,11 +52,13 @@ import {
   loadSaleItems,
   mispricedLines,
   resolveApprovers,
+  taxModeFor,
   unapprovedBreaches,
 } from '../sales-docs/prepare.js';
 import { creditNotesRepository } from '../credit-notes/credit-notes.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
+import { assertRule46, decideInvoiceSupply, dispatchSnapshot, sellerSnapshot } from './invoice-supply.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
 import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js';
 
@@ -190,13 +192,23 @@ export async function createInvoice(body: CreateInvoiceBody) {
       throw new ValidationError('Unknown items on the invoice.', { details: { itemIds: unknown } });
     const itemFor = (itemId: string | null | undefined) => items.itemFor(itemId);
 
+    const tenant = await tenantsRepository.findCurrent(tx);
+    if (!tenant) throw new NotFoundError('Tenant');
+    const mode = taxModeFor(settings);
+    const supply = await decideInvoiceSupply(tx, {
+      body,
+      mode,
+      customer,
+      supplierState: outlet.stateCode ?? settings.stateCode,
+    });
+
     const totals = computeSaleTotals({
       settings,
       outlet,
       customer,
       items,
-      placeOfSupplyStateCode: body.placeOfSupplyStateCode,
-      supplyType: body.supplyType,
+      placeOfSupplyStateCode: supply.placeOfSupply,
+      supplyType: supply.supplyType,
       isReverseCharge: body.isReverseCharge,
       pricesIncludeTax: body.pricesIncludeTax,
       roundOff: body.roundOff,
@@ -205,6 +217,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       lines: body.lines,
     });
     assertTotalsMatch(totals, body.expectedTotals, 'Invoice');
+    assertRule46({ mode, supplyType: totals.supplyType, supply, taxableValue: totals.taxableAmount });
 
     const tenders = body.payments ?? [];
     const paid = tenders.reduce((acc, t) => acc + t.amount, 0);
@@ -346,11 +359,11 @@ export async function createInvoice(body: CreateInvoiceBody) {
       documentDate: body.documentDate,
       fyStartYear: fy.startYear,
       customerId: customer?.id ?? null,
-      customerName: customer?.name ?? null,
-      customerGstin: customer?.gstin ?? null,
+      customerName: supply.buyer?.name ?? null,
+      customerGstin: supply.buyer?.gstin ?? null,
       supplierGstin: outlet.gstin ?? settings.gstin,
       supplierStateCode: outlet.stateCode ?? settings.stateCode,
-      placeOfSupplyStateCode: body.placeOfSupplyStateCode ?? customer?.stateCode ?? null,
+      placeOfSupplyStateCode: supply.placeOfSupply ?? customer?.stateCode ?? null,
       pricesIncludeTax: body.pricesIncludeTax,
       roundOffEnabled: body.roundOff,
       totals,
@@ -368,7 +381,28 @@ export async function createInvoice(body: CreateInvoiceBody) {
       billDiscountReason: body.billDiscountReason ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
+      supply: {
+        scenario: supply.scenario,
+        provision: supply.provision,
+        override: supply.override,
+        sezAuthorisedOperations: supply.sezAuthorisedOperations,
+        lutReference: body.lutReference ?? null,
+        buyerGstTreatment: supply.buyer?.gstTreatment ?? null,
+        customerUin: supply.buyer?.uin ?? null,
+        seller: sellerSnapshot(tenant, outlet, mode),
+        buyer: supply.buyer,
+        shipTo: supply.shipTo,
+        dispatchFrom: dispatchSnapshot(tenant, outlet),
+      },
     });
+    if (supply.override) {
+      await recordAudit(tx, {
+        action: 'invoice.place_of_supply_overridden',
+        entityType: 'invoice',
+        entityId: body.id,
+        changes: { placeOfSupply: { from: supply.resolvedPlaceOfSupply, to: supply.placeOfSupply } },
+      });
+    }
 
     const lineRows: InvoiceLineInsert[] = body.lines.map((l, index) => {
       const computed = totals.lines[index];

@@ -212,6 +212,8 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'customer.create': 'customers:write',
   'customer.update': 'customers:write',
   'customer.delete': 'customers:write',
+  'customer_address.upsert': 'customers:write',
+  'customer_address.delete': 'customers:write',
   'item.create': 'catalogue:write',
   'item.update': 'catalogue:write',
   'item.delete': 'catalogue:write',
@@ -269,6 +271,8 @@ const OPERATION_TABLE: Partial<Record<OperationType, string>> = {
   'customer.create': 'customers',
   'customer.update': 'customers',
   'customer.delete': 'customers',
+  'customer_address.upsert': 'customer_addresses',
+  'customer_address.delete': 'customer_addresses',
   'item.create': 'items',
   'item.update': 'items',
   'item.delete': 'items',
@@ -397,6 +401,16 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
     case 'category.update': {
       const p = payload as Payload<'category.update'>;
       await catalogueService.updateCategory(p.id, p.patch);
+      return { id: p.id };
+    }
+    case 'customer_address.upsert': {
+      const p = payload as Payload<'customer_address.upsert'>;
+      await customersService.upsertCustomerAddress(p);
+      return { id: p.id };
+    }
+    case 'customer_address.delete': {
+      const p = payload as Payload<'customer_address.delete'>;
+      await customersService.deleteCustomerAddress(p.customerId, p.id).catch(ignoreNotFound);
       return { id: p.id };
     }
     case 'customer.delete': {

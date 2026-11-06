@@ -1,13 +1,18 @@
 import { z } from 'zod';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
-import { booleanQuery, gstin, nonEmpty, signedPaise, stateCode } from '../../lib/validators.js';
+import { GST_TREATMENTS } from '../../domain/gst/enums.js';
+import { booleanQuery, countryCode, gstin, nonEmpty, signedPaise, stateCode, uin } from '../../lib/validators.js';
 
 const supplierFields = {
   name: nonEmpty,
   phone: nonEmpty.nullable().optional(),
   email: z.string().email().nullable().optional(),
   gstin: gstin.nullable().optional(),
+  /** Omitted, it follows the GSTIN, UIN and country. */
+  gstTreatment: z.enum(GST_TREATMENTS).optional(),
+  uin: uin.nullable().optional(),
+  countryCode: countryCode.optional(),
   /** Place of supply for a purchase: decides IGST versus CGST/SGST. */
   stateCode: stateCode.nullable().optional(),
   addressLine1: nonEmpty.nullable().optional(),

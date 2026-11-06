@@ -19,6 +19,8 @@ import {
   buildRuleSetVectors,
   buildTaxVectors,
   buildTosVectors,
+  buildPosVectors,
+  buildInvoiceRulesVectors,
 } from './build.js';
 
 export const CONTRACTS_DIR = fileURLToPath(new URL('../../contracts/', import.meta.url));
@@ -32,6 +34,8 @@ export const RULESET_VECTORS_PATH = `${CONTRACTS_DIR}ruleset-vectors.json`;
 export const REGISTRATION_VECTORS_PATH = `${CONTRACTS_DIR}registration-vectors.json`;
 export const ENTITY_VECTORS_PATH = `${CONTRACTS_DIR}entity-vectors.json`;
 export const TOS_VECTORS_PATH = `${CONTRACTS_DIR}tos-vectors.json`;
+export const POS_VECTORS_PATH = `${CONTRACTS_DIR}pos-vectors.json`;
+export const INVOICE_RULES_VECTORS_PATH = `${CONTRACTS_DIR}invoice-rules-vectors.json`;
 
 function write(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -48,3 +52,5 @@ write(RULESET_VECTORS_PATH, buildRuleSetVectors());
 write(REGISTRATION_VECTORS_PATH, buildRegistrationVectors());
 write(ENTITY_VECTORS_PATH, buildEntityVectors());
 write(TOS_VECTORS_PATH, buildTosVectors());
+write(POS_VECTORS_PATH, buildPosVectors());
+write(INVOICE_RULES_VECTORS_PATH, buildInvoiceRulesVectors());
