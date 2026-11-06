@@ -12,6 +12,18 @@ import { describe, expect, it } from 'vitest';
 import type { TaxInvoiceResult } from '../../src/domain/tax/types.js';
 import {
   buildAccessVectors,
+  buildEntityVectors,
+  buildGstinVectors,
+  buildRegistrationVectors,
+  buildRuleSetVectors,
+  evaluateEntityCase,
+  evaluateGstinCase,
+  evaluateRegistrationCase,
+  evaluateRuleSetCase,
+  type EntityVectorsFile,
+  type GstinVectorsFile,
+  type RegistrationVectorsFile,
+  type RuleSetVectorsFile,
   buildCostingVectors,
   buildNumberingVectors,
   buildReturnsVectors,
@@ -159,5 +171,59 @@ describe('access contract vectors', () => {
     for (const granted of Object.values(file.roles)) {
       for (const permission of granted) expect(file.permissions).toContain(permission);
     }
+  });
+});
+
+describe('gstin contract vectors', () => {
+  const file = load<GstinVectorsFile>('gstin-vectors.json');
+
+  it('covers valid, invalid and swept GSTINs', () => {
+    expect(file.cases.length).toBeGreaterThan(100);
+    const results = file.cases.filter((c) => c.op === 'gstinProblem').map((c) => (c.expected as { result: unknown }).result);
+    for (const problem of [null, 'format', 'state_code', 'checksum']) expect(results).toContain(problem);
+  });
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateGstinCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildGstinVectors()).toEqual(file);
+  });
+});
+
+describe('gst rule-set contract vectors', () => {
+  const file = load<RuleSetVectorsFile>('ruleset-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateRuleSetCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildRuleSetVectors()).toEqual(file);
+  });
+});
+
+describe('gst registration contract vectors', () => {
+  const file = load<RegistrationVectorsFile>('registration-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateRegistrationCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildRegistrationVectors()).toEqual(file);
+  });
+});
+
+describe('gst entity contract vectors', () => {
+  const file = load<EntityVectorsFile>('entity-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateEntityCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildEntityVectors()).toEqual(file);
   });
 });

@@ -1,6 +1,7 @@
 /** Reusable Zod fields. Formats here are defined by GST law or ISO standards. */
 import { z } from 'zod';
 import { env } from '../config/env.js';
+import { isGstinValid } from '../domain/gst/gstin.js';
 
 export const nonEmpty = z.string().trim().min(1);
 
@@ -18,7 +19,7 @@ export const gstin = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'must be a valid GSTIN');
+  .refine(isGstinValid, 'must be a valid GSTIN');
 
 export const pan = z
   .string()

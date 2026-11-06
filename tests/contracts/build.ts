@@ -37,6 +37,49 @@ import { costingCases, type CostingContractCase } from './costing-cases.js';
 import { numberingCases, type BlockInput, type NumberingContractCase } from './numbering-cases.js';
 import { returnsCases, type ReturnsContractCase } from './returns-cases.js';
 import { allTaxCases, CONTRACT_GST_RATES } from './tax-cases.js';
+import {
+  einvoiceApplicability,
+  hsnRequirement,
+  resolvedTurnover,
+  statutoryFyStartYear,
+  type EntityFacts,
+} from '../../src/domain/gst/entity.js';
+import type { ThresholdKey } from '../../src/domain/gst/enums.js';
+import {
+  gstinMatchesState,
+  gstinProblem,
+  isUinFormatValid,
+  normaliseGstin,
+} from '../../src/domain/gst/gstin.js';
+import {
+  isRegistrationInForce,
+  profileInForce,
+  taxModeFor,
+  type RegistrationFacts,
+} from '../../src/domain/gst/registration.js';
+import {
+  checkLineRate,
+  isCessAllowed,
+  isRateAllowed,
+  ratesFor,
+  selectRuleSet,
+  thresholdValue,
+  validationEnforcement,
+  type GstRuleSet,
+} from '../../src/domain/gst/rule-set.js';
+import {
+  ENTITIES,
+  REGISTRATIONS,
+  RULE_SETS,
+  entityCases,
+  gstinCases,
+  registrationCases,
+  ruleSetCases,
+  type EntityCase,
+  type GstinCase,
+  type RegistrationCase,
+  type RuleSetCase,
+} from './gst-cases.js';
 
 /** What the reference implementation produced for a case. */
 export type ContractOutcome =
@@ -255,4 +298,199 @@ export function buildAccessVectors(): AccessVectorsFile {
     plans: Object.fromEntries(PLAN_CODES.map((code) => [code, [...PLANS[code].features]])),
     documentTypes: [...DOCUMENT_TYPES],
   };
+}
+
+// --- GST (A0b): GSTIN, rule set, registration, entity -------------------------
+
+export interface GstinVectorsFile {
+  readonly contract: 'gstin';
+  readonly version: 1;
+  readonly notes: readonly string[];
+  readonly cases: readonly (GstinCase & { readonly expected: ContractOutcome })[];
+}
+
+export interface RuleSetVectorsFile {
+  readonly contract: 'gst-rule-set';
+  readonly version: 1;
+  readonly notes: readonly string[];
+  readonly ruleSets: readonly GstRuleSet[];
+  readonly cases: readonly (RuleSetCase & { readonly expected: ContractOutcome })[];
+}
+
+export interface RegistrationVectorsFile {
+  readonly contract: 'gst-registration';
+  readonly version: 1;
+  readonly notes: readonly string[];
+  readonly registrations: readonly RegistrationFacts[];
+  readonly cases: readonly (RegistrationCase & { readonly expected: ContractOutcome })[];
+}
+
+export interface EntityVectorsFile {
+  readonly contract: 'gst-entity';
+  readonly version: 1;
+  readonly notes: readonly string[];
+  readonly ruleSets: readonly GstRuleSet[];
+  readonly registrations: readonly RegistrationFacts[];
+  readonly entities: Readonly<Record<string, EntityFacts>>;
+  readonly cases: readonly (EntityCase & { readonly expected: ContractOutcome })[];
+}
+
+function ruleSetByVersion(version: string): GstRuleSet {
+  const found = RULE_SETS.find((r) => r.version === version);
+  if (!found) throw new Error(`Unknown fixture rule set ${version}`);
+  return found;
+}
+
+function registrationById(id: string): RegistrationFacts {
+  const found = REGISTRATIONS.find((r) => r.id === id);
+  if (!found) throw new Error(`Unknown fixture registration ${id}`);
+  return found;
+}
+
+function entityByName(name: string): EntityFacts {
+  const found = ENTITIES[name];
+  if (!found) throw new Error(`Unknown fixture entity ${name}`);
+  return found;
+}
+
+export function evaluateGstinCase(c: GstinCase): ContractOutcome {
+  return outcome(() => {
+    switch (c.op) {
+      case 'gstinProblem':
+        return gstinProblem(c.input.value);
+      case 'isUinFormatValid':
+        return isUinFormatValid(c.input.value);
+      case 'normaliseGstin':
+        return normaliseGstin(c.input.value);
+      case 'gstinMatchesState':
+        return gstinMatchesState(c.input.value, c.input.stateCode ?? '');
+    }
+  });
+}
+
+export function evaluateRuleSetCase(c: RuleSetCase): ContractOutcome {
+  return outcome(() => {
+    switch (c.op) {
+      case 'selectRuleSet':
+        return selectRuleSet(c.input.date, RULE_SETS).version;
+      case 'thresholdValue':
+        return thresholdValue(ruleSetByVersion(c.input.version), c.input.key as ThresholdKey, c.input.date);
+      case 'isRateAllowed':
+        return isRateAllowed(ruleSetByVersion(c.input.version), c.input.ratePercent, c.input.date);
+      case 'isCessAllowed':
+        return isCessAllowed(ruleSetByVersion(c.input.version), c.input.date);
+      case 'validationEnforcement':
+        return validationEnforcement(ruleSetByVersion(c.input.version), c.input.id, c.input.date);
+      case 'ratesFor':
+        return ratesFor(ruleSetByVersion(c.input.version), c.input.kind, c.input.code, c.input.date).map((r) => r.id);
+      case 'checkLineRate':
+        return checkLineRate(ruleSetByVersion(c.input.version), c.input.line, c.input.date);
+    }
+  });
+}
+
+export function evaluateRegistrationCase(c: RegistrationCase): ContractOutcome {
+  return outcome(() => {
+    const registration = c.input.registrationId === null ? null : registrationById(c.input.registrationId);
+    switch (c.op) {
+      case 'profileInForce':
+        return profileInForce(registration!, c.input.date);
+      case 'taxModeFor':
+        return taxModeFor(registration, c.input.date);
+      case 'isRegistrationInForce':
+        return isRegistrationInForce(registration!, c.input.date);
+    }
+  });
+}
+
+export function evaluateEntityCase(c: EntityCase): ContractOutcome {
+  return outcome(() => {
+    switch (c.op) {
+      case 'statutoryFyStartYear':
+        return statutoryFyStartYear(c.input.date);
+      case 'resolvedTurnover':
+        return resolvedTurnover(entityByName(c.input.entity), c.input.fyStartYear);
+      case 'einvoiceApplicability':
+        return einvoiceApplicability({
+          entity: entityByName(c.input.entity),
+          registration: registrationById(c.input.registrationId),
+          documentKind: c.input.documentKind,
+          buyerTreatment: c.input.buyerTreatment,
+          supplyType: c.input.supplyType,
+          documentDate: c.input.documentDate,
+          ruleSet: ruleSetByVersion(c.input.ruleSetVersion),
+        });
+      case 'hsnRequirement':
+        return hsnRequirement(
+          entityByName(c.input.entity),
+          c.input.documentDate,
+          c.input.buyerClass,
+          ruleSetByVersion(c.input.ruleSetVersion),
+        );
+    }
+  });
+}
+
+const GST_FIXTURE_NOTE =
+  'Fixture rule sets use notificationRef "TEST": they exercise the evaluator, they are not the real notified rates.';
+
+export function buildGstinVectors(): GstinVectorsFile {
+  return jsonClone({
+    contract: 'gstin',
+    version: 1,
+    notes: [
+      'Generated by `npm run contracts:generate` from src/domain/gst/gstin.ts; do not edit by hand.',
+      'gstinProblem returns null for a valid GSTIN, else "format" | "state_code" | "checksum" (checked in that order).',
+      'The SQL function app.gstin_valid() must agree: valid exactly when gstinProblem is null.',
+      'The validator does not normalise; normaliseGstin is a separate operation.',
+    ],
+    cases: gstinCases().map((c) => ({ ...c, expected: evaluateGstinCase(c) })),
+  });
+}
+
+export function buildRuleSetVectors(): RuleSetVectorsFile {
+  return jsonClone({
+    contract: 'gst-rule-set',
+    version: 1,
+    notes: [
+      'Generated by `npm run contracts:generate` from src/domain/gst/rule-set.ts; do not edit by hand.',
+      GST_FIXTURE_NOTE,
+      'Dates are ISO strings; effectiveTo is exclusive. selectRuleSet returns the chosen version string.',
+      'ratesFor returns candidate ids sorted ascending. checkLineRate returns {outcome, ...} exactly as in the reference.',
+      'expected.error.code RULE_SET_UNAVAILABLE / VALIDATION_FAILED must be raised by the port for the same inputs.',
+    ],
+    ruleSets: RULE_SETS,
+    cases: ruleSetCases().map((c) => ({ ...c, expected: evaluateRuleSetCase(c) })),
+  });
+}
+
+export function buildRegistrationVectors(): RegistrationVectorsFile {
+  return jsonClone({
+    contract: 'gst-registration',
+    version: 1,
+    notes: [
+      'Generated by `npm run contracts:generate` from src/domain/gst/registration.ts; do not edit by hand.',
+      'Registration and profile ranges are half-open [effectiveFrom, effectiveTo).',
+      'registrationId null means the outlet has no GST registration.',
+    ],
+    registrations: REGISTRATIONS,
+    cases: registrationCases().map((c) => ({ ...c, expected: evaluateRegistrationCase(c) })),
+  });
+}
+
+export function buildEntityVectors(): EntityVectorsFile {
+  return jsonClone({
+    contract: 'gst-entity',
+    version: 1,
+    notes: [
+      'Generated by `npm run contracts:generate` from src/domain/gst/entity.ts; do not edit by hand.',
+      GST_FIXTURE_NOTE,
+      'Turnover and thresholds are paise. Turnover years are statutory FYs (April-March).',
+      'Inputs reference fixtures in this file by key: entities by name, registrations by id, rule sets by version.',
+    ],
+    ruleSets: RULE_SETS,
+    registrations: REGISTRATIONS,
+    entities: ENTITIES,
+    cases: entityCases().map((c) => ({ ...c, expected: evaluateEntityCase(c) })),
+  });
 }

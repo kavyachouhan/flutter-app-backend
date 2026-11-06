@@ -8,6 +8,7 @@ import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 import { createApp } from '../../../src/app.js';
 import { data } from './body.js';
+import { gstinCheckCharacter } from '../../../src/domain/gst/gstin.js';
 
 interface DevLoginResult {
   identity: { identityToken: string; userId: string };
@@ -36,7 +37,9 @@ function uniqueGstin(stateCode: string): string {
     () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)],
   ).join('');
   const digits = String(Math.floor(Math.random() * 10_000)).padStart(4, '0');
-  return `${stateCode}${letters}${digits}A1Z5`;
+  // The last character is the GSTN mod-36 check digit: the database rejects any other.
+  const first14 = `${stateCode}${letters}${digits}A1Z`;
+  return first14 + gstinCheckCharacter(first14);
 }
 
 export interface TenantFixture {
