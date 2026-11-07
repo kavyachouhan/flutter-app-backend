@@ -4,6 +4,7 @@ import { accessibleOutletIds, assertOutletAccess } from '../../middleware/author
 import { diffFields, recordAudit } from '../audit/audit.js';
 import { assertQuota } from '../entitlements/entitlements.js';
 import { numberingRepository } from '../numbering/numbering.repository.js';
+import { closeUnusedRegistrations, setOutletGstin } from '../gst/registrations.service.js';
 import { outletsRepository, type CounterRow, type OutletRow } from './outlets.repository.js';
 import type {
   CreateCounterBody,
@@ -39,8 +40,9 @@ export function createOutlet(body: CreateOutletBody) {
       id: body.id,
       name: body.name,
       code: body.code,
-      gstin: body.gstin ?? null,
-      stateCode: body.stateCode ?? null,
+      // Set below, on the registration, which mirrors them here.
+      gstin: null,
+      stateCode: null,
       addressLine1: body.addressLine1 ?? null,
       addressLine2: body.addressLine2 ?? null,
       city: body.city ?? null,
@@ -49,6 +51,7 @@ export function createOutlet(body: CreateOutletBody) {
       isActive: body.isActive ?? true,
       isDefault: body.isDefault ?? false,
     });
+    await setOutletGstin(tx, body.id, body.gstin ?? null, body.stateCode ?? null);
     await recordAudit(tx, { action: 'outlet.created', entityType: 'outlet', entityId: body.id });
     return requireOutlet(tx, body.id);
   });
@@ -75,7 +78,16 @@ export function updateOutlet(id: string, patch: UpdateOutletBody) {
     }
     if (patch.isDefault && !before.isDefault) await outletsRepository.clearDefaultOutlet(tx);
 
-    await outletsRepository.updateOutlet(tx, id, patch);
+    const { gstin, stateCode, ...rest } = patch;
+    await outletsRepository.updateOutlet(tx, id, rest);
+    if (gstin !== undefined || stateCode !== undefined) {
+      await setOutletGstin(
+        tx,
+        id,
+        gstin === undefined ? before.gstin : gstin,
+        stateCode === undefined ? before.stateCode : stateCode,
+      );
+    }
     const changes = diffFields(before, patch);
     if (changes)
       await recordAudit(tx, {
@@ -97,6 +109,7 @@ export function deleteOutlet(id: string) {
       throw new UnprocessableError('Delete this outlet’s counters first.');
     }
     await outletsRepository.softDeleteOutlet(tx, id);
+    await closeUnusedRegistrations(tx);
     await recordAudit(tx, { action: 'outlet.deleted', entityType: 'outlet', entityId: id });
   });
 }

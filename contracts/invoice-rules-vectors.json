@@ -484,6 +484,129 @@
       }
     },
     {
+      "name": "an invoice-cum-bill of supply is tested like a tax invoice",
+      "op": "rule46MissingFields",
+      "input": {
+        "documentType": "invoice_cum_bill_of_supply",
+        "supplyType": "intra_state",
+        "buyer": null,
+        "shipTo": null,
+        "taxableValue": 5000000,
+        "unregisteredThreshold": 5000000
+      },
+      "expected": {
+        "result": [
+          "recipient_name",
+          "recipient_address",
+          "recipient_state",
+          "delivery_address",
+          "delivery_state"
+        ]
+      }
+    },
+    {
+      "name": "document type: all taxable, walk-in",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "gst",
+        "buyerTreatment": null,
+        "supplyCategories": [
+          "taxable"
+        ]
+      },
+      "expected": {
+        "result": "tax_invoice"
+      }
+    },
+    {
+      "name": "document type: taxable and exempt, walk-in: Rule 46A",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "gst",
+        "buyerTreatment": null,
+        "supplyCategories": [
+          "taxable",
+          "exempt"
+        ]
+      },
+      "expected": {
+        "result": "invoice_cum_bill_of_supply"
+      }
+    },
+    {
+      "name": "document type: taxable and nil, unregistered: Rule 46A",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "gst",
+        "buyerTreatment": "unregistered",
+        "supplyCategories": [
+          "nil_rated",
+          "taxable"
+        ]
+      },
+      "expected": {
+        "result": "invoice_cum_bill_of_supply"
+      }
+    },
+    {
+      "name": "document type: taxable and exempt, registered: a tax invoice",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "gst",
+        "buyerTreatment": "registered_regular",
+        "supplyCategories": [
+          "taxable",
+          "exempt"
+        ]
+      },
+      "expected": {
+        "result": "tax_invoice"
+      }
+    },
+    {
+      "name": "document type: only exempt lines, walk-in",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "gst",
+        "buyerTreatment": null,
+        "supplyCategories": [
+          "exempt"
+        ]
+      },
+      "expected": {
+        "result": "tax_invoice"
+      }
+    },
+    {
+      "name": "document type: composition",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "composition",
+        "buyerTreatment": null,
+        "supplyCategories": [
+          "taxable",
+          "exempt"
+        ]
+      },
+      "expected": {
+        "result": "bill_of_supply"
+      }
+    },
+    {
+      "name": "document type: not registered",
+      "op": "documentTypeFor",
+      "input": {
+        "mode": "non_gst",
+        "buyerTreatment": null,
+        "supplyCategories": [
+          "taxable"
+        ]
+      },
+      "expected": {
+        "result": null
+      }
+    },
+    {
       "name": "endorsement: intra_state",
       "op": "zeroRatedEndorsement",
       "input": {

@@ -1,0 +1,158 @@
+﻿Release 3.2.4
+Bug fix to accept invoice value from 100000.01 to 100000.49 and 250000.01 to 250000.49 in B2CL table error record.
+Release 3.2.3
+Addition of new tax rate - 40%
+Release 3.2.2
+HSN is bifurcated in to HSN(B2B) Supplies and HSN(B2C) Supplies.
+Release 3.2.1
+1. updated invoice limit for B2CL and B2CLA tables based on return period before and after Aug 2024.
+Release 3.2
+1.Table 14,14A,15 and 15A are added which will be applicable from 1st January 2024.
+Release 3.1.8-I
+GSTR1 offline Tool Fix- Offline tool FY to start from 2018
+Release 3.1.7
+Hsn validation phase II changes
+Release 3.1.6
+1.Changing the minimum input HSN length to 6 digits for taxpayer having AATO greater than 5 CR (manual entry)
+2.Bug Fix for importing latest excel version 2.0
+Release 3.1.5
+HSN Product Master Integration & Addition of new tax rate - 6%
+Release 3.1.4
+Minor enhancement for the bug fix
+Release 3.1.3
+Updated table headings/ labels in B2B table & Enabling HSN Validation
+Release 3.1.2
+Masters facility on GST Portal and Offline tool
+Release 3.0.4
+1.Relaxation in validations for hsn table 12
+Release 3.0.2
+1.Bug fixes
+Release 3.0.1
+1.Bug fixes
+Release 3.0.0
+1. IFF features are added which will be applicable from 1st January 2021 for the First and Second month of Quarter in sections B2B, B2BA, CDNR, CDNRA.Changes are added in GSTR1 and GSTR2A of Offline.
+Release 2.4.2
+1. Auto-population of e-invoice details into GSTR1.
+Release 2.4
+1. Delinking of CDN and Invoice for GSTR1.
+Release 2.3.2
+1.Changing the Label name Sales "Sale from Bounded WH" to "Supplies covered under section 7 of IGST Act" in B2B/A, B2CL/A 
+2.Allowing the tan based Tds tin in B2B,CDNR section in the CSV files of offline tool of Gstr1 form.
+Sections.
+3.Allowing to show total cess value for b2b section while import excel, import as csv, as well as in summary page.
+4.Showing the error report for NIL rated supplies and generate corrected json file.
+Release 2.3.1
+1.Addtional tax rates (IGST) of 1% , 1.5% , 7.5% added.
+2.Allowing the Tan based GSTIN as a receiver tin in b2b section of GSTR1.
+Release 2.3.0
+1.Cess field is now enabled for invoice type as SEZ Without Pay also in B2B section.
+2.Error handler added with error message as "Column Headers Missing/Mismatch or Data Invalid" for errors in column headers in excel template.
+3.Fix for issue description "Not able to import the invoices of FY 2017-18 in offline tool"
+Release 2.2.9.
+4.FAQs updated in User manual updated.
+
+Fix for -11844 : Prod || GSTR1 || Not able to import/copy excel if nature of document is “Delivery Challan in case other than by way of supply (excluding at S no. 9 to 11)”.
+
+Release 2.2.8
+
+Fix for - Invoice number as zero(0)(invoice number cannot be saved as '0');
+
+Fix for - When the user is deleting to the invoices in middle button of offline utility tool then no pop up message is coming in tool.
+
+Ui changes 
+
+Pop up alert added on-click of "Proceed" in dasboard for all three tabs. User need to confirm the details to proceed or cancel if details are not correct.
+
+
+Release 2.2.7
+FIX- For - Incase of invoices in "Rejected by Receiver " tab consisting of cflag:"FR", they are not visible in offline.
+FIX For - In case the "Invoice type" dropdown is having "Select" option by default , the default Supplytype is coming as always "Inter-State".
+
+UI changes
+Version number is now added as part of header.
+ 
+Release 2.2.6
+1.FIX -For CDNUR – Not able to import excel / csv or copy paste excel data in the Offline tool, only manual entry working.(9940)
+2.FIX -For  Generate File – Generate file not generating data for “Uploaded by Supplier” invoices for b2b/cdnr(9941)
+3.FIX -For  If we modify any record in offline utility by clicking checkbox , then in JSON an extra attribute SELECT  Y is coming,for which schema failure occurs .(9992)
+
+Release 2.2.5
+1.Turnover declaration in GSTR1: omit "gt" and "cur_gt" field based on financial year (will be visible for only 2017-18).(UAT 9150)
+2. FIX- The user is unable to take action ( Accept/Reject/Pending ) on the invoices rejected by receiver  in GSTR1 .(UAT 9333)
+3. FIX- For the invoice type Deemed Export , the CESS field is disable in offline utility , where as it is enable in online  portal .(UAT 9274)
+4. FIX-User is not able to edit GSTIN/ETIN in error flow in offline utility tool . (UAT 8869)
+5. FIX-Production: The json created from offline utility tool contains the invoice for which the user does not take any action.(UAT 9394)
+Release 2.2.4
+Change to charge IGST on supplies made as per section 7(2) of IGST Act (GSTR 1 and GSTR 1 Offline)
+
+Release 2.2.3
+1.Length restriction on UI & Backend for SBNUM in EXP / EXPA section  was restored to 7 digit numeric(UAT:8261).
+2.B2BA page load issue and Aggregate Turnover field issue in final generated payload.
+3.Taxable value length changed to 11,2.
+5.Version update
+
+Release 2.2.2
+1.Not able to delete the large data of invoices through GSTR1 Offline tool(UAT:7896)
+2.Not able to generate the Json after deleting the invoices with large data(UAT:7897)
+3.Records are not getting displayed in section summary for CDNRA.(UAT:8048) 
+4.In CDNRA section if the user selects SEZ option , then for CDNRA section supply type is getting deleted automatically  after giving item details(UAT:8085) 
+5.Version update
+
+Release 2.2.1
+1.Errors in uploading files after accept / reject - OFFLINE UTILITY UPDATE (Prod issue)
+2.OPD is an extra attribute that is coming in the payload -(Prod issue)
+3.Not able to DELETE already saved invoices--(Prod issue)
+4.Version update 
+5.Manual update
+
+Release 2.2
+1. Prepare GSTR-1 amendments data for applicable Tables 
+2. Prepare GSTR-1 Tables 8 (Nil supplies) and 13 (Documents issued) data 
+3. Take action as (Accept/Reject/Pending) for B2B and CDNR sections in GSTR-1
+4. Functionality to split generated Json in 'New Flow' and 'Open flow' in multiple parts.User can upload JSON's chunks on online portal 
+
+Release 2.1
+GSTR-2
+1. Export the data opened in Offline tool to an excel file to prepare the GSTR 2.
+
+GSTR-1A
+1. Open the GSTR-1A data downloaded from GST portal to take action of Accept/Reject/Keep Pending on the invoices. 
+2. Once action has been taken on invoices; generate JSON to upload data on GST portal. 
+
+
+Release 2.0
+1.      Open in Offline tool; GSTR-2 Json file with details auto-populated from Supplier GSTR-1 or uploaded by the recipient 
+2.	Take Action on auto populated details submitted by supplier :  Accept, Reject, Modify and Pending in Offline Tool
+3.	Add missing invoices and records to other sections using one by one entry in Offline tool, Excel import or section wise using CSV or Copy paste
+4.	Take action of Accept/Reject/Modify/ Pending for auto populated details submitted by supplier
+5.	Add auto populated details saved by supplier as recipient invoice 
+6.	Add missing invoices and records to section with no counterparty
+7.	Mark as delete records added by recipient earlier in his GSTR-2 return 
+8.	Import Excel with action and details added  in Offline and generate Json for upload to GST portal
+9.	Section wise ‘Delete All’ functionality to mark as delete details previously uploaded on GST portal. The details would be removed from portal upon Json upload on GST portal
+
+
+Release 1.2.1
+1. In an invoice if we have multiple rates, and when we import this information from the excel template to the latest version (V1.2) of the offline tool, only one rate (last rate) is getting imported
+
+Release 1.2
+1. The offline tool in production creates the wrong json.In the json it shows wrong sgst and cgst tax amount  and it interchanges the tax amount and shows the cgst amount against sgst and vice versa. 
+The same wrong amount shown in offline summary also. 
+
+
+Release 1.1
+1.	Offline tool – second tab "Open downloaded return file from GST portal" is active.
+2.	User can download GSTR1 form from online portal; upload the same in offline tool .User can edit/delete for all sections.
+3.	User can download GSTR2A form from online portal; upload the same offline tool and view for b2b and cdn.
+4.	Bug fixes: 
+Export section: If shipping bill is present then shipping bill date should be mandatory.
+Description should not be Case Sensitive.
+AT / ATADJ: Record should have overwritten if same POS is already existing in tool.
+Pre- GST notes getting rejected while import
+Error file: Not able to update invoice numbers/note number – CDNR and CDNUR
+
+Release 1.0
+
+1. Creation and Generation of json file for GSTR1 return in offline tool.
+2. Correction of downloaded GSTR1 error file and regeneration of json file in offline tool
+3. Improved version of GSTR1 Excel template.

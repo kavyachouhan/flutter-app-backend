@@ -275,14 +275,13 @@ export async function decideInvoiceSupply(
 
 /** Rule 46: a tax invoice missing what the rule requires is not issued. */
 export function assertRule46(input: {
-  readonly mode: TaxMode;
+  readonly documentType: GstDocumentType | null;
   readonly supplyType: SupplyType;
   readonly supply: InvoiceSupply;
   readonly taxableValue: number;
 }): void {
-  const documentType: GstDocumentType | null = input.mode === 'gst' ? 'tax_invoice' : null;
   const missing = rule46MissingFields({
-    documentType,
+    documentType: input.documentType,
     supplyType: input.supplyType,
     buyer: input.supply.buyer,
     shipTo: input.supply.shipTo,

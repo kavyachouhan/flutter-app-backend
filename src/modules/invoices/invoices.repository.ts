@@ -55,6 +55,7 @@ export interface InvoiceHeaderInsert {
   billDiscountReason: string | null;
   issuedAt: string;
   issuedBy: string;
+  documentType: string | null;
   supply: InvoiceSupplyColumns;
 }
 
@@ -164,6 +165,7 @@ const HEADER_COLUMNS = `
   i.custom_fields AS "customFields", i.attachments, i.is_reverse_charge AS "isReverseCharge",
   i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId", i.proforma_invoice_id AS "proformaInvoiceId",
   i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
+  i.document_type AS "documentType", i.irn_state AS "irnState",
   i.supply_scenario AS "supplyScenario", i.pos_provision AS "posProvision", i.pos_override AS "posOverride",
   i.sez_authorised_operations AS "sezAuthorisedOperations", i.lut_reference AS "lutReference",
   i.buyer_gst_treatment AS "buyerGstTreatment", i.customer_uin AS "customerUin",
@@ -225,7 +227,7 @@ export const invoicesRepository = {
          amends_invoice_id, bill_discount_reason, estimate_id, attachments, proforma_invoice_id,
          supply_scenario, pos_provision, pos_override, sez_authorised_operations, lut_reference,
          buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
-         dispatch_from_snapshot)
+         dispatch_from_snapshot, document_type)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -234,7 +236,7 @@ export const invoicesRepository = {
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb, $50,
-         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61)`,
+         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62)`,
       [
         h.id,
         h.outletId,
@@ -297,6 +299,7 @@ export const invoicesRepository = {
         jsonParam(h.supply.buyer),
         jsonParam(h.supply.shipTo),
         jsonParam(h.supply.dispatchFrom),
+        h.documentType,
       ],
     );
   },

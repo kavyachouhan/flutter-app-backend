@@ -7,6 +7,7 @@
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { financialYearOf, formatDocumentNumber } from '../../domain/numbering/series.js';
+import { adjustmentLine, creditNoteLastDate, voidRefusal } from '../../domain/gst/corrections.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
 import { taxPayableByFor } from '../../domain/tax/types.js';
 import { deriveReturnLine } from '../../domain/tax/returns.js';
@@ -26,6 +27,7 @@ import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { customersRepository, type NewLedgerEntry } from '../customers/customers.repository.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import { gstr1FiledFor } from '../gst/filing-state.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { numberingRepository } from '../numbering/numbering.repository.js';
 import { toSeriesFormat } from '../numbering/numbering.service.js';
@@ -80,6 +82,8 @@ export function listReturnable(invoiceId: string) {
         soldQuantity: l.quantity,
         returnedQuantity: l.returnedQuantity,
         returnableQuantity: l.quantity - l.returnedQuantity,
+        taxableAmount: l.taxableAmount,
+        creditableValue: Math.max(0, l.taxableAmount - l.creditedTaxable),
       })),
     };
   });
@@ -101,6 +105,16 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       throw new UnprocessableError(
         'A void invoice cannot be returned against.',
         ErrorCode.INVOICE_NOT_RETURNABLE,
+      );
+    }
+
+    // s.34(2): past this a GST credit note no longer reduces tax; a financial one still can.
+    const invoiceDate = String(invoice.documentDate).slice(0, 10);
+    if ((invoice['taxMode'] as TaxMode) === 'gst' && body.documentDate > creditNoteLastDate(invoiceDate)) {
+      throw new UnprocessableError(
+        'The time for a GST credit note against this invoice has passed. Issue a financial credit note instead.',
+        ErrorCode.CREDIT_NOTE_TIME_BARRED,
+        { details: { lastDate: creditNoteLastDate(invoiceDate) } },
       );
     }
 
@@ -135,7 +149,7 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
     );
     const requested = new Map<string, number>();
     for (const line of body.lines) {
-      requested.set(line.invoiceLineId, (requested.get(line.invoiceLineId) ?? 0) + line.quantity);
+      requested.set(line.invoiceLineId, (requested.get(line.invoiceLineId) ?? 0) + (line.quantity ?? 0));
     }
     for (const [invoiceLineId, qty] of requested) {
       const line = sold.get(invoiceLineId);
@@ -162,9 +176,39 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
     // the bag has to be right before it is written.
     await validateCustomFields(tx, 'credit_note', body.customFields);
 
-    const taxInput = body.lines.map((line) =>
-      deriveReturnLine(sold.get(line.invoiceLineId) as SoldLineRow, line),
+    const lineFor = (invoiceLineId: string): SoldLineRow => {
+      const line = sold.get(invoiceLineId);
+      if (!line) throw new UnprocessableError('That line does not belong to this invoice.');
+      return line;
+    };
+    const taxInput = body.lines.map((line) => {
+      const original = lineFor(line.invoiceLineId);
+      if (line.quantity !== undefined) {
+        return deriveReturnLine(original, { id: line.id, invoiceLineId: line.invoiceLineId, quantity: line.quantity });
+      }
+      return adjustmentLine(
+        {
+          taxRatePercent: Number(original.taxRatePercent),
+          cessRatePercent: Number(original.cessRatePercent),
+          supplyCategory: original.supplyCategory,
+          hsnCode: original.hsnCode,
+          remainingTaxable: original.taxableAmount - original.creditedTaxable,
+        },
+        { id: line.id, amount: line.valueAmount ?? 0, differentialRatePercent: line.differentialRatePercent ?? null },
+      );
+    });
+    const returnsGoods = body.lines.some((line) => line.quantity !== undefined);
+    const correctionReason =
+      body.correctionReason ??
+      (returnsGoods ? 'goods_return' : body.lines.some((l) => l.differentialRatePercent !== undefined) ? 'excess_tax_charged' : 'value_reduction');
+    if (correctionReason === 'value_increase' || correctionReason === 'tax_undercharged') {
+      throw new ValidationError('An increase is a sales debit note, not a credit note.');
+    }
+    // s.15(3)(b), s.34(1) as amended: on a discount, a registered buyer must reverse the credit.
+    const buyerRegistered = ['registered_regular', 'registered_composition', 'sez_unit', 'sez_developer'].includes(
+      (invoice['buyerGstTreatment'] as string | null) ?? '',
     );
+    const recipientItcReversalStatus = correctionReason === 'post_supply_discount' && buyerRegistered ? 'pending' : null;
     const totals = computeInvoice(
       {
         mode: invoice['taxMode'] as TaxMode,
@@ -180,7 +224,13 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
         roundOff: invoice['roundOffEnabled'] as boolean,
         lines: taxInput,
       },
-      { allowedGstRates: env.GST_ALLOWED_RATES },
+      {
+        // A rate correction taxes at the difference between two slabs, which need not be a slab.
+        allowedGstRates: new Set<number>([
+          ...env.GST_ALLOWED_RATES,
+          ...body.lines.flatMap((l) => (l.differentialRatePercent === undefined ? [] : [l.differentialRatePercent])),
+        ]),
+      },
     );
     void taxModeFor;
 
@@ -223,7 +273,8 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       body.sequenceNo,
       env.DOCUMENT_NUMBER_MAX_LENGTH,
     );
-    const restock = body.restock ?? body.reasonCode !== 'damaged';
+    // Nothing comes back on a value-only note, so nothing goes on the shelf.
+    const restock = returnsGoods && (body.restock ?? body.reasonCode !== 'damaged');
 
     await creditNotesRepository.insertHeader(tx, {
       id: body.id,
@@ -239,6 +290,8 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       originalDocumentNumber: invoice.documentNumber,
       customerId: customer?.id ?? null,
       customerName: invoice.customerName,
+      correctionReason,
+      recipientItcReversalStatus,
       supply: {
         scenario: (invoice['supplyScenario'] as string | null) ?? null,
         provision: (invoice['posProvision'] as string | null) ?? null,
@@ -274,6 +327,8 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
       const original = sold.get(line.invoiceLineId);
       if (!computed || !original) throw new InternalError('Return line resolution failed.');
       return {
+        adjustmentKind:
+          line.quantity !== undefined ? 'quantity' : line.differentialRatePercent !== undefined ? 'tax' : 'value',
         id: line.id,
         invoiceLineId: line.invoiceLineId,
         lineNo: index + 1,
@@ -281,8 +336,8 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
         itemName: original.itemName,
         hsnCode: computed.hsnCode ?? null,
         unit: original.unit,
-        quantity: line.quantity,
-        unitPrice: original.unitPrice,
+        quantity: line.quantity ?? 0,
+        unitPrice: line.quantity !== undefined ? original.unitPrice : (line.valueAmount ?? 0),
         discount: taxInput[index]?.discount ?? null,
         grossAmount: computed.grossAmount,
         lineDiscount: computed.lineDiscount,
@@ -308,7 +363,7 @@ export async function createCreditNote(body: CreateCreditNoteBody) {
     if (restock) {
       const stockLines = body.lines.flatMap((line) => {
         const original = sold.get(line.invoiceLineId);
-        return original?.trackStock && original.itemId
+        return original?.trackStock && original.itemId && line.quantity !== undefined
           ? [{ itemId: original.itemId, quantity: line.quantity }]
           : [];
       });
@@ -440,6 +495,17 @@ export async function voidCreditNote(id: string, reason: string) {
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { note: await loadCreditNote(tx, id), voided: false };
 
+    const refusal = voidRefusal({
+      gstr1Filed: await gstr1FiledFor(tx, (header['supplierGstin'] as string | null) ?? null, String(header['documentDate']).slice(0, 10)),
+      einvoiced: header['irnState'] === 'registered',
+      withinIrpCancelWindow: false,
+    });
+    if (refusal) {
+      throw new UnprocessableError('This credit note has been reported and can no longer be cancelled.', ErrorCode.CORRECTION_NOT_ALLOWED, {
+        details: { reason: refusal },
+      });
+    }
+
     await creditNotesRepository.markVoid(tx, id, reason, auth.userId);
     // The return never happened, so what it handed back counts as delivered again.
     const original = await invoicesRepository.findHeader(tx, header.originalInvoiceId);
@@ -499,6 +565,23 @@ export async function voidCreditNote(id: string, reason: string) {
 
   if (voided) businessEvents.inc({ event: 'credit_note.voided' });
   return note;
+}
+
+/** Records what the buyer has done about the credit, once the seller knows (D27). */
+export function setRecipientReversal(id: string, status: string) {
+  return withTransaction(async (tx) => {
+    const header = await creditNotesRepository.findHeader(tx, id, true);
+    if (!header) throw new NotFoundError('Credit note');
+    assertOutletAccess(header.outletId);
+    await creditNotesRepository.setRecipientReversal(tx, id, status);
+    await recordAudit(tx, {
+      action: 'credit_note.recipient_reversal_set',
+      entityType: 'credit_note',
+      entityId: id,
+      metadata: { status },
+    });
+    return loadCreditNote(tx, id);
+  });
 }
 
 export function markPrinted(id: string) {

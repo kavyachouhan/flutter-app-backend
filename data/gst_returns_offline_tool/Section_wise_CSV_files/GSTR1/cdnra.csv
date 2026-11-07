@@ -1,0 +1,5 @@
+GSTIN/UIN of Recipient,Receiver Name,Original Note Number,Original Note Date,Revised Note Number,Revised Note Date,Note Type,Place Of Supply,Reverse Charge,Note Supply Type,Note Value,Applicable % of Tax Rate,Rate,Taxable Value,Cess Amount
+07DDMAV0811B2ZK,Kumar,90001,15-Jul-17,90001,15-Jul-17,C,33-Tamil Nadu,Y,Regular B2B,52000,65,12,3240,
+07DDMAV0811B3ZJ,Kumar,90002,15-Jul-17,90002,15-Jul-17,C,10-Bihar,N,Deemed Exp,0,,12,50000,
+07DDMAV0811B4ZI,Kumar,90003,15-Jul-17,90003,15-Jul-17,C,07-Delhi,N,SEZ supplies with payment,20000,,5,25000,100
+07DDMAV0811B5ZH,Kumar,90004,15-Jul-17,90004,15-Jul-17,D,33-Tamil Nadu,N,SEZ supplies without payment,50000,,5,20000,100

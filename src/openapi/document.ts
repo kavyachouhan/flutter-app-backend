@@ -22,6 +22,7 @@ import '../modules/numbering/numbering.openapi.js';
 import '../modules/invoices/invoices.openapi.js';
 import '../modules/payments/payments.openapi.js';
 import '../modules/credit-notes/credit-notes.openapi.js';
+import '../modules/adjustment-notes/adjustment-notes.openapi.js';
 import '../modules/suppliers/suppliers.openapi.js';
 import '../modules/terms/terms.openapi.js';
 import '../modules/purchases/purchases.openapi.js';
@@ -80,6 +81,8 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Invoices', description: 'Issuing, voiding and listing invoices.' },
       { name: 'Payments', description: 'Receipts against the khata and their allocations.' },
       { name: 'Credit notes', description: 'Returns and corrections against issued invoices.' },
+      { name: 'Sales debit notes', description: 'Value or tax added to an issued invoice (s.34(3)).' },
+      { name: 'Financial credit notes', description: 'Commercial credits with no GST, outside every return.' },
       { name: 'Suppliers', description: 'Supplier master, payables ledger and ageing.' },
       {
         name: 'Terms & Conditions',

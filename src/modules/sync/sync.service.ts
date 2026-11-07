@@ -31,6 +31,7 @@ import * as creditNotesService from '../credit-notes/credit-notes.service.js';
 import * as customersService from '../customers/customers.service.js';
 import * as estimatesService from '../estimates/estimates.service.js';
 import * as proformaInvoicesService from '../proforma-invoices/proforma-invoices.service.js';
+import * as adjustmentNotes from '../adjustment-notes/adjustment-notes.service.js';
 import * as invoicesService from '../invoices/invoices.service.js';
 import type { BlockRow } from '../numbering/numbering.repository.js';
 import * as operationsService from '../operations/operations.service.js';
@@ -206,6 +207,10 @@ const OPERATION_PERMISSIONS: Record<OperationType, Permission> = {
   'invoice.printed': 'invoices:read',
   'credit_note.create': 'credit_notes:create',
   'credit_note.void': 'credit_notes:void',
+  'sales_debit_note.create': 'credit_notes:create',
+  'sales_debit_note.void': 'credit_notes:void',
+  'financial_credit_note.create': 'credit_notes:create',
+  'financial_credit_note.void': 'credit_notes:void',
   'credit_note.printed': 'credit_notes:read',
   'payment.create': 'payments:create',
   'payment.void': 'payments:void',
@@ -346,6 +351,26 @@ async function dispatch(type: OperationType, payload: unknown): Promise<Applied>
     case 'invoice.printed': {
       const p = payload as Payload<'invoice.printed'>;
       await invoicesService.markPrinted(p.id);
+      return { id: p.id };
+    }
+    case 'sales_debit_note.create': {
+      const p = payload as Payload<'sales_debit_note.create'>;
+      const r = await adjustmentNotes.createSalesDebitNote(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'sales_debit_note.void': {
+      const p = payload as Payload<'sales_debit_note.void'>;
+      await adjustmentNotes.voidSalesDebitNote(p.id, p.reason);
+      return { id: p.id };
+    }
+    case 'financial_credit_note.create': {
+      const p = payload as Payload<'financial_credit_note.create'>;
+      const r = await adjustmentNotes.createFinancialCreditNote(p);
+      return { id: p.id, replayed: r.replayed };
+    }
+    case 'financial_credit_note.void': {
+      const p = payload as Payload<'financial_credit_note.void'>;
+      await adjustmentNotes.voidFinancialCreditNote(p.id, p.reason);
       return { id: p.id };
     }
     case 'credit_note.create': {

@@ -12,6 +12,7 @@
  *   - reservation (stock promised to the order) is a projection on
  *     `stock_balances`, kept in step with the lines at every change.
  */
+import { stampDocumentParties } from '../sales-docs/document-parties.js';
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import type { Discount, TaxInvoiceResult, TaxMode } from '../../domain/tax/types.js';
@@ -679,6 +680,11 @@ export async function createSaleOrderInTx(
         createdBy: auth.userId,
       });
       await salesOrdersRepository.insertLines(tx, body.id, prepared.lines);
+      await stampDocumentParties(tx, 'sales_orders', {
+        id: body.id,
+        outletId: prepared.header.outletId,
+        customerId: prepared.header.customerId,
+      });
     },
     true,
   );
@@ -892,6 +898,11 @@ function updateSaleOrderInTransaction(
         await salesOrdersRepository.deleteLines(tx, id, toDelete);
         await salesOrdersRepository.updateLines(tx, id, toUpdate);
         await salesOrdersRepository.insertLines(tx, id, toInsert);
+        await stampDocumentParties(tx, 'sales_orders', {
+          id,
+          outletId: prepared.header.outletId,
+          customerId: prepared.header.customerId,
+        });
         // A manually closed order stays closed through an edit that adds nothing to
         // deliver (notes, T&C); one that adds quantity or a line is open for business again.
         if (order.closedManually && pendingAfter > pendingBefore) {

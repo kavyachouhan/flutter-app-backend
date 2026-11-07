@@ -8,10 +8,22 @@ import * as service from './credit-notes.service.js';
 import {
   createCreditNoteBody,
   listCreditNotesQuery,
+  recipientReversalBody,
   voidCreditNoteBody,
 } from './credit-notes.schemas.js';
 
 export const creditNotesRouter: Router = Router();
+
+const recipientReversal = { params: idParams, body: recipientReversalBody };
+creditNotesRouter.post(
+  '/:id/recipient-reversal',
+  requirePermission('credit_notes:create'),
+  validate(recipientReversal),
+  async (req, res) => {
+    const { params, body } = validated<typeof recipientReversal>(req);
+    res.json({ data: await service.setRecipientReversal(params.id, body.status) });
+  },
+);
 
 const list = { query: listCreditNotesQuery };
 creditNotesRouter.get(

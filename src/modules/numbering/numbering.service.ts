@@ -250,6 +250,8 @@ async function ensureSuccessorSeries(tx: Tx, series: SeriesRow): Promise<SeriesR
 const BOOTSTRAP_SERIES: Record<LeasedDocumentType, string> = {
   invoice: 'INV',
   credit_note: 'CN',
+  sales_debit_note: 'SDN',
+  financial_credit_note: 'FCN',
   estimate: 'EST',
   proforma_invoice: 'PI',
   sales_order: 'SO',
@@ -278,6 +280,8 @@ const LEASE_REQUIREMENTS: Partial<
 type LeasedDocumentType =
   | 'invoice'
   | 'credit_note'
+  | 'sales_debit_note'
+  | 'financial_credit_note'
   | 'estimate'
   | 'proforma_invoice'
   | 'sales_order'

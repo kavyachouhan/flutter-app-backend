@@ -27,6 +27,7 @@ import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { ConflictError, ErrorCode, NotFoundError } from '../../lib/errors.js';
 import { remove as removeObject, verifyUploadedObject } from '../../lib/storage.js';
 import { assertOutletAccess } from '../../middleware/authorize.js';
+import { adjustmentNotesRepository } from '../adjustment-notes/adjustment-notes.repository.js';
 import { recordAudit } from '../audit/audit.js';
 import { creditNotesRepository } from '../credit-notes/credit-notes.repository.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
@@ -183,6 +184,7 @@ interface InvoicePrintHeader extends DocumentPrintHeader {
 
 interface CreditNotePrintHeader extends DocumentPrintHeader {
   readonly originalDocumentNumber: string;
+  readonly originalDocumentDate: string | Date | null;
   readonly refundMode: string;
   readonly refundAmount: number;
 }
@@ -276,8 +278,9 @@ function businessFromSnapshot(seller: PartySnapshot) {
 }
 
 /** What a tax invoice or a note against one states about the supply: all as issued. */
-function gstFacts(header: DocumentPrintHeader, buyer: PartySnapshot | null) {
+function gstFacts(header: DocumentPrintHeader & { documentType?: string | null }, buyer: PartySnapshot | null) {
   return {
+    documentType: header.documentType ?? null,
     placeOfSupply: header.placeOfSupplyStateCode,
     supplyType: header.supplyType,
     isReverseCharge: header.isReverseCharge,
@@ -332,6 +335,25 @@ async function loadCustomer(
       [details?.city, details?.pincode].filter(Boolean).join(' '),
     ]),
     stateName: stateLabelFor(details?.stateCode) ?? stateNameFor(details?.stateCode),
+  };
+}
+
+/** The parties of an editable document, as last saved; live records for one saved before A3. */
+async function frozenParties(
+  tx: Tx,
+  table: 'estimates' | 'sales_orders' | 'proforma_invoices',
+  id: string,
+  outlet: OutletRow,
+  tenant: TenantRow,
+  customerId: string | null,
+  customerName: string | null,
+) {
+  const stored = await printRepository.findPartySnapshots(tx, table, id);
+  const seller = usableSnapshot(stored?.seller);
+  const buyer = usableSnapshot(stored?.buyer);
+  return {
+    business: seller ? businessFromSnapshot(seller) : buildBusiness(outlet, tenant),
+    customer: buyer ? printableParty(buyer) : await loadCustomer(tx, customerId, customerName, null),
   };
 }
 
@@ -430,6 +452,154 @@ export function buildInvoicePayload(id: string, query: PrintPayloadQuery): Promi
 }
 
 // ---------------------------------------------------------------------------
+// Sales debit note and financial credit note
+// ---------------------------------------------------------------------------
+
+export function buildSalesDebitNotePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    const row = await adjustmentNotesRepository.findDebitNote(tx, id);
+    if (!row) throw new NotFoundError('Debit note');
+    assertOutletAccess(row.outletId);
+    const [tenant, outlet, profiles, lines] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, row.outletId),
+      printRepository.findProfilesForOutlet(tx, row.outletId),
+      adjustmentNotesRepository.findDebitNoteLines(tx, id) as Promise<
+        { itemName: string; unit: string | null; hsnCode: string | null; taxableAmount: number; taxRatePercent: string; lineTotal: number }[]
+      >,
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+    const seller = usableSnapshot(row.sellerSnapshot);
+    const buyer = usableSnapshot(row.buyerSnapshot);
+    const shipTo = usableSnapshot(row.shipToSnapshot);
+    return resolvePrintDocument({
+      kind: 'sales_debit_note',
+      documentNumber: row.documentNumber,
+      documentDate: String(row.documentDate),
+      issuedAt: row.issuedAt,
+      taxMode: row.taxMode as TaxMode,
+      isInterState: usesIgst(row.supplyType as SupplyType),
+      business: seller ? businessFromSnapshot(seller) : buildBusiness(outlet, tenant),
+      profile: resolved.profile,
+      customer: buyer ? printableParty(buyer) : await loadCustomer(tx, row.customerId, row.customerName, row.customerGstin),
+      shipTo: shipTo ? printableParty(shipTo) : null,
+      gst: {
+        placeOfSupply: row.placeOfSupplyStateCode,
+        supplyType: row.supplyType as SupplyType,
+        isReverseCharge: row.isReverseCharge,
+        sezAuthorisedOperations: row.sezAuthorisedOperations,
+        registeredBuyer: Boolean(buyer?.gstin ?? buyer?.uin ?? row.customerGstin),
+      },
+      lines: lines.map((line) => ({
+        name: line.itemName,
+        quantity: 1000,
+        unit: line.unit,
+        unitPrice: line.taxableAmount,
+        hsnCode: line.hsnCode,
+        taxRatePercent: Number(line.taxRatePercent),
+        discount: 0,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        grossAmount: row.grossAmount,
+        totalDiscount: 0,
+        taxableAmount: row.taxableAmount,
+        totalCgst: row.totalCgst,
+        totalSgst: row.totalSgst,
+        totalIgst: row.totalIgst,
+        totalCess: row.totalCess,
+        charges: 0,
+        roundOff: row.roundOff,
+        grandTotal: row.grandTotal,
+        amountPaid: row.grandTotal,
+      },
+      taxRows: toTaxRows(row.taxSummary),
+      tenders: [],
+      customFields: [],
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      originalDocumentNumber: row.originalDocumentNumber,
+      originalDocumentDate: String(row.originalDocumentDate),
+      notes: row.notes,
+    });
+  });
+}
+
+export function buildFinancialCreditNotePayload(id: string, query: PrintPayloadQuery): Promise<PrintDocument> {
+  return withReadTransaction(async (tx) => {
+    const row = await adjustmentNotesRepository.findFinancialNote(tx, id);
+    if (!row) throw new NotFoundError('Credit note');
+    assertOutletAccess(row.outletId);
+    const [tenant, outlet, profiles] = await Promise.all([
+      tenantsRepository.findCurrent(tx),
+      outletsRepository.findOutlet(tx, row.outletId),
+      printRepository.findProfilesForOutlet(tx, row.outletId),
+    ]);
+    if (!tenant) throw new NotFoundError('Tenant');
+    if (!outlet) throw new NotFoundError('Outlet');
+    const resolved = foldProfiles(profiles);
+    const template = pickTemplate(resolved, query.template);
+    const copyIndex = query.copyIndex ?? 0;
+    assertCopyIndex(template, copyIndex);
+    const seller = usableSnapshot(row.sellerSnapshot);
+    const buyer = usableSnapshot(row.buyerSnapshot);
+    return resolvePrintDocument({
+      kind: 'financial_credit_note',
+      documentNumber: row.documentNumber,
+      documentDate: String(row.documentDate),
+      issuedAt: row.issuedAt,
+      // No tax of any kind prints on this note, whatever the shop's tax mode.
+      taxMode: 'non_gst',
+      isInterState: false,
+      business: seller ? businessFromSnapshot(seller) : buildBusiness(outlet, tenant),
+      profile: resolved.profile,
+      customer: buyer ? printableParty(buyer) : await loadCustomer(tx, row.customerId, row.customerName, null),
+      lines: [
+        {
+          name: row.reason,
+          quantity: 1000,
+          unit: null,
+          unitPrice: row.amount,
+          hsnCode: null,
+          taxRatePercent: 0,
+          discount: 0,
+          lineTotal: row.amount,
+        },
+      ],
+      totals: {
+        grossAmount: row.amount,
+        totalDiscount: 0,
+        taxableAmount: row.amount,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        charges: 0,
+        roundOff: 0,
+        grandTotal: row.amount,
+        amountPaid: row.amount,
+      },
+      taxRows: [],
+      tenders: [],
+      customFields: [],
+      template,
+      timezone: tenant.timezone,
+      currencySymbol: tenant.currencySymbol,
+      copyIndex,
+      ...(row.originalDocumentNumber ? { originalDocumentNumber: row.originalDocumentNumber } : {}),
+      notes: row.notes,
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Sales order
 // ---------------------------------------------------------------------------
 
@@ -474,9 +644,8 @@ export function buildSaleOrderPayload(
       issuedAt: order.createdAt,
       taxMode: order.taxMode as TaxMode,
       isInterState: order.supplyType !== 'intra_state',
-      business: buildBusiness(outlet, tenant),
+      ...(await frozenParties(tx, 'sales_orders', id, outlet, tenant, order.customerId, order.customerName)),
       profile: withDocumentTerms(resolved.profile, order.termsSnapshot),
-      customer: await loadCustomer(tx, order.customerId, order.customerName, null),
       lines: lines.map((line) => ({
         name: line.itemName,
         quantity: line.quantity,
@@ -552,9 +721,8 @@ export function buildEstimatePayload(id: string, query: PrintPayloadQuery): Prom
       issuedAt: estimate.createdAt,
       taxMode: estimate.taxMode as TaxMode,
       isInterState: estimate.supplyType !== 'intra_state',
-      business: buildBusiness(outlet, tenant),
+      ...(await frozenParties(tx, 'estimates', id, outlet, tenant, estimate.customerId, estimate.customerName)),
       profile: withDocumentTerms(resolved.profile, estimate.termsSnapshot),
-      customer: await loadCustomer(tx, estimate.customerId, estimate.customerName, null),
       lines: lines.map((line) => ({
         name: line.itemName,
         quantity: line.quantity,
@@ -626,9 +794,16 @@ export function buildProformaInvoicePayload(id: string, query: PrintPayloadQuery
       issuedAt: proformaInvoice.createdAt,
       taxMode: proformaInvoice.taxMode as TaxMode,
       isInterState: proformaInvoice.supplyType !== 'intra_state',
-      business: buildBusiness(outlet, tenant),
+      ...(await frozenParties(
+        tx,
+        'proforma_invoices',
+        id,
+        outlet,
+        tenant,
+        proformaInvoice.customerId,
+        proformaInvoice.customerName,
+      )),
       profile: withDocumentTerms(resolved.profile, proformaInvoice.termsSnapshot),
-      customer: await loadCustomer(tx, proformaInvoice.customerId, proformaInvoice.customerName, null),
       lines: lines.map((line) => ({
         name: line.itemName,
         quantity: line.quantity,
@@ -751,6 +926,7 @@ export function buildCreditNotePayload(
       currencySymbol: tenant.currencySymbol,
       copyIndex,
       originalDocumentNumber: header.originalDocumentNumber,
+      originalDocumentDate: header.originalDocumentDate === null ? null : String(header.originalDocumentDate),
       cashierName: context?.cashierName ?? null,
       counterName: context?.counterName ?? null,
       notes: header.notes,

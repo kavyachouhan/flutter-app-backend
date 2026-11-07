@@ -1,0 +1,8 @@
+GSTIN/UIN of Recipient,Receiver Name,Note Number,Note Date,Note Type,Place Of Supply,Reverse Charge,Note Supply Type,Note Value,Applicable % of Tax Rate,Rate,Taxable Value,Cess Amount
+19AAACM9169K1ZU,MCPI Private Limited,BP3014400000,26-Apr-18,C,19-West Bengal,Y,Regular B2B,575136,,23420,32420,
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400001,1-Apr-18,C,05-Uttarakhand,Y,Deemed Exp,5878,,0.25,"4,981",
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400002,1-Apr-18,C,05-Uttarakhand,Y,Deemed Exp,6947,,0.25,"5,887",
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400003,1-Apr-18,C,05-Uttarakhand,Y,Regular B2B,6947,,0.25,"5,887",
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400004,1-Apr-18,C,05-Uttarakhand,N,Intra-State supplies attracting IGST,6947,,0.1,"5,887",
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400005,1-Apr-18,C,05-Uttarakhand,Y,Regular B2B,320,,0.25,"5,887",
+05AAACC2659Q1ZC,CENTURY PULP & PAPER,BP3014400006,1-Apr-18,C,05-Uttarakhand,Y,Regular B2B,324,,0.25,"5,887",

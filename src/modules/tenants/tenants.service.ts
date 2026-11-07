@@ -7,6 +7,7 @@ import { diffFields, recordAudit } from '../audit/audit.js';
 import { createSession } from '../auth/auth.service.js';
 import { getSubscriptionWithUsage, insertSubscription } from '../entitlements/entitlements.js';
 import { membersRepository } from '../members/members.repository.js';
+import { setTenantGst } from '../gst/registrations.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from './tenants.repository.js';
 import type { CreateTenantBody, UpdateTenantBody } from './tenants.schemas.js';
@@ -45,9 +46,10 @@ export async function onboardTenant(userId: string, body: CreateTenantBody) {
         id: body.id,
         name: body.name,
         legalName: body.legalName ?? null,
-        isGstRegistered: body.isGstRegistered,
-        gstin: body.gstin ?? null,
-        isComposition,
+        // The GST facts are set below, on the registration, which mirrors them here.
+        isGstRegistered: false,
+        gstin: null,
+        isComposition: false,
         pan: body.pan ?? null,
         stateCode: body.stateCode,
         addressLine1: body.addressLine1 ?? null,
@@ -64,20 +66,10 @@ export async function onboardTenant(userId: string, body: CreateTenantBody) {
         allowNegativeStock: body.allowNegativeStock ?? env.TENANT_DEFAULT_ALLOW_NEGATIVE_STOCK,
         defaultPricesIncludeTax:
           body.defaultPricesIncludeTax ?? env.TENANT_DEFAULT_PRICES_INCLUDE_TAX,
-        // A composition shop is asked for its category and rate in settings,
-        // not at onboarding: the scheme has four rates and guessing one would
-        // put a wrong figure on the first CMP-08.
-        compositionCategory: body.compositionCategory ?? null,
-        // pg reads NUMERIC back as a string, so the row type is a string; the
-        // wire takes a number, which is the right shape for a percentage.
-        compositionRatePercent:
-          body.compositionRatePercent !== undefined && body.compositionRatePercent !== null
-            ? String(body.compositionRatePercent)
-            : isComposition && body.compositionCategory
-              ? String(DEFAULT_COMPOSITION_RATES[body.compositionCategory])
-              : null,
+        compositionCategory: null,
+        compositionRatePercent: null,
         filingFrequency: body.filingFrequency ?? 'monthly',
-        registrationEffectiveFrom: body.registrationEffectiveFrom ?? null,
+        registrationEffectiveFrom: null,
       });
 
       await insertSubscription(tx);
@@ -103,6 +95,29 @@ export async function onboardTenant(userId: string, body: CreateTenantBody) {
         code: body.counter.code,
         isActive: true,
         isDefault: true,
+      });
+      await setTenantGst(tx, {
+        tenantId: body.id,
+        isGstRegistered: body.isGstRegistered,
+        gstin: body.gstin ?? null,
+        stateCode: body.stateCode,
+        isComposition,
+        // A composition shop is asked for its category and rate in settings,
+        // not at onboarding: the scheme has four rates and guessing one would
+        // put a wrong figure on the first CMP-08.
+        compositionCategory: body.compositionCategory ?? null,
+        // pg reads NUMERIC back as a string, so the row type is a string; the
+        // wire takes a number, which is the right shape for a percentage.
+        compositionRatePercent:
+          body.compositionRatePercent !== undefined && body.compositionRatePercent !== null
+            ? String(body.compositionRatePercent)
+            : isComposition && body.compositionCategory
+              ? String(DEFAULT_COMPOSITION_RATES[body.compositionCategory])
+              : null,
+        filingFrequency: body.filingFrequency ?? 'monthly',
+        registrationEffectiveFrom: body.registrationEffectiveFrom ?? null,
+        name: body.name,
+        legalName: body.legalName ?? null,
       });
       await recordAudit(tx, { action: 'tenant.created', entityType: 'tenant', entityId: body.id });
       return tenantsRepository.findCurrent(tx);
@@ -131,7 +146,41 @@ export function updateTenant(patch: UpdateTenantBody) {
       isComposition: patch.isComposition ?? before.isComposition,
     });
 
-    await tenantsRepository.update(tx, patch);
+    // GST facts go to the registration, which mirrors them onto the tenant row.
+    const {
+      isGstRegistered,
+      gstin,
+      stateCode,
+      isComposition,
+      compositionCategory,
+      compositionRatePercent,
+      filingFrequency,
+      registrationEffectiveFrom,
+      ...rest
+    } = patch;
+    await tenantsRepository.update(tx, rest);
+    const gstTouched =
+      Object.keys(patch).length !== Object.keys(rest).length ||
+      patch.name !== undefined ||
+      patch.legalName !== undefined;
+    if (gstTouched) {
+      await setTenantGst(tx, {
+        tenantId: before.id,
+        isGstRegistered: isGstRegistered ?? before.isGstRegistered,
+        gstin: gstin === undefined ? before.gstin : gstin,
+        stateCode: stateCode ?? before.stateCode,
+        isComposition: isComposition ?? before.isComposition,
+        compositionCategory:
+          compositionCategory === undefined ? before.compositionCategory : compositionCategory,
+        compositionRatePercent:
+          compositionRatePercent === undefined ? before.compositionRatePercent : compositionRatePercent,
+        filingFrequency: filingFrequency ?? before.filingFrequency,
+        registrationEffectiveFrom:
+          registrationEffectiveFrom === undefined ? before.registrationEffectiveFrom : registrationEffectiveFrom,
+        name: patch.name ?? before.name,
+        legalName: patch.legalName === undefined ? before.legalName : patch.legalName,
+      });
+    }
     const changes = diffFields(before, patch);
     if (changes)
       await recordAudit(tx, {

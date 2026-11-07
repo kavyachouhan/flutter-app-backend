@@ -14,6 +14,13 @@ import {
   type SnapshotAddress,
 } from '../../src/domain/gst/invoice-rules.js';
 import type { PosAddress, PosInput } from '../../src/domain/gst/place-of-supply.js';
+import {
+  CORRECTION_SITUATIONS,
+  type AdjustmentRequest,
+  type CorrectionFacts,
+  type CorrectionSituation,
+  type SoldLineForAdjustment,
+} from '../../src/domain/gst/corrections.js';
 import type { RegistrationFacts } from '../../src/domain/gst/registration.js';
 import type { TaxPointFacts, TaxPointKind } from '../../src/domain/gst/time-of-supply.js';
 import type { GstRuleSet, GstRuleSetContent, LineRateInput } from '../../src/domain/gst/rule-set.js';
@@ -598,6 +605,7 @@ const party = (over: Partial<PartySnapshot>, address: Partial<SnapshotAddress> =
 });
 
 export type InvoiceRulesCase =
+  | { readonly name: string; readonly op: 'documentTypeFor'; readonly input: { readonly mode: 'gst' | 'composition' | 'non_gst'; readonly buyerTreatment: GstTreatment | null; readonly supplyCategories: readonly ('taxable' | 'exempt' | 'nil_rated' | 'non_gst')[] } }
   | { readonly name: string; readonly op: 'rule46MissingFields'; readonly input: Rule46Input }
   | { readonly name: string; readonly op: 'zeroRatedEndorsement'; readonly input: { readonly supplyType: SupplyType; readonly sezAuthorisedOperations: boolean | null } }
   | { readonly name: string; readonly op: 'stateTaxLabel'; readonly input: { readonly placeOfSupply: string | null } }
@@ -636,6 +644,22 @@ export function invoiceRulesCases(): InvoiceRulesCase[] {
     r('export with an Indian destination', { supplyType: 'export_with_tax', taxableValue: 100 }),
     r('a bill of supply is not tested here', { documentType: 'bill_of_supply', buyer: null }),
     r('a non-GST document is not tested', { documentType: null, buyer: null }),
+    r('an invoice-cum-bill of supply is tested like a tax invoice', { documentType: 'invoice_cum_bill_of_supply', buyer: null }),
+    ...([
+      ['all taxable, walk-in', 'gst', null, ['taxable']],
+      ['taxable and exempt, walk-in: Rule 46A', 'gst', null, ['taxable', 'exempt']],
+      ['taxable and nil, unregistered: Rule 46A', 'gst', 'unregistered', ['nil_rated', 'taxable']],
+      ['taxable and exempt, registered: a tax invoice', 'gst', 'registered_regular', ['taxable', 'exempt']],
+      ['only exempt lines, walk-in', 'gst', null, ['exempt']],
+      ['composition', 'composition', null, ['taxable', 'exempt']],
+      ['not registered', 'non_gst', null, ['taxable']],
+    ] as const).map(
+      ([name, mode, buyerTreatment, supplyCategories]): InvoiceRulesCase => ({
+        name: `document type: ${name}`,
+        op: 'documentTypeFor',
+        input: { mode, buyerTreatment, supplyCategories },
+      }),
+    ),
     ...(['intra_state', 'inter_state', 'export_with_tax', 'export_without_tax'] as const).map(
       (supplyType): InvoiceRulesCase => ({ name: `endorsement: ${supplyType}`, op: 'zeroRatedEndorsement', input: { supplyType, sezAuthorisedOperations: null } }),
     ),
@@ -649,5 +673,60 @@ export function invoiceRulesCases(): InvoiceRulesCase[] {
     ...(['intra_state', 'inter_state', 'export_with_tax', 'sez_without_tax'] as const).map(
       (supplyType): InvoiceRulesCase => ({ name: `head: ${supplyType}`, op: 'usesIgst', input: { supplyType } }),
     ),
+  ];
+}
+
+// --- Corrections (D27) -------------------------------------------------------------
+
+const OPEN: CorrectionFacts = {
+  gstr1Filed: false,
+  gstr3bFiled: false,
+  einvoiced: false,
+  withinIrpCancelWindow: false,
+  recipientRegistered: true,
+  recipientWillReverseItc: null,
+};
+const FILED: CorrectionFacts = { ...OPEN, gstr1Filed: true };
+const AFTER_3B: CorrectionFacts = { ...FILED, gstr3bFiled: true };
+const IRN_IN_WINDOW: CorrectionFacts = { ...OPEN, einvoiced: true, withinIrpCancelWindow: true };
+const IRN_PAST_WINDOW: CorrectionFacts = { ...OPEN, einvoiced: true };
+
+export type CorrectionsCase =
+  | { readonly name: string; readonly op: 'correctionRoute'; readonly input: { readonly situation: CorrectionSituation; readonly facts: CorrectionFacts } }
+  | { readonly name: string; readonly op: 'voidRefusal'; readonly input: { readonly facts: CorrectionFacts } }
+  | { readonly name: string; readonly op: 'creditNoteLastDate'; readonly input: { readonly invoiceDate: string; readonly annualReturnFiledOn: string | null } }
+  | { readonly name: string; readonly op: 'adjustmentLine'; readonly input: { readonly sold: SoldLineForAdjustment; readonly request: AdjustmentRequest } };
+
+export function correctionsCases(): CorrectionsCase[] {
+  const route = (situation: CorrectionSituation, label: string, facts: CorrectionFacts): CorrectionsCase => ({
+    name: `${situation}: ${label}`,
+    op: 'correctionRoute',
+    input: { situation, facts },
+  });
+  const states: readonly (readonly [string, CorrectionFacts])[] = [
+    ['open', OPEN],
+    ['GSTR-1 filed', FILED],
+    ['GSTR-3B filed', AFTER_3B],
+    ['e-invoiced, in window', IRN_IN_WINDOW],
+    ['e-invoiced, past window', IRN_PAST_WINDOW],
+  ];
+  const sold: SoldLineForAdjustment = { taxRatePercent: 18, cessRatePercent: 0, supplyCategory: 'taxable', hsnCode: '1006', remainingTaxable: 10_000 };
+  return [
+    ...CORRECTION_SITUATIONS.flatMap((s) => states.map(([label, facts]) => route(s, label, facts))),
+    route('post_supply_discount', 'registered buyer will reverse', { ...OPEN, recipientWillReverseItc: true }),
+    route('post_supply_discount', 'registered buyer will not reverse', { ...OPEN, recipientWillReverseItc: false }),
+    route('post_supply_discount', 'unregistered buyer', { ...OPEN, recipientRegistered: false, recipientWillReverseItc: false }),
+    ...states.map(([label, facts]): CorrectionsCase => ({ name: `void: ${label}`, op: 'voidRefusal', input: { facts } })),
+    { name: 'last date, April invoice', op: 'creditNoteLastDate', input: { invoiceDate: '2026-04-01', annualReturnFiledOn: null } },
+    { name: 'last date, March invoice', op: 'creditNoteLastDate', input: { invoiceDate: '2027-03-31', annualReturnFiledOn: null } },
+    { name: 'last date, annual return filed sooner', op: 'creditNoteLastDate', input: { invoiceDate: '2026-04-01', annualReturnFiledOn: '2027-09-30' } },
+    { name: 'last date, annual return filed later', op: 'creditNoteLastDate', input: { invoiceDate: '2026-04-01', annualReturnFiledOn: '2027-12-31' } },
+    { name: 'value line', op: 'adjustmentLine', input: { sold, request: { id: 'l1', amount: 2500 } } },
+    { name: 'value line, exactly what is left', op: 'adjustmentLine', input: { sold, request: { id: 'l1', amount: 10_000 } } },
+    { name: 'value line, more than is left', op: 'adjustmentLine', input: { sold, request: { id: 'l1', amount: 10_001 } } },
+    { name: 'value line of nothing', op: 'adjustmentLine', input: { sold, request: { id: 'l1', amount: 0 } } },
+    { name: 'rate correction, not capped', op: 'adjustmentLine', input: { sold: { ...sold, cessRatePercent: 12 }, request: { id: 'l1', amount: 50_000, differentialRatePercent: 13 } } },
+    { name: 'rate correction with no difference', op: 'adjustmentLine', input: { sold, request: { id: 'l1', amount: 100, differentialRatePercent: 0 } } },
+    { name: 'debit note: nothing to cap', op: 'adjustmentLine', input: { sold: { ...sold, remainingTaxable: null }, request: { id: 'l1', amount: 99_999 } } },
   ];
 }

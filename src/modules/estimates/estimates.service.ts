@@ -6,6 +6,7 @@
  * here, in one transaction) or an invoice (raised by the till, which names the estimate on
  * the invoice); either way the estimate is then frozen and says what it became.
  */
+import { stampDocumentParties } from '../sales-docs/document-parties.js';
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import type { TaxInvoiceResult } from '../../domain/tax/types.js';
@@ -317,6 +318,11 @@ export async function createEstimate(body: CreateEstimateBody) {
       createdBy: auth.userId,
     });
     await estimatesRepository.insertLines(tx, body.id, prepared.lines);
+    await stampDocumentParties(tx, 'estimates', {
+      id: body.id,
+      outletId: prepared.header.outletId,
+      customerId: prepared.header.customerId,
+    });
 
     await recordAudit(tx, {
       action: 'estimate.created',
@@ -365,6 +371,11 @@ function updateEstimateInTransaction(
     const prepared = await prepareEstimate(tx, body);
     await estimatesRepository.updateHeader(tx, { ...prepared.header, id });
     await estimatesRepository.replaceLines(tx, id, prepared.lines);
+    await stampDocumentParties(tx, 'estimates', {
+      id,
+      outletId: prepared.header.outletId,
+      customerId: prepared.header.customerId,
+    });
 
     await recordAudit(tx, {
       action: 'estimate.updated',

@@ -1,0 +1,7 @@
+Original Invoice Number,Original Invoice date,Original Place Of Supply,Revised Invoice Number,Revised Invoice date,Invoice Value,Applicable % of Tax Rate,Rate,Taxable Value,Cess Amount,E-Commerce GSTIN
+10001,14-Jul-17,37-Andhra Pradesh,A1000,15-Sep-17,250000.01,,5.00,345600.00,20756.00,
+10002,14-Jul-17,37-Andhra Pradesh,A1001,16-Sep-17,250000.01,,0.00,255000.00,20756.00,
+10003,14-Jul-17,32-Kerala,A1002,17-Sep-17,250000.01,65.00,12.00,255000.00,20756.00,
+10004,14-Jul-17,37-Andhra Pradesh,A1003,18-Sep-17,2500000.00,,5.00,265000.00,20756.00,
+10005,14-Jul-17,04-Chandigarh,A1004,19-Sep-17,250901.00,,5.00,250000.00,20756.00,
+10005,14-Jul-17,04-Chandigarh,A1005,20-Sep-17,250901.00,65.00,28.00,251000.00,20756.00,

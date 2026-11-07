@@ -45,7 +45,7 @@ export const printDocumentSchema = registry.register(
   'PrintDocument',
   z
     .object({
-      kind: z.enum(['invoice', 'credit_note', 'payment_receipt', 'estimate', 'proforma_invoice', 'sales_order']),
+      kind: z.enum(['invoice', 'credit_note', 'sales_debit_note', 'financial_credit_note', 'payment_receipt', 'estimate', 'proforma_invoice', 'sales_order']),
       title: z.string().openapi({ description: '"TAX INVOICE", "BILL OF SUPPLY", "CREDIT NOTE".' }),
       business: z.object({
         name: z.string(),

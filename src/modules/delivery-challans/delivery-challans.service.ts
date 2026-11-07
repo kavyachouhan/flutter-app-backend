@@ -13,6 +13,7 @@
  * tagged with referenceType 'delivery_challan' instead of 'invoice'. No new
  * stock entry type, no new CHECK constraint.
  */
+import { stampDocumentParties } from '../sales-docs/document-parties.js';
 import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { assertAttachments, checkAttachments, removeDroppedAttachments } from '../../lib/attachments.js';
@@ -94,6 +95,11 @@ export async function createDeliveryChallan(body: CreateDeliveryChallanBody) {
       createdBy: auth.userId,
     });
 
+    await stampDocumentParties(tx, 'delivery_challans', {
+      id: body.id,
+      outletId: body.outletId,
+      customerId: body.customerId,
+    });
     await deliveryChallansRepository.insertLines(
       tx,
       body.id,
@@ -258,6 +264,11 @@ function updateChallanInTransaction(
       customerId: body.customerId,
       notes: body.notes,
       attachments: body.attachments,
+    });
+    await stampDocumentParties(tx, 'delivery_challans', {
+      id,
+      outletId: challan.outletId,
+      customerId: body.customerId,
     });
     await deliveryChallansRepository.replaceLines(
       tx,

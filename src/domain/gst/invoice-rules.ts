@@ -5,7 +5,7 @@
  * already refused at the till.
  */
 import type { SupplyType } from '../tax/types.js';
-import type { GstDocumentType, GstTreatment } from './enums.js';
+import type { GstDocumentType, GstTreatment, Taxability } from './enums.js';
 import { INDIA } from './place-of-supply.js';
 
 /**
@@ -69,7 +69,7 @@ const REGISTERED: readonly GstTreatment[] = ['registered_regular', 'registered_c
  * unregistered recipient's details are optional, clause (f).
  */
 export function rule46MissingFields(input: Rule46Input): readonly Rule46Field[] {
-  if (input.documentType !== 'tax_invoice') return [];
+  if (input.documentType !== 'tax_invoice' && input.documentType !== 'invoice_cum_bill_of_supply') return [];
   const { buyer, shipTo } = input;
   const delivery = shipTo?.address ?? buyer?.address ?? null;
   const missing: Rule46Field[] = [];
@@ -119,6 +119,23 @@ export function zeroRatedEndorsement(supplyType: SupplyType, sezAuthorisedOperat
     return 'SUPPLY MEANT FOR EXPORT/SUPPLY TO SEZ UNIT OR SEZ DEVELOPER FOR AUTHORISED OPERATIONS UNDER BOND OR LETTER OF UNDERTAKING WITHOUT PAYMENT OF INTEGRATED TAX';
   }
   return null;
+}
+
+const UNREGISTERED_BUYERS: readonly (GstTreatment | null)[] = [null, 'consumer', 'unregistered'];
+
+/**
+ * The document this sale is (D9). Rule 46A: one document for taxable and exempt goods sold to an
+ * unregistered person. A registered buyer gets a tax invoice whatever the lines are.
+ */
+export function documentTypeFor(
+  mode: 'gst' | 'composition' | 'non_gst',
+  buyerTreatment: GstTreatment | null,
+  supplyCategories: readonly Taxability[],
+): GstDocumentType | null {
+  if (mode === 'non_gst') return null;
+  if (mode === 'composition') return 'bill_of_supply';
+  const mixed = supplyCategories.includes('taxable') && supplyCategories.some((c) => c !== 'taxable');
+  return mixed && UNREGISTERED_BUYERS.includes(buyerTreatment) ? 'invoice_cum_bill_of_supply' : 'tax_invoice';
 }
 
 /** Union territories without a legislature charge UTGST where a state charges SGST (D6). */

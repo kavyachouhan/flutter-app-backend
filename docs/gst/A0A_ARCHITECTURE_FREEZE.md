@@ -913,7 +913,17 @@ Named GST constraints that bad input can reach are reported as `VALIDATION_FAILE
 - Invoices, credit notes, purchase bills and debit notes store their snapshots; printing reads them. Rows from before A3 hold a stub or nothing, and print from the live records as before.
 - `supply_scenario` and `pos_provision` are stored on invoices and credit notes. A client that names no scenario gets a declared export or SEZ supply as declared, a known other state as `delivered`, and otherwise `counter_sale`; the app always names one.
 - A supply to an SEZ outside authorised operations is stored as `sez_with_tax` with `sez_authorised_operations = false`: it charges IGST and carries no endorsement. The A5 return engine must report it by that flag, not as zero-rated.
-- **Not done in A3:** the tenant and outlet APIs still write the old columns, so the direction flip above is still to come. Estimates, sales orders, proforma invoices and delivery challans have no snapshot columns and print live records; they are not tax documents, and delivery challans should gain them with the e-way bill work (B4). Per-registration round-off (D5) needs registrations on the device, so the bill's own round-off choice stays, defaulting on. `tax_point_*` and `rule_set_version` wait for a published rule set (A2).
+- **The direction flipped (0044).** The tenant and outlet APIs now call `app.set_tenant_gst` and `app.set_outlet_gstin`, which write `gst_registrations` and its profiles and then mirror the old columns. The triggers that derived registrations from those columns are gone. `gst_registrations.is_principal` marks the business's own GSTIN. The contract migration still has to drop the old columns once no app version reads them.
+- Estimates, sales orders, proforma invoices and delivery challans have `registration_id` and the party snapshots, refreshed on each edit because they stay editable. `ship_to_snapshot` on a challan is filled by the e-way bill work (B4).
+- Round-off is per registration (D5): `round_off_enabled` is set through `PATCH /v1/gst/registrations/:id`, and a device starts each bill from it. The bill's own choice still wins for that bill.
+- **Still waiting on A2:** `tax_point_*` and `rule_set_version` need a published rule set.
+
+**A4 as built (7 Nov 2026):**
+- `src/domain/gst/corrections.ts` is the D27 matrix, with a Dart twin and `corrections-vectors.json`. Cancelling an invoice or note is refused once the GSTR-1 for its period is filed.
+- `credit_note_lines.adjustment_kind` is `quantity`, `value` or `tax`. A `value` or `tax` line holds quantity 0, so anything summing returned quantity is unaffected. A `tax` line taxes the given value at the difference between the rate charged and the right rate, which need not be a notified slab; how that is reported is open item C1.
+- `sales_debit_notes` take parties, place of supply and registration from the invoice they adjust. They need a saved customer, because they move the khata. `financial_credit_notes` have no tax columns.
+- `documentTypeFor` makes a mixed taxable and exempt bill to an unregistered buyer an `invoice_cum_bill_of_supply`, in the invoice series.
+- **The return engine does not read these yet (A5).** Until then GSTR-1, 3B and the sales reports leave out sales debit notes, and value-only credit notes are reported through the existing credit-note queries.
 
 **Series families for BillBanao's own voucher types.** `payment_receipt` and `refund_voucher` map to `non_gst` for now. They record payments against invoices and refunds of returns, not s.31(3)(d)/(e) advance receipt and refund vouchers. Open item **V1** (A5): confirm before they are counted in Table 13.
 
@@ -957,4 +967,6 @@ Named GST constraints that bad input can reach are reported as `VALIDATION_FAILE
 - **T1** — How consumed-but-unissued numbers (`withdrawn`, `rejected_before_issue`) appear inside a GSTR-1 Table 13 serial range (CA confirmation). Needed by A5.
 - **P1** — The preflight report's blocking categories may grow after its first run on TEST. Any addition is recorded here before 0037 is applied.
 - **V1** — Whether BillBanao's `payment_receipt` / `refund_voucher` documents are s.31(3)(d)/(e) vouchers for Table 13 (mapped `non_gst` until confirmed, §9a). Needed by A5.
+- **C1** — How a rate correction (a credit or debit note taxed at the difference between two rates) is reported in GSTR-1, where the portal expects notified rates. CA and GSTN schema to confirm. Needed by A5.
+- **C2** — Primary text of s.15(3)(b) and s.34 as amended, Notif. 03/2026-CT and Rule 46A are not yet attached; `creditNoteLastDate`, the post-supply-discount route and `documentTypeFor` follow the approved plan until they are. Transition for a discount agreed before 1 Nov 2026 stays open (plan §9 item 4).
 - **E1** — Whether supplies to UIN holders fall within e-invoicing (`einvoiceApplicability` rule 6). Default until confirmed: excluded, with reason `uin_buyer_out_of_scope`. Needed by B3.

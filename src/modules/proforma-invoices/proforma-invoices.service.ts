@@ -6,6 +6,7 @@
  * invoice when the till raises one that names it (see `claimProformaInvoiceForInvoice`); it is
  * then frozen and says what it became. It lapses by date: see `sales-docs/expiry.ts`.
  */
+import { stampDocumentParties } from '../sales-docs/document-parties.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import type { TaxInvoiceResult } from '../../domain/tax/types.js';
 import {
@@ -305,6 +306,11 @@ export async function createProformaInvoice(body: CreateProformaInvoiceBody) {
       createdBy: auth.userId,
     });
     await proformaInvoicesRepository.insertLines(tx, body.id, prepared.lines);
+    await stampDocumentParties(tx, 'proforma_invoices', {
+      id: body.id,
+      outletId: prepared.header.outletId,
+      customerId: prepared.header.customerId,
+    });
 
     await recordAudit(tx, {
       action: 'proforma_invoice.created',
@@ -353,6 +359,11 @@ function updateProformaInvoiceInTransaction(
     const prepared = await prepareProformaInvoice(tx, body);
     await proformaInvoicesRepository.updateHeader(tx, { ...prepared.header, id });
     await proformaInvoicesRepository.replaceLines(tx, id, prepared.lines);
+    await stampDocumentParties(tx, 'proforma_invoices', {
+      id,
+      outletId: prepared.header.outletId,
+      customerId: prepared.header.customerId,
+    });
 
     await recordAudit(tx, {
       action: 'proforma_invoice.updated',

@@ -60,7 +60,11 @@ export type LedgerEntryType =
   | 'credit_note'
   | 'credit_note_void'
   | 'refund'
-  | 'refund_void';
+  | 'refund_void'
+  | 'sales_debit_note'
+  | 'sales_debit_note_void'
+  | 'financial_credit_note'
+  | 'financial_credit_note_void';
 
 export interface NewLedgerEntry {
   customerId: string;

@@ -26,6 +26,46 @@ import {
   RETURN_TYPES,
 } from './gst.schemas.js';
 
+const gstRegistration = z.object({
+  id: uuid,
+  gstin: z.string(),
+  stateCode: z.string(),
+  isPrincipal: z.boolean(),
+  status: z.string(),
+  effectiveFrom: z.string(),
+  effectiveTo: z.string().nullable(),
+  roundOffEnabled: z.boolean(),
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/registrations',
+  tags: ['GST'],
+  summary: 'The business\'s GST registrations',
+  security: accessTokenSecurity,
+  responses: {
+    200: jsonResponse('Registrations.', dataEnvelope(z.array(gstRegistration))),
+    ...errorResponses(401, 403),
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/v1/gst/registrations/{id}',
+  tags: ['GST'],
+  summary: 'Change a registration\'s settings',
+  description: 'Rounding the bill to the rupee is set per registration and is on by default.',
+  security: accessTokenSecurity,
+  request: {
+    params: z.object({ id: uuid }),
+    body: { content: { 'application/json': { schema: z.object({ roundOffEnabled: z.boolean() }) } } },
+  },
+  responses: {
+    200: jsonResponse('The registration.', dataEnvelope(gstRegistration)),
+    ...errorResponses(400, 401, 403, 404),
+  },
+});
+
 registry.registerPath({
   method: 'get',
   path: '/v1/gst/rule-sets',

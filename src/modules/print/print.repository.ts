@@ -267,6 +267,14 @@ export const printRepository = {
     );
   },
 
+  /** What an editable document froze about its parties when last saved; null before A3. */
+  findPartySnapshots(tx: Tx, table: 'estimates' | 'sales_orders' | 'proforma_invoices', id: string) {
+    return tx.one<{ seller: unknown; buyer: unknown }>(
+      `SELECT seller_snapshot AS seller, buyer_snapshot AS buyer FROM ${table} WHERE id = $1`,
+      [id],
+    );
+  },
+
   /** Address and state code for the party block; the names themselves are snapshotted. */
   findCustomerDetails(tx: Tx, customerId: string) {
     return tx.one<{

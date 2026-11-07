@@ -58,6 +58,9 @@ import {
 import { creditNotesRepository } from '../credit-notes/credit-notes.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
+import { voidRefusal } from '../../domain/gst/corrections.js';
+import { documentTypeFor } from '../../domain/gst/invoice-rules.js';
+import { gstr1FiledFor } from '../gst/filing-state.js';
 import { assertRule46, decideInvoiceSupply, dispatchSnapshot, sellerSnapshot } from './invoice-supply.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
 import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js';
@@ -217,7 +220,12 @@ export async function createInvoice(body: CreateInvoiceBody) {
       lines: body.lines,
     });
     assertTotalsMatch(totals, body.expectedTotals, 'Invoice');
-    assertRule46({ mode, supplyType: totals.supplyType, supply, taxableValue: totals.taxableAmount });
+    const documentType = documentTypeFor(
+      mode,
+      supply.buyer?.gstTreatment ?? null,
+      totals.lines.map((l) => l.supplyCategory),
+    );
+    assertRule46({ documentType, supplyType: totals.supplyType, supply, taxableValue: totals.taxableAmount });
 
     const tenders = body.payments ?? [];
     const paid = tenders.reduce((acc, t) => acc + t.amount, 0);
@@ -381,6 +389,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       billDiscountReason: body.billDiscountReason ?? null,
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
+      documentType,
       supply: {
         scenario: supply.scenario,
         provision: supply.provision,
@@ -704,6 +713,20 @@ export async function voidInvoice(id: string, reason: string) {
     if (!header) throw new NotFoundError('Invoice');
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { invoice: await loadInvoice(tx, id), voided: false };
+
+    const refusal = voidRefusal({
+      gstr1Filed: await gstr1FiledFor(tx, (header['supplierGstin'] as string | null) ?? null, String(header.documentDate).slice(0, 10)),
+      einvoiced: header['irnState'] === 'registered',
+      // No document can be registered with the IRP until e-invoicing is built (B3).
+      withinIrpCancelWindow: false,
+    });
+    if (refusal) {
+      throw new UnprocessableError(
+        'This invoice has been reported and can no longer be cancelled. Correct it with a note or an amendment.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+        { details: { reason: refusal } },
+      );
+    }
 
     if (await paymentsRepository.hasActiveReceiptAllocations(tx, id)) {
       throw new UnprocessableError('Void the receipts collected against this invoice first.');

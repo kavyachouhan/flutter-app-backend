@@ -1,0 +1,6 @@
+GSTIN of Supplier,Invoice Number,Invoice date,Invoice Value,Place Of Supply,Reverse Charge,Invoice Type,Rate,Taxable Value,Integrated Tax Paid,Central Tax Paid,State/UT Tax Paid,Cess Paid,Eligibility For ITC,Availed ITC Integrated Tax,Availed ITC Central Tax,Availed ITC State/UT Tax,Availed ITC Cess
+08AAACG1395D1ZU,1001,12-Jul-17,100000,29-Karnataka,N,Regular,12,90000,10800,0,0,700,Ineligible,0,0,0,
+08AAACG1395D1ZU,1002,13-Jul-17,100001,29-Karnataka,N,Regular,12,90000,10800,0,0,,Ineligible,0,0,0,
+08AAACG1395D1ZU,1003,13-Jul-17,100001,29-Karnataka,N,Regular,5,10000,500,0,0,,Ineligible,0,0,0,
+08AAACG1395D1ZU,1004,15-Jul-17,100004,29-Karnataka,Y,Regular,5,94000,4700,0,0,,Ineligible,0,0,0,
+08AAACG1395D1ZU,1005,16-Jul-17,100004,08-Rajasthan,N,Regular,5,94000,4700,2500,2500,,Ineligible,0,0,0,

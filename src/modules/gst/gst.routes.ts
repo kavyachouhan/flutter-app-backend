@@ -8,6 +8,7 @@ import { validate, validated } from '../../middleware/validate.js';
 import * as exportService from './export.service.js';
 import * as reconciliation from './reconciliation.service.js';
 import * as service from './gst.service.js';
+import * as registrations from './registrations.service.js';
 import * as ruleSets from './rule-sets.service.js';
 import {
   acceptMatchBody,
@@ -24,6 +25,8 @@ export const gstRouter: Router = Router();
 // --- Rule sets and the HSN/SAC master ----------------------------------------
 
 // Every device bills with these, so any signed-in member may read them.
+export const updateRegistrationBody = z.object({ roundOffEnabled: z.boolean() });
+
 const ruleSetsQuery = { query: z.object({ since: z.string().datetime({ offset: true }).optional() }) };
 gstRouter.get('/rule-sets', validate(ruleSetsQuery), async (req, res) => {
   const { query } = validated<typeof ruleSetsQuery>(req);
@@ -35,6 +38,23 @@ gstRouter.get('/hsn-master', validate(hsnQuery), async (req, res) => {
   const { query } = validated<typeof hsnQuery>(req);
   res.json({ data: await ruleSets.hsnMaster(query.version) });
 });
+
+// --- Registrations -----------------------------------------------------------
+
+gstRouter.get('/registrations', requirePermission('gst:read'), async (_req, res) => {
+  res.json({ data: await registrations.listRegistrations() });
+});
+
+const updateRegistration = { params: idParams, body: updateRegistrationBody };
+gstRouter.patch(
+  '/registrations/:id',
+  requirePermission('gst:manage'),
+  validate(updateRegistration),
+  async (req, res) => {
+    const { params, body } = validated<typeof updateRegistration>(req);
+    res.json({ data: await registrations.updateRegistration(params.id, body) });
+  },
+);
 
 // --- Return periods --------------------------------------------------------
 

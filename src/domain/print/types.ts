@@ -15,6 +15,8 @@
 export type PrintDocumentKind =
   | 'invoice'
   | 'credit_note'
+  | 'sales_debit_note'
+  | 'financial_credit_note'
   | 'payment_receipt'
   | 'estimate'
   | 'proforma_invoice'

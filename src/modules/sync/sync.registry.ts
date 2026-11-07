@@ -96,6 +96,9 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
     where: RECENT_LINES,
     omit: ['cogs_amount'],
   }),
+  table('sales_debit_notes', ['id'], false, ['sales_debit_note.create', 'sales_debit_note.void']),
+  table('sales_debit_note_lines', ['id'], false, ['sales_debit_note.create']),
+  table('financial_credit_notes', ['id'], false, ['financial_credit_note.create', 'financial_credit_note.void']),
   table('credit_notes', ['id'], false, [
     'credit_note.create',
     'credit_note.void',

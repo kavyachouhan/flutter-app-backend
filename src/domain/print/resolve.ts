@@ -119,6 +119,7 @@ export interface ResolveInput {
   readonly shipTo?: PrintableCustomer | null;
   /** What a tax invoice or a note against one must state; absent on other documents. */
   readonly gst?: {
+    readonly documentType?: string | null;
     readonly placeOfSupply: string | null;
     readonly supplyType: SupplyType;
     readonly isReverseCharge: boolean;
@@ -136,8 +137,9 @@ export interface ResolveInput {
   readonly currencySymbol: string;
   /** Which copy this is, indexing the template's copy labels. */
   readonly copyIndex?: number;
-  /** Shown on a credit note so the original can be found. */
+  /** Shown on a note so the original can be found. */
   readonly originalDocumentNumber?: string;
+  readonly originalDocumentDate?: string | null;
   /** When a sales order is due, shown next to its date. */
   readonly dueDate?: string | null;
   readonly cashierName?: string | null;
@@ -161,8 +163,11 @@ const TENDER_LABELS: Record<string, string> = {
  * document is a bill of supply, and calling it anything else is a misstatement
  * on a legal record.
  */
-function titleFor(kind: PrintDocumentKind, mode: TaxMode): string {
+function titleFor(kind: PrintDocumentKind, mode: TaxMode, documentType?: string | null): string {
   if (kind === 'credit_note') return 'CREDIT NOTE';
+  if (kind === 'sales_debit_note') return 'DEBIT NOTE';
+  if (kind === 'financial_credit_note') return 'COMMERCIAL CREDIT NOTE';
+  if (kind === 'invoice' && documentType === 'invoice_cum_bill_of_supply') return 'INVOICE-CUM-BILL OF SUPPLY';
   if (kind === 'payment_receipt') return 'RECEIPT';
   if (kind === 'estimate') return 'ESTIMATE';
   // Preliminary, so it is never a tax invoice either.
@@ -188,6 +193,9 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   ];
   if (input.originalDocumentNumber) {
     meta.push({ label: 'Against invoice', value: input.originalDocumentNumber });
+    if (input.originalDocumentDate) {
+      meta.push({ label: 'Invoice date', value: formatDocumentDate(input.originalDocumentDate, input.timezone) });
+    }
   }
   if (input.dueDate) {
     meta.push({ label: 'Due date', value: formatDocumentDate(input.dueDate, input.timezone) });
@@ -311,7 +319,10 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
   const termsLines: string[] = [...input.profile.termsLines];
   // Section 10(5) of the CGST Act: a composition dealer must say this on every
   // bill of supply, in these words.
-  if (input.taxMode === 'composition') {
+  if (input.kind === 'financial_credit_note') {
+    termsLines.unshift('This is a commercial credit note. It carries no GST and does not change the tax on any invoice.');
+  }
+  if (input.taxMode === 'composition' && input.kind !== 'financial_credit_note') {
     termsLines.unshift('Composition taxable person, not eligible to collect tax on supplies.');
   }
   const endorsement = gst ? zeroRatedEndorsement(gst.supplyType, gst.sezAuthorisedOperations) : null;
@@ -323,7 +334,7 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
 
   return {
     kind: input.kind,
-    title: titleFor(input.kind, input.taxMode),
+    title: titleFor(input.kind, input.taxMode, input.gst?.documentType),
     business: {
       name: input.business.name,
       addressLines: input.business.addressLines,
@@ -378,7 +389,10 @@ export function resolvePrintDocument(input: ResolveInput): PrintDocument {
 function labelForNumber(kind: PrintDocumentKind): string {
   switch (kind) {
     case 'credit_note':
+    case 'financial_credit_note':
       return 'Credit note no.';
+    case 'sales_debit_note':
+      return 'Debit note no.';
     case 'payment_receipt':
       return 'Receipt no.';
     case 'estimate':

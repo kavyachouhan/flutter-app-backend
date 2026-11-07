@@ -17,6 +17,7 @@ files are how both sides prove they agree before a device ever goes offline.
 | `ruleset-vectors.json`   | `src/domain/gst/rule-set.ts`                    | `packages/khata_domain` (Dart) GST test    |
 | `registration-vectors.json` | `src/domain/gst/registration.ts`             | `packages/khata_domain` (Dart) GST test    |
 | `entity-vectors.json`    | `src/domain/gst/entity.ts`                      | `packages/khata_domain` (Dart) GST test    |
+| `corrections-vectors.json` | `src/domain/gst/corrections.ts`               | `packages/khata_domain` (Dart) GST test  |
 | `pos-vectors.json`       | `src/domain/gst/place-of-supply.ts`             | `packages/khata_domain` (Dart) GST test  |
 | `invoice-rules-vectors.json` | `src/domain/gst/invoice-rules.ts`           | `packages/khata_domain` (Dart) GST test  |
 | `tos-vectors.json`       | `src/domain/gst/time-of-supply.ts`              | `packages/khata_domain` (Dart) GST test    |

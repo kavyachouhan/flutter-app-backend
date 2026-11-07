@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/auth.routes.js';
 import { devAuthRouter } from './modules/auth/dev.routes.js';
 import { catalogueRouter } from './modules/catalogue/catalogue.routes.js';
 import { creditNotesRouter } from './modules/credit-notes/credit-notes.routes.js';
+import { financialCreditNotesRouter, salesDebitNotesRouter } from './modules/adjustment-notes/adjustment-notes.routes.js';
 import { debitNotesRouter } from './modules/debit-notes/debit-notes.routes.js';
 import { gstRouter } from './modules/gst/gst.routes.js';
 import {
@@ -87,6 +88,8 @@ export function createV1Router(): Router {
   tenantScoped.use('/invoices', invoicesRouter);
   tenantScoped.use('/payments', paymentsRouter);
   tenantScoped.use('/credit-notes', creditNotesRouter);
+  tenantScoped.use('/sales-debit-notes', salesDebitNotesRouter);
+  tenantScoped.use('/financial-credit-notes', financialCreditNotesRouter);
   tenantScoped.use('/suppliers', suppliersRouter);
   tenantScoped.use('/terms', termsRouter);
   tenantScoped.use('/purchase-bills', purchaseBillsRouter);

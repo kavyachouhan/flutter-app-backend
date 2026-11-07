@@ -9,6 +9,9 @@ import type {
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface CreditNoteHeaderInsert {
+  correctionReason: string;
+  /** Null lets the database work it out from the buyer. */
+  recipientItcReversalStatus: string | null;
   /** Copied from the invoice: a note adjusting a supply keeps its parties and place of supply. */
   supply: InvoiceSupplyColumns;
   id: string;
@@ -42,6 +45,7 @@ export interface CreditNoteHeaderInsert {
 }
 
 export interface CreditNoteLineInsert {
+  adjustmentKind: 'quantity' | 'value' | 'tax';
   id: string;
   invoiceLineId: string;
   lineNo: number;
@@ -111,6 +115,9 @@ export interface SoldLineRow {
   supplyCategory: SupplyCategory;
   trackStock: boolean;
   returnedQuantity: number;
+  /** The line's own taxable value, and how much of it credit notes have taken back. */
+  taxableAmount: number;
+  creditedTaxable: number;
 }
 
 export interface CreditNoteListFilter {
@@ -126,7 +133,9 @@ const HEADER_COLUMNS = `
   c.id, c.outlet_id AS "outletId", c.counter_id AS "counterId", c.device_id AS "deviceId", c.series_id AS "seriesId",
   c.sequence_no AS "sequenceNo", c.document_number AS "documentNumber", c.document_date AS "documentDate",
   c.fy_start_year AS "fyStartYear", c.original_invoice_id AS "originalInvoiceId",
-  c.original_document_number AS "originalDocumentNumber", c.customer_id AS "customerId", c.customer_name AS "customerName",
+  c.original_document_number AS "originalDocumentNumber", c.original_document_date AS "originalDocumentDate",
+  c.correction_reason AS "correctionReason", c.recipient_itc_reversal_status AS "recipientItcReversalStatus",
+  c.irn_state AS "irnState", c.customer_id AS "customerId", c.customer_name AS "customerName",
   c.customer_gstin AS "customerGstin", c.supplier_gstin AS "supplierGstin", c.supplier_state_code AS "supplierStateCode",
   c.place_of_supply_state_code AS "placeOfSupplyStateCode", c.tax_mode AS "taxMode", c.supply_type AS "supplyType",
   c.prices_include_tax AS "pricesIncludeTax", c.round_off_enabled AS "roundOffEnabled",
@@ -145,7 +154,7 @@ const LINE_COLUMNS = `
   hsn_code AS "hsnCode", unit, quantity, unit_price AS "unitPrice", discount, gross_amount AS "grossAmount",
   line_discount AS "lineDiscount", taxable_amount AS "taxableAmount", tax_rate_percent AS "taxRatePercent",
   cess_rate_percent AS "cessRatePercent", cgst, sgst, igst, cess, line_total AS "lineTotal",
-  supply_category AS "supplyCategory"`;
+  supply_category AS "supplyCategory", adjustment_kind AS "adjustmentKind"`;
 
 export const creditNotesRepository = {
   async exists(tx: Tx, id: string): Promise<boolean> {
@@ -172,7 +181,11 @@ export const creditNotesRepository = {
               l.cess_rate_percent AS "cessRatePercent", l.supply_category AS "supplyCategory",
               COALESCE(i.track_stock, false) AS "trackStock",
               COALESCE((SELECT SUM(cl.quantity) FROM credit_note_lines cl JOIN credit_notes c ON c.id = cl.credit_note_id
-                        WHERE cl.invoice_line_id = l.id AND c.status = 'issued'), 0) AS "returnedQuantity"
+                        WHERE cl.invoice_line_id = l.id AND c.status = 'issued'), 0) AS "returnedQuantity",
+              l.taxable_amount AS "taxableAmount",
+              COALESCE((SELECT SUM(cl.taxable_amount) FROM credit_note_lines cl JOIN credit_notes c ON c.id = cl.credit_note_id
+                        WHERE cl.invoice_line_id = l.id AND c.status = 'issued' AND cl.adjustment_kind <> 'tax'), 0)
+                AS "creditedTaxable"
        FROM invoice_lines l LEFT JOIN items i ON i.id = l.item_id
        WHERE l.invoice_id = $1
        ORDER BY l.line_no`,
@@ -216,7 +229,7 @@ export const creditNotesRepository = {
          round_off_enabled, gross_amount, line_discount_total, bill_discount_amount, taxable_amount, total_cgst,
          total_sgst, total_igst, total_cess, total_tax, sub_total, round_off, grand_total, tax_summary, hsn_summary,
          reason_code, refund_mode, refund_amount, restock, custom_fields, notes, status, issued_at, issued_by,
-         is_reverse_charge, supply_scenario, pos_provision, pos_override, sez_authorised_operations,
+         is_reverse_charge, correction_reason, recipient_itc_reversal_status, supply_scenario, pos_provision, pos_override, sez_authorised_operations,
          lut_reference, buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
          dispatch_from_snapshot)
        VALUES (
@@ -226,7 +239,7 @@ export const creditNotesRepository = {
          $21, $22, $23, $24, $25, $26,
          $27, $28, $29, $30, $31, $32, $33, $34, $35,
          $36, $37, $38, $39, $40, $41, 'issued', $42, $43, $44,
-         $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55)`,
+         $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57)`,
       [
         h.id,
         h.outletId,
@@ -272,6 +285,8 @@ export const creditNotesRepository = {
         h.issuedAt,
         h.issuedBy,
         t.isReverseCharge,
+        h.correctionReason,
+        h.recipientItcReversalStatus,
         h.supply.scenario,
         h.supply.provision,
         jsonParam(h.supply.override),
@@ -298,16 +313,16 @@ export const creditNotesRepository = {
       `INSERT INTO credit_note_lines (id, tenant_id, credit_note_id, invoice_line_id, outlet_id, document_date, line_no,
          item_id, item_name, hsn_code, unit, quantity, unit_price, discount, gross_amount, line_discount,
          taxable_amount, tax_rate_percent, cess_rate_percent, cgst, sgst, igst, cess, line_total,
-         supply_category)
+         supply_category, adjustment_kind)
        SELECT l.id, app.current_tenant_id(), $1, l."invoiceLineId", $2, $3, l."lineNo",
               l."itemId", l."itemName", l."hsnCode", l.unit, l.quantity, l."unitPrice", l.discount, l."grossAmount",
               l."lineDiscount", l."taxableAmount", l."taxRatePercent", l."cessRatePercent", l.cgst, l.sgst, l.igst,
-              l.cess, l."lineTotal", l."supplyCategory"
+              l.cess, l."lineTotal", l."supplyCategory", l."adjustmentKind"
        FROM jsonb_to_recordset($4::jsonb) AS l(
          id uuid, "invoiceLineId" uuid, "lineNo" int, "itemId" uuid, "itemName" text, "hsnCode" text, unit text,
          quantity bigint, "unitPrice" bigint, discount jsonb, "grossAmount" bigint, "lineDiscount" bigint,
          "taxableAmount" bigint, "taxRatePercent" numeric, "cessRatePercent" numeric, cgst bigint, sgst bigint,
-         igst bigint, cess bigint, "lineTotal" bigint, "supplyCategory" text)`,
+         igst bigint, cess bigint, "lineTotal" bigint, "supplyCategory" text, "adjustmentKind" text)`,
       [creditNoteId, outletId, documentDate, JSON.stringify(lines)],
     );
   },
@@ -369,6 +384,10 @@ export const creditNotesRepository = {
       "UPDATE credit_notes SET status = 'void', void_reason = $2, voided_at = now(), voided_by = $3 WHERE id = $1",
       [id, reason, userId],
     );
+  },
+
+  async setRecipientReversal(tx: Tx, id: string, status: string): Promise<void> {
+    await tx.query('UPDATE credit_notes SET recipient_itc_reversal_status = $2 WHERE id = $1', [id, status]);
   },
 
   async markPrinted(tx: Tx, id: string): Promise<void> {

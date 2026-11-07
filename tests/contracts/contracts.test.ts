@@ -22,6 +22,9 @@ import {
   buildInvoiceRulesVectors,
   evaluatePosCase,
   evaluateInvoiceRulesCase,
+  buildCorrectionsVectors,
+  evaluateCorrectionsCase,
+  type CorrectionsVectorsFile,
   type PosVectorsFile,
   type InvoiceRulesVectorsFile,
   type TosVectorsFile,
@@ -302,5 +305,17 @@ describe('gst invoice-rules contract vectors', () => {
 
   it('is byte-for-byte what the generator would write now', () => {
     expect(buildInvoiceRulesVectors()).toEqual(file);
+  });
+});
+
+describe('gst corrections contract vectors', () => {
+  const file = load<CorrectionsVectorsFile>('corrections-vectors.json');
+
+  it('re-evaluates every case to the committed expectation', () => {
+    for (const c of file.cases) expect(evaluateCorrectionsCase(c), c.name).toEqual(c.expected);
+  });
+
+  it('is byte-for-byte what the generator would write now', () => {
+    expect(buildCorrectionsVectors()).toEqual(file);
   });
 });

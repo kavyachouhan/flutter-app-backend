@@ -21,6 +21,7 @@ import {
   buildTosVectors,
   buildPosVectors,
   buildInvoiceRulesVectors,
+  buildCorrectionsVectors,
 } from './build.js';
 
 export const CONTRACTS_DIR = fileURLToPath(new URL('../../contracts/', import.meta.url));
@@ -36,6 +37,7 @@ export const ENTITY_VECTORS_PATH = `${CONTRACTS_DIR}entity-vectors.json`;
 export const TOS_VECTORS_PATH = `${CONTRACTS_DIR}tos-vectors.json`;
 export const POS_VECTORS_PATH = `${CONTRACTS_DIR}pos-vectors.json`;
 export const INVOICE_RULES_VECTORS_PATH = `${CONTRACTS_DIR}invoice-rules-vectors.json`;
+export const CORRECTIONS_VECTORS_PATH = `${CONTRACTS_DIR}corrections-vectors.json`;
 
 function write(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -54,3 +56,4 @@ write(ENTITY_VECTORS_PATH, buildEntityVectors());
 write(TOS_VECTORS_PATH, buildTosVectors());
 write(POS_VECTORS_PATH, buildPosVectors());
 write(INVOICE_RULES_VECTORS_PATH, buildInvoiceRulesVectors());
+write(CORRECTIONS_VECTORS_PATH, buildCorrectionsVectors());

@@ -376,6 +376,8 @@
   "documentTypes": [
     "invoice",
     "credit_note",
+    "sales_debit_note",
+    "financial_credit_note",
     "debit_note",
     "payment_receipt",
     "purchase_order",
