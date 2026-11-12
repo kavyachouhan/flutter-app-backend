@@ -41,7 +41,7 @@ registry.registerPath({
   method: 'get',
   path: '/v1/gst/registrations',
   tags: ['GST'],
-  summary: 'The business\'s GST registrations',
+  summary: "The business's GST registrations",
   security: accessTokenSecurity,
   responses: {
     200: jsonResponse('Registrations.', dataEnvelope(z.array(gstRegistration))),
@@ -53,12 +53,14 @@ registry.registerPath({
   method: 'patch',
   path: '/v1/gst/registrations/{id}',
   tags: ['GST'],
-  summary: 'Change a registration\'s settings',
+  summary: "Change a registration's settings",
   description: 'Rounding the bill to the rupee is set per registration and is on by default.',
   security: accessTokenSecurity,
   request: {
     params: z.object({ id: uuid }),
-    body: { content: { 'application/json': { schema: z.object({ roundOffEnabled: z.boolean() }) } } },
+    body: {
+      content: { 'application/json': { schema: z.object({ roundOffEnabled: z.boolean() }) } },
+    },
   },
   responses: {
     200: jsonResponse('The registration.', dataEnvelope(gstRegistration)),
@@ -93,7 +95,12 @@ registry.registerPath({
   responses: {
     200: jsonResponse(
       'The master, or just its version.',
-      dataEnvelope(z.object({ version: z.string().nullable(), codes: z.array(z.array(z.string().nullable())) })),
+      dataEnvelope(
+        z.object({
+          version: z.string().nullable(),
+          codes: z.array(z.array(z.string().nullable())),
+        }),
+      ),
     ),
     ...errorResponses(401),
   },
@@ -176,7 +183,8 @@ const importProgress = registry.register(
     exactCount: z.number().int(),
     probableCount: z.number().int(),
     missingInBooks: z.number().int().openapi({
-      description: 'Filed by a supplier, absent from the shop’s books — usually a bill nobody entered.',
+      description:
+        'Filed by a supplier, absent from the shop’s books — usually a bill nobody entered.',
     }),
     missingIn2b: z.number().int().openapi({
       description:
@@ -318,22 +326,27 @@ registry.registerPath({
   tags: ['GST'],
   summary: 'Download a prepared return',
   description: [
-    'A workbook with one sheet per table (B2B, B2CL, B2CS, exports, SEZ, CDNR, CDNUR,',
-    'nil/exempt/non-GST, HSN, documents issued), or the same figures as JSON.',
+    'format=xlsx: a workbook with one sheet per table (GSTR-1: b2b, b2cl, b2cs, cdnr, cdnur, exp,',
+    'nil/exempt/non-GST, HSN b2b/b2c, documents issued; GSTR-3B: 3.1, 3.2, 4, 5), rendered from the',
+    'same sheets the app shows. format=ca adds a summary, the issues list and (GSTR-3B) the ITC register.',
     '',
-    'Reads the snapshotted workings, never recomputing — which is the point of snapshotting them:',
-    'the file an accountant was given last week and the figures on screen today have to be the',
-    'same thing, or nobody can tell which was filed.',
+    'format=json: portal upload JSON from a versioned mapper, validated against the official schema.',
+    'GSTR-3B uses the official Save schema (portal ready). GSTR-1 follows the official Get response',
+    'schemas only (no official upload schema was available), so it is always labelled draft, and the',
+    'sections with no official schema (exports, advances, nil/exempt, HSN, documents issued,',
+    'amendments) are refused unless acceptUnsupported=true, which produces a clearly named partial draft.',
+    'The response says which mapper and schema fingerprint produced the file and lists every issue.',
     '',
-    'The JSON carries the workings as stored under an identifying header. It is deliberately not',
-    'reshaped into the portal’s abbreviated upload keys: that mapping belongs with a filing',
-    'integration that can be tested against the real API, and inventing it here would produce a',
-    'file that looks official and may not upload.',
+    'Reads the snapshotted workings, never recomputing, so the file an accountant was given last week',
+    'and the figures on screen today are the same thing.',
   ].join('\n'),
   security: accessTokenSecurity,
   request: {
     params: z.object({ id: uuid }),
-    query: z.object({ format: z.enum(['xlsx', 'json']).optional() }),
+    query: z.object({
+      format: z.enum(['xlsx', 'json', 'ca']).optional(),
+      acceptUnsupported: z.enum(['true', 'false']).optional(),
+    }),
   },
   responses: {
     200: jsonResponse(
@@ -343,6 +356,19 @@ registry.registerPath({
           objectKey: z.string(),
           filename: z.string(),
           contentType: z.string(),
+          payloadStatus: z.enum(['portal_ready', 'draft', 'draft_partial']).optional(),
+          mapperId: z.string().optional(),
+          schemaSha256: z.string().optional(),
+          issues: z
+            .array(
+              z.object({
+                severity: z.string(),
+                code: z.string(),
+                message: z.string(),
+                path: z.string().optional(),
+              }),
+            )
+            .optional(),
           downloadUrl: z.string(),
           expiresAt: timestamp,
         }),

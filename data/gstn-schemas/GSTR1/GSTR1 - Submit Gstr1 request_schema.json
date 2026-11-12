@@ -1,0 +1,31 @@
+{
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"gstin": {
+			"description": "GSTIN of the taxpayer",
+			"type": "string",
+			"maxLength": 15,
+			"minLength": 15,
+			"pattern": "^[a-zA-Z0-9]+$"
+		},
+		"ret_period": {
+			"description": "Return Period",
+			"type": "string",
+			"minLength": 6,
+			"maxLength": 6,
+			"pattern": "^((0[1-9]|1[012])((19|20)\\d\\d))$"
+		},
+		"generate_summary": {
+			"description": "Request to generate summary before submit",
+			"type": "string",
+			"enum": [
+				"Y"
+			]
+		}
+	},
+	"required": [
+		"gstin",
+		"ret_period"
+	]
+}

@@ -1,0 +1,606 @@
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "GSTR1 Summary Schema",
+      "additionalProperties": false,
+      "properties": {
+        "gstin": {
+          "description": "GSTIN of the taxpayer",
+          "$ref": "#/definitions/gstin"
+        },
+        "ret_period": {
+          "description": "Return Period",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^((0[1-9]|1[012])((19|20)\\d\\d))$"
+        },
+        "chksum": {
+          "description": "Invoice Check sum value",
+          "type": "string"
+        },
+        "smryTyp": {
+          "description": "Type of Summary",
+          "type": "string",
+          "enum": [
+            "L"
+          ]
+        },
+        "newSumFlag": {
+          "description": "Is the summary in new or old format",
+          "type": "boolean"
+        },
+        "sec_sum": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "sec_nm": {
+                "description": "Return Section",
+                "type": "string",
+                "$ref": "#/definitions/seclist"
+              },
+              "chksum": {
+                "description": "Invoice Check sum value",
+                "type": "string"
+              },
+              "ttl_rec": {
+                "description": "total number of Records",
+                "$ref": "#/definitions/ttl_rec"
+              },
+              "ttl_val": {
+                "description": "total records value",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_igst": {
+                "description": "total IGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_sgst": {
+                "description": "total SGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_cgst": {
+                "description": "total CGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_cess": {
+                "description": "total cess amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_tax": {
+                "description": " total taxable value of records",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_expt_amt": {
+                "description": "total exempted amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_ngsup_amt": {
+                "description": "total negative supplier amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_nilsup_amt": {
+                "description": "total Nil supplier amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_doc_issued": {
+                "description": "total document issued amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "ttl_doc_cancelled": {
+                "description": "total doc cancelled amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "net_doc_issued": {
+                "description": "total document issued amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_tax": {
+                "description": "actual taxable value of records",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_igst": {
+                "description": "actual IGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_sgst": {
+                "description": "actual SGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_cgst": {
+                "description": "actual CGST amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_val": {
+                "description": "actual records value",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_cess": {
+                "description": "actual cess amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_expt_amt": {
+                "description": "actual exempted amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_ngsup_amt": {
+                "description": "actual non-GST supply amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "act_nilsup_amt": {
+                "description": "actual Nil supply amount",
+                "$ref": "#/definitions/taxvalue"
+              },
+              "sub_sections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sec_nm": {
+                      "description": "Return Section",
+                      "type": "string",
+                      "$ref": "#/definitions/subseclist"
+                    },
+                    "chksum": {
+                      "description": "Invoice Check sum value",
+                      "type": "string"
+                    },
+                    "ttl_rec": {
+                      "description": "total number of Records",
+                      "$ref": "#/definitions/ttl_rec"
+                    },
+                    "ttl_val": {
+                      "description": "total records value",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_igst": {
+                      "description": "total IGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_sgst": {
+                      "description": "total SGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_cgst": {
+                      "description": "total CGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_cess": {
+                      "description": "total cess amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_tax": {
+                      "description": " total taxable value of records",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_tax": {
+                      "description": "actual taxable value of records",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_igst": {
+                      "description": "actual IGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_sgst": {
+                      "description": "actual SGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_cgst": {
+                      "description": "actual CGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_val": {
+                      "description": "actual records value",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_cess": {
+                      "description": "actual cess amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "typ": {
+                      "description": "type",
+                      "type": "string",
+                      "$ref": "#/definitions/typelist"
+                    },
+                    "cpty_sum": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ctin": {
+                            "description": "CTIN of the taxpayer",
+                            "$ref": "#/definitions/ctin"
+                          },
+                          "chksum": {
+                            "description": "Invoice Check sum value",
+                            "type": "string"
+                          },
+                          "ttl_rec": {
+                            "description": "total number of records",
+                            "$ref": "#/definitions/ttl_rec"
+                          },
+                          "ttl_val": {
+                            "description": "total record value",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "ttl_igst": {
+                            "description": "total IGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "ttl_sgst": {
+                            "description": "total SGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "ttl_cgst": {
+                            "description": "total CGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "ttl_cess": {
+                            "description": "total cess amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "ttl_tax": {
+                            "description": " total taxable value of records",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "state_cd": {
+                            "type": "string"
+                          },
+                          "act_tax": {
+                            "description": "actual taxable value of records",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "act_igst": {
+                            "description": "actual IGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "act_sgst": {
+                            "description": "actual SGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "act_cgst": {
+                            "description": "actual CGST amount",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "act_val": {
+                            "description": "actual records value",
+                            "$ref": "#/definitions/taxvalue"
+                          },
+                          "act_cess": {
+                            "description": "actual cess amount",
+                            "$ref": "#/definitions/taxvalue"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "cpty_sum": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ctin": {
+                      "description": "CTIN of the taxpayer",
+                      "$ref": "#/definitions/ctin"
+                    },
+                    "chksum": {
+                      "description": "Invoice Check sum value",
+                      "type": "string"
+                    },
+                    "ttl_rec": {
+                      "description": "total number of records",
+                      "$ref": "#/definitions/ttl_rec"
+                    },
+                    "ttl_val": {
+                      "description": "total record value",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_igst": {
+                      "description": "total IGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_sgst": {
+                      "description": "total SGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_cgst": {
+                      "description": "total CGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_cess": {
+                      "description": "total cess amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "ttl_tax": {
+                      "description": " total taxable value of records",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "state_cd": {
+                      "type": "string"
+                    },
+                    "act_tax": {
+                      "description": "actual taxable value of records",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_igst": {
+                      "description": "actual IGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_sgst": {
+                      "description": "actual SGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_cgst": {
+                      "description": "actual CGST amount",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_val": {
+                      "description": "actual records value",
+                      "$ref": "#/definitions/taxvalue"
+                    },
+                    "act_cess": {
+                      "description": "actual cess amount",
+                      "$ref": "#/definitions/taxvalue"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "gstin",
+        "ret_period",
+        "sec_sum",
+        "chksum"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gstin": {
+          "description": "GSTIN of the taxpayer",
+          "$ref": "#/definitions/gstin"
+        },
+        "ret_period": {
+          "description": "Return Period",
+          "type": "string"
+        },
+        "isnil": {
+          "description": "is nil",
+          "type": "string",
+          "enum": [
+            "Y"
+          ]
+        }
+      },
+      "required": [
+        "gstin",
+        "ret_period",
+        "isnil"
+      ]
+    }
+  ],
+  "definitions": {
+    "seclist": {
+      "type": "string",
+      "enum": [
+        "AT",
+        "AT_B2B_REG",
+        "AT_B2B_DE",
+        "AT_B2B_SEWPAO",
+        "AT_B2B_SEWOPAO",
+        "AT_B2B_SEZNAO",
+        "AT_B2C",
+        "AT_EXPWP",
+        "AT_EXPWOP",
+        "AT_ECOM_URP2B_REG",
+        "AT_ECOM_URP2B_SEWPAO",
+        "AT_ECOM_URP2B_SEWOPAO",
+        "AT_ECOM_URP2B_SEZNAO",
+        "AT_ECOM_URP2C",
+        "AT_INTER",
+        "AT_INTRA",
+        "ATA",
+        "ATA_B2B_REG",
+        "ATA_B2B_DE",
+        "ATA_B2B_SEWPAO",
+        "ATA_B2B_SEWOPAO",
+        "ATA_B2B_SEZNAO",
+        "ATA_B2C",
+        "ATA_EXPWP",
+        "ATA_EXPWOP",
+        "ATA_ECOM_URP2B_REG",
+        "ATA_ECOM_URP2B_DE",
+        "ATA_ECOM_URP2B_SEWPAO",
+        "ATA_ECOM_URP2B_SEWOPAO",
+        "ATA_ECOM_URP2B_SEZNAO",
+        "ATA_ECOM_URP2C",
+        "ATA_INTER",
+        "ATA_INTRA",
+        "CDNUR",
+        "B2BA_4A",
+        "B2BA_4D",
+        "CDNURA",
+        "B2BA_4B",
+        "B2BA_4F",
+        "EXP",
+        "B2BA_6C",
+        "EXPA",
+        "B2BA_4F",
+        "B2BA_SEZWOP",
+        "B2BA_SEZWP",
+        "B2B_4A",
+        "B2B_4B",
+        "B2B_4D",
+        "B2B_6C",
+        "B2B_4F",
+        "B2B_SEZWOP",
+        "B2B_SEZWP",
+        "B2CL",
+        "B2CLA",
+        "B2CS",
+        "B2CSA",
+        "HSN",
+        "HSN_B2B",
+        "HSN_B2C",
+        "HSNA",
+        "HSNA_B2B",
+        "HSNA_B2C",
+        "NIL",
+        "NILA",
+        "TTL_LIAB",
+        "TXPD",
+        "TXPD_B2B_REG",
+        "TXPD_B2B_DE",
+        "TXPD_B2B_SEWPAO",
+        "TXPD_B2B_SEWOPAO",
+        "TXPD_B2B_SEZNAO",
+        "TXPD_B2C",
+        "TXPD_EXPWP",
+        "TXPD_EXPWOP",
+        "TXPD_ECOM_URP2B_REG",
+        "TXPD_ECOM_URP2B_DE",
+        "TXPD_ECOM_URP2B_SEWPAO",
+        "TXPD_ECOM_URP2B_SEWOPAO",
+        "TXPD_ECOM_URP2B_SEZNAO",
+        "TXPD_ECOM_URP2C",
+        "TXPD_INTER",
+        "TXPD_INTRA",
+        "TXPDA",
+        "TXPDA_B2B_REG",
+        "TXPDA_B2B_DE",
+        "TXPDA_B2B_SEWPAO",
+        "TXPDA_B2B_SEWOPAO",
+        "TXPDA_B2B_SEZNAO",
+        "TXPDA_B2C",
+        "TXPDA_EXPWP",
+        "TXPDA_EXPWOP",
+        "TXPDA_ECOM_URP2B_REG",
+        "TXPDA_ECOM_URP2B_DE",
+        "TXPDA_ECOM_URP2B_SEWPAO",
+        "TXPDA_ECOM_URP2B_SEWOPAO",
+        "TXPDA_ECOM_URP2B_SEZNAO",
+        "TXPDA_ECOM_URP2C",
+        "TXPDA_INTER",
+        "TXPDA_INTRA",
+        "DOC_ISSUE",
+        "CDNR",
+        "CDNRA",
+        "B2B",
+        "B2BA",
+        "SUPECOM",
+        "SUPECOMA",
+        "ECOM",
+        "ECOMA",
+        "ECOM_REG",
+        "ECOM_DE",
+        "ECOM_UNREG",
+        "ECOM_SEZNAO",
+        "ECOM_SEZWP",
+        "ECOM_SEZWOP",
+        "ECOMA_REG",
+        "ECOMA_DE",
+        "ECOMA_UNREG",
+        "ECOMA_SEZNAO",
+        "ECOMA_SEZWP",
+        "ECOMA_SEZWOP"
+      ]
+    },
+    "subseclist": {
+      "type": "string",
+      "enum": [
+        "CDNRA_4A",
+        "CDNRA_4B",
+        "CDNRA_4D",
+        "CDNRA_6C",
+        "CDNRA_4F",
+        "CDNRA_SEZWP",
+        "CDNRA_SEZWOP",
+        "CDNRA_15B2B_R",
+        "CDNRA_15B2B_SEZNAO",
+        "CDNRA_15B2B_SEWPAO",
+        "CDNRA_15B2B_SEWOPAO",
+        "CDNRA_15URP2B_R",
+        "CDNRA_15URP2B_SEZNAO",
+        "CDNRA_15URP2B_SEWPAO",
+        "CDNRA_15URP2B_SEWOPAO",
+        "CDNR_4A",
+        "CDNR_4B",
+        "CDNR_4D",
+        "CDNR_6C",
+        "CDNR_4F",
+        "CDNR_SEZWP",
+        "CDNR_SEZWOP",
+        "CDNR_15B2B_R",
+        "CDNR_15B2B_SEZNAO",
+        "CDNR_15B2B_SEWPAO",
+        "CDNR_15B2B_SEWOPAO",
+        "CDNR_15URP2B_R",
+        "CDNR_15URP2B_SEZNAO",
+        "CDNR_15URP2B_SEWPAO",
+        "CDNR_15URP2B_SEWOPAO",
+        "SUPECOM_14A",
+        "SUPECOM_14B",
+        "SUPECOMA_14A",
+        "SUPECOMA_14B"
+      ]
+    },
+    "typelist": {
+      "type": "string",
+      "enum": [
+        "B2CL",
+        "EXPWP",
+        "EXPWOP"
+      ]
+    },
+    "ttl_rec": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "taxvalue": {
+      "type": "number",
+      "multipleOf": 0.01
+    },
+    "gstin": {
+      "type": "string",
+      "maxLength": 15,
+      "minLength": 15,
+      "pattern": "[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[Zz1-9A-Ja-j]{1}[0-9a-zA-Z]{1}"
+    },
+    "ctin": {
+      "anyOf": [{
+        "type": "string",
+        "maxLength": 15,
+        "minLength": 15,
+        "pattern": "[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[Zz1-9A-Ja-j]{1}[0-9a-zA-Z]{1}"
+      },
+        {
+          "type": "string",
+          "maxLength": 15,
+          "minLength": 15,
+          "pattern": "[0-9]{4}[A-Z]{3}[0-9]{5}[UO]{1}[N][A-Z0-9]{1}"
+        },
+        {
+          "type": "string",
+          "maxLength": 15,
+          "minLength": 15,
+          "pattern": "[0-9]{4}[a-zA-Z]{3}[0-9]{5}[N][R][0-9a-zA-Z]{1}"
+        },
+        {
+          "type":"string",
+          "maxLength":15,
+          "minLength":15,
+          "pattern":"[0-9]{2}[a-zA-Z]{4}[a-zA-Z0-9]{1}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[D]{1}[0-9a-zA-Z]{1}"
+        }
+      ]
+    }
+  }
+
+}

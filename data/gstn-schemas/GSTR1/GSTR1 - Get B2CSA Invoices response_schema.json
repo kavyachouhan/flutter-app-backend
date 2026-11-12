@@ -1,0 +1,106 @@
+{
+   "$schema":"http://json-schema.org/draft-04/schema#",
+   "id":"http://example.com/example.json",
+   "type":"object",
+   "additionalProperties":false,
+   "properties":{
+      "b2csa":{
+         "type":"array",
+         "additionalItems":false,
+         "items":{
+            "type":"object",
+            "additionalProperties":false,
+            "properties":{
+               "chksum":{
+                  "maxLength":64,
+                  "description":"Invoice checksum",
+                  "type":"string",
+                  "pattern":"^[a-zA-Z0-9]+$",
+                  "minLength":1
+               },
+               "omon":{
+                  "description":"Original month",
+                  "maxLength":6,
+                  "minLength":6,
+                  "type":"string"
+               },
+               "etin":{
+                  "description":"Ecom Tin",
+                  "type":"string",
+                  "maxLength":15,
+                  "minLength":15,
+                  "pattern":"^[a-zA-Z0-9._\\s]+$"
+               },
+               "flag":{
+                  "description":"tax payer action"
+               },
+               "pos":{
+                  "description":"Actual Place of Supply",
+                  "maxLength":2,
+                  "minLength":2,
+                  "type":"string",
+				  "pattern": "^(3[0-8]|[12][0-9]|0[1-9]|97)$"
+               },
+               "sply_ty":{
+                  "description":"Supply Type of invoice",
+                  "type":"string",
+                  "enum":[
+                     "INTER",
+                     "INTRA"
+                  ]
+               },
+               "typ":{
+                  "type":"string"
+               },
+               "diff_percent":{
+                  "description":"Differential percentage",
+                  "type":"number",
+                  "multipleOf":0.01
+               },
+               "itms":{
+                  "type":"array",
+                  "additionalItems":false,
+                  "items":{
+                     "type":"object",
+                     "additionalProperties":false,
+                     "properties":{
+                        "rt":{
+                           "description":"Rate as per invoice",
+                           "type":"number"
+                        },
+                        "txval":{
+                           "description":"Taxable value of Goods or Service as per invoice",
+                           "type":"number",
+                           "minLength":1
+                        },
+                        "iamt":{
+                           "description":"IGST Amount as per invoice",
+                           "type":"number"
+                        },
+                        "camt":{
+                           "description":"CGST Amount as per invoice",
+                           "type":"number"
+                        },
+                        "samt":{
+                           "description":"SGST Amount as per invoice",
+                           "type":"number"
+                        },
+                        "csamt":{
+                           "description":"Cess Amount as per invoice",
+                           "type":"number"
+                        }
+                     }
+                  },
+                  "required":[
+                     "rt",
+                     "txval"
+                  ]
+               }
+            },
+            "required":[
+               "chksum"
+            ]
+         }
+      }
+   }
+}

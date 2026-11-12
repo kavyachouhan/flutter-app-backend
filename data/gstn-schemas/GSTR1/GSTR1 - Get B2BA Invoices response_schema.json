@@ -1,0 +1,199 @@
+{
+  "id": "Get-B2BA-Schema",
+  "properties": {
+    "b2ba": {
+      "items": {
+        "properties": {
+		"flag":{
+					"description": "Status of Invoice",
+					"type": "string"
+			},
+          "ctin": {
+            "type": "string",
+            "maxLength": 15,
+            "minLength": 15,
+            "pattern": "^[a-zA-Z0-9._\\s]+$",
+            "description": "GSTIN/UID of the Receiver taxpayer/UN,Govt Bodies"
+          },
+          "inv": {
+            "items": {
+              "properties": {
+                "cflag": {
+                  "description": "Status of counter party",
+                  "type": "string"
+                },
+                "etin": {
+                  "description": "Ecom Tin",
+                  "type": "string",
+                  "maxLength": 15,
+                  "minLength": 15,
+                  "pattern": "^[a-zA-Z0-9._\\s]+$"
+                },
+                "oinum": {
+                  "maxLength": 16,
+                  "description": "Original Invoice Number",
+                  "type": "string"
+                },
+                "oidt": {
+                  "description": "Original Invoice Date",
+                  "type": "string",
+                  "pattern": "^((0[1-9]|[12][0-9]|3[01])[-](0[1-9]|1[012])[-]((19|20)\\d\\d))$"
+                },
+                "inum": {
+                  "maxLength": 16,
+                  "description": "Supplier Invoice Number",
+                  "type": "string"
+                },
+                "chksum": {
+                  "maxLength": 64,
+                  "description": "Invoice checksum value",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9]+$",
+                  "minLength": 1
+                },
+                "idt": {
+                  "description": "Supplier Invoice Date",
+                  "type": "string",
+                  "pattern": "^((0[1-9]|[12][0-9]|3[01])[-](0[1-9]|1[012])[-]((19|20)\\d\\d))$"
+                },
+                "inv_typ": {
+                  "description": " Invoice Type",
+                  "type": "string"
+                },
+				"tos": {
+				   "description": "Type of Supply",
+				   "type": "string",
+				   "enum": [
+				            "G",
+				            "S"
+				            ]
+				  },
+				   "esup": {
+				      "description": "Supplies made through ECO u/s 52",
+				       "type": "string"
+				  },
+				  "is_4d": {
+				      "description": "Table 4D flag; set to Y when receiver is an ISD with the same PAN and state code as the supplier. Recomputed and enforced by backend.",
+				      "type": "string",
+				      "enum": [
+				               "Y",
+				               "N"
+				                ]
+				  },
+				  "diff_percent":{
+                        "description":"Differential percentage",
+					    "type":"number",
+						"multipleOf": 0.01							 
+					 }, 
+					"opd":{
+         		     "description":"Original Period",
+        		 "type":"string",
+        		 "pattern":"^(((19|20)\\d\\d)-(0[1-9]|1[012]))$"
+      },
+                "itms": {
+                  "items": {
+                    "properties": {
+                      "itm_det": {
+                        "properties": {
+                          "rt": {
+                            "description": "rate as per invoice",
+                            "type": "number",
+							"multipleOf": 0.001
+                          },
+                          "iamt": {
+                            "description": "IGST Amount as per invoice",
+                            "type": "number",
+							"multipleOf": 0.001
+                          },
+                          "camt": {
+                            "description": "CGST Amount as per invoice",
+                            "type": "number",
+							"multipleOf": 0.001
+                          },
+                          "samt": {
+                            "description": "SGST Amount as per invoice",
+                            "type": "number",
+							"multipleOf": 0.001
+                          },
+                          "txval": {
+                            "description": "Taxable value of Goods or Service as per invoice",
+                            "type": "number",
+							"multipleOf": 0.001,
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "rt",
+                          "txval"
+                        ],
+                        "type": "object"
+                      },
+                      "num": {
+                        "description": "Serial no",
+                        "type": "number",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "itm_det",
+                      "num"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "pos": {
+                  "description": "Actual Place of Supply",
+                  "maxLength": 2,
+                  "minLength": 2,
+                  "type": "string",
+				  "pattern": "^(3[0-8]|[12][0-9]|0[1-9]|97)$"
+                },
+                "rchrg": {
+                  "description": "Reverse Charge",
+                  "type": "string"
+                },
+                "updby": {
+                  "description": "Uploaded by",
+                  "type": "string"
+                },
+                "val": {
+                  "description": "Supplier Invoice Value",
+                  "type": "number",
+				  "multipleOf": 0.001
+                }
+              },
+              "required": [
+             
+                "inv_typ",
+                "itms",
+                "val",
+                "rchrg",
+                "idt",
+                "updby",
+                "pos",
+                "inum",
+                "oinum",
+                "oidt",
+                "cflag",
+                "chksum"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ctin",
+          "inv"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "b2ba"
+  ],
+  "type": "object"
+}

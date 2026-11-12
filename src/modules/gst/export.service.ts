@@ -1,18 +1,24 @@
 /**
- * Hands a prepared return over: as a workbook an accountant reads, or as the
- * JSON the GST portal's offline tool uploads.
+ * Hands a prepared return over: as an Excel workbook, as portal JSON, or as a CA package.
  *
- * Reads the *snapshotted* workings, never recomputing. That is the whole point
- * of snapshotting them: the file an accountant was given last week and the
- * figures on screen today have to be the same thing, or nobody can tell which
- * was filed.
+ * Everything is rendered from the *snapshotted* workings, never recomputed: the file an accountant
+ * was given last week and the figures on screen today have to be the same thing, or nobody can
+ * tell which was filed. The sheets, the neutral model and the issues all live in that snapshot,
+ * which is what keeps the screen, the Excel file, the PDF the app draws, the JSON and the CA
+ * package identical.
  *
- * Synchronous, like the spreadsheet exporter, and for the same reason: the work
- * is a second, and the alternative is a job table whose only job is to hold a
- * URL. The storage round trip happens after the transaction closes, so a
- * pooled connection is never held across a network call.
+ * Portal JSON is produced by a versioned mapper and validated against the official schema; a file
+ * that fails validation is refused with the reasons, and a mapper not built from the official
+ * request schema is labelled draft. Nothing here is ever called "portal compatible" on its own
+ * say-so.
  */
 import { withReadTransaction } from '../../db/tx.js';
+import type { Gstr1Return, Gstr3bReturn } from '../../domain/gst/returns/model.js';
+import type {
+  Sheet,
+  SheetColumn as ReturnColumn,
+  WorkingIssue,
+} from '../../domain/gst/returns/sheets.js';
 import { NotFoundError, UnprocessableError, ErrorCode } from '../../lib/errors.js';
 import { upload } from '../../lib/storage.js';
 import {
@@ -20,169 +26,310 @@ import {
   paiseToNumber,
   quantityToNumber,
   SPREADSHEET_CONTENT_TYPE,
+  type ColumnFormat,
   type SheetColumn,
   type SheetSpec,
 } from '../exports/workbook.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { gstRepository, type GstReturnPeriodRow } from './gst.repository.js';
+import { itcRepository } from './itc.repository.js';
+import { exportPayload } from './returns/payload-export.js';
 
 const JSON_CONTENT_TYPE = 'application/json';
 
 type Row = Record<string, unknown>;
 
-const text = (header: string, key: string, width?: number): SheetColumn => ({
-  header,
-  key,
-  format: 'text',
-  ...(width === undefined ? {} : { width }),
-});
-const money = (header: string, key: string): SheetColumn => ({ header, key, format: 'money' });
-const date = (header: string, key: string): SheetColumn => ({ header, key, format: 'date' });
-const qty = (header: string, key: string): SheetColumn => ({ header, key, format: 'quantity' });
+const FORMAT: Readonly<Record<ReturnColumn['kind'], ColumnFormat>> = {
+  text: 'text',
+  money: 'money',
+  number: 'number',
+  percent: 'number',
+  date: 'date',
+  quantity: 'quantity',
+};
 
-/** The columns every itemised outward table shares, in the portal's own order. */
-const ITEMISED_COLUMNS: SheetColumn[] = [
-  text('GSTIN of recipient', 'customerGstin', 18),
-  text('Receiver name', 'customerName', 24),
-  text('Invoice number', 'documentNumber', 16),
-  date('Invoice date', 'documentDate'),
-  money('Invoice value', 'invoiceValue'),
-  text('Place of supply', 'placeOfSupply'),
-  text('Reverse charge', 'reverseCharge'),
-  money('Taxable value', 'taxableAmount'),
-  money('CGST', 'cgst'),
-  money('SGST', 'sgst'),
-  money('IGST', 'igst'),
-  money('Cess', 'cess'),
-];
+const convert = (kind: ReturnColumn['kind'], value: unknown): unknown => {
+  if (typeof value !== 'number') return value ?? null;
+  if (kind === 'money') return paiseToNumber(value);
+  if (kind === 'quantity') return quantityToNumber(value);
+  return value;
+};
 
-function itemisedRows(rows: unknown): Row[] {
-  if (!Array.isArray(rows)) return [];
-  return rows.map((value) => {
-    const row = value as Row;
-    return {
-      customerGstin: row['customerGstin'] ?? '',
-      customerName: row['customerName'] ?? '',
-      documentNumber: row['documentNumber'],
-      documentDate: row['documentDate'],
-      invoiceValue: paiseToNumber(row['invoiceValue'] as number),
-      placeOfSupply: row['placeOfSupply'] ?? '',
-      // 'Y'/'N' rather than true/false: that is what the portal's template
-      // expects, and an accountant transcribing by hand reads it the same way.
-      reverseCharge: row['isReverseCharge'] === true ? 'Y' : 'N',
-      taxableAmount: paiseToNumber(row['taxableAmount'] as number),
-      cgst: paiseToNumber(row['cgst'] as number),
-      sgst: paiseToNumber(row['sgst'] as number),
-      igst: paiseToNumber(row['igst'] as number),
-      cess: paiseToNumber(row['cess'] as number),
-      ...(row['originalDocumentNumber']
-        ? { originalDocumentNumber: row['originalDocumentNumber'] }
-        : {}),
-    };
+/** Excel sheet names: at most 31 characters and none of `\ / ? * [ ] :`. */
+const sheetName = (title: string, used: Set<string>): string => {
+  const base =
+    title
+      .replace(/[\\/?*[\]:]/g, ' ')
+      .slice(0, 31)
+      .trim() || 'Sheet';
+  let name = base;
+  for (let i = 2; used.has(name); i++) name = `${base.slice(0, 28)} ${i}`;
+  used.add(name);
+  return name;
+};
+
+/** A stored return sheet as a workbook sheet, with a totals row when any column totals. */
+function toSheetSpec(sheet: Sheet, used: Set<string>): SheetSpec {
+  const columns: SheetColumn[] = sheet.columns.map((c) => ({
+    header: c.label,
+    key: c.key,
+    format: FORMAT[c.kind],
+    width: c.kind === 'text' ? 22 : 16,
+  }));
+  const rows: Row[] = sheet.rows.map((row) => {
+    const out: Row = {};
+    for (const c of sheet.columns) out[c.key] = convert(c.kind, row[c.key]);
+    return out;
   });
+  if (sheet.columns.some((c) => c.total) && sheet.rows.length > 0) {
+    const first = sheet.columns[0];
+    const totals: Row = {};
+    for (const c of sheet.columns) {
+      totals[c.key] = c.total ? convert(c.kind, sheet.totals[c.key] ?? 0) : null;
+    }
+    if (first && !first.total) totals[first.key] = 'Total';
+    rows.push(totals);
+  }
+  return { name: sheetName(sheet.id === 'b2b' ? 'b2b,sez,de' : sheet.id, used), columns, rows };
 }
 
-/**
- * One sheet per GSTR-1 table.
- *
- * `buildWorkbook` has always taken a list of sheets and every caller so far
- * passed one; a return is what it was built for. Empty tables are included
- * rather than dropped, because an accountant checking a return needs to see
- * that a table is empty, not wonder whether it was computed.
- */
-function gstr1Sheets(workings: Record<string, unknown>): SheetSpec[] {
-  const b2cs = Array.isArray(workings['b2cs']) ? (workings['b2cs'] as Row[]) : [];
-  const nilExempt = Array.isArray(workings['nilExemptNonGst'])
-    ? (workings['nilExemptNonGst'] as Row[])
-    : [];
-  const hsn = Array.isArray(workings['hsnSummary']) ? (workings['hsnSummary'] as Row[]) : [];
-  const issued = Array.isArray(workings['documentsIssued'])
-    ? (workings['documentsIssued'] as Row[])
-    : [];
-
-  const cdnColumns: SheetColumn[] = [
-    ...ITEMISED_COLUMNS,
-    text('Original invoice number', 'originalDocumentNumber', 16),
-  ];
-
-  return [
-    { name: 'B2B', columns: ITEMISED_COLUMNS, rows: itemisedRows(workings['b2b']) },
-    { name: 'B2CL', columns: ITEMISED_COLUMNS, rows: itemisedRows(workings['b2cl']) },
-    {
-      name: 'B2CS',
-      columns: [
-        text('Place of supply', 'placeOfSupply'),
-        { header: 'Rate', key: 'taxRatePercent', format: 'number' },
-        money('Taxable value', 'taxableAmount'),
-      ],
-      rows: b2cs.map((row) => ({
-        placeOfSupply: row['placeOfSupply'],
-        taxRatePercent: row['taxRatePercent'],
-        taxableAmount: paiseToNumber(row['taxableAmount'] as number),
-      })),
-    },
-    { name: 'EXP', columns: ITEMISED_COLUMNS, rows: itemisedRows(workings['exports']) },
-    { name: 'SEZ', columns: ITEMISED_COLUMNS, rows: itemisedRows(workings['sez']) },
-    { name: 'CDNR', columns: cdnColumns, rows: itemisedRows(workings['cdnr']) },
-    { name: 'CDNUR', columns: cdnColumns, rows: itemisedRows(workings['cdnur']) },
-    {
-      name: 'Nil-Exempt-NonGST',
-      columns: [
-        text('Classification', 'supplyCategory'),
-        text('Supply type', 'supplyType'),
-        money('Taxable value', 'taxableAmount'),
-      ],
-      rows: nilExempt.map((row) => ({
-        supplyCategory: row['supplyCategory'],
-        supplyType: row['supplyType'],
-        taxableAmount: paiseToNumber(row['taxableAmount'] as number),
-      })),
-    },
-    {
-      name: 'HSN',
-      columns: [
-        text('HSN', 'hsnCode'),
-        text('UQC', 'unit'),
-        qty('Total quantity', 'quantity'),
-        money('Taxable value', 'taxableAmount'),
-        money('CGST', 'cgst'),
-        money('SGST', 'sgst'),
-        money('IGST', 'igst'),
-        money('Cess', 'cess'),
-      ],
-      rows: hsn.map((row) => ({
-        hsnCode: row['hsnCode'],
-        unit: row['unit'] ?? '',
-        quantity: quantityToNumber(row['quantity'] as number),
-        taxableAmount: paiseToNumber(row['taxableAmount'] as number),
-        cgst: paiseToNumber(row['cgst'] as number),
-        sgst: paiseToNumber(row['sgst'] as number),
-        igst: paiseToNumber(row['igst'] as number),
-        cess: paiseToNumber(row['cess'] as number),
-      })),
-    },
-    {
-      name: 'Documents',
-      columns: [
-        text('Document type', 'documentType'),
-        text('From', 'fromNo'),
-        text('To', 'toNo'),
-        { header: 'Issued', key: 'issued', format: 'number' },
-      ],
-      rows: issued,
-    },
-  ];
+interface StoredWorkings {
+  form: 'gstr1' | 'gstr3b';
+  sheets: Sheet[];
+  issues: WorkingIssue[];
+  summary: {
+    key: string;
+    label: string;
+    records: number;
+    taxable: number;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    cess: number;
+  }[];
+  model: Gstr1Return | Gstr3bReturn;
 }
 
-/** GSTR-3B and CMP-08 are summaries, so one sheet of label-and-figure rows. */
-function summarySheets(period: GstReturnPeriodRow): SheetSpec[] {
+function requireStored(period: GstReturnPeriodRow): StoredWorkings {
+  const w = period.workings as unknown as Partial<StoredWorkings> | null;
+  if (!w || !Array.isArray(w.sheets) || !w.model) {
+    throw new UnprocessableError(
+      'This return was prepared with an older version. Prepare it again, then export.',
+      ErrorCode.UNPROCESSABLE,
+    );
+  }
+  return w as StoredWorkings;
+}
+
+const issueSheet = (issues: readonly WorkingIssue[]): SheetSpec => ({
+  name: 'Issues',
+  columns: [
+    { header: 'Severity', key: 'severity', format: 'text', width: 10 },
+    { header: 'Code', key: 'code', format: 'text', width: 30 },
+    { header: 'Count', key: 'count', format: 'number', width: 8 },
+    { header: 'Reference', key: 'ref', format: 'text', width: 20 },
+    { header: 'What to check', key: 'message', format: 'text', width: 90 },
+  ],
+  rows: issues.map((i) => ({ ...i, count: i.count ?? null, ref: i.ref ?? '' })),
+});
+
+export interface GstExportResult {
+  readonly objectKey: string;
+  readonly filename: string;
+  readonly contentType: string;
+  /** For JSON: how far the file can be trusted. */
+  readonly payloadStatus?: 'portal_ready' | 'draft' | 'draft_partial';
+  readonly mapperId?: string;
+  readonly schemaSha256?: string;
+  /** Sections or problems the user must know about before using the file. */
+  readonly issues?: readonly { severity: string; code: string; message: string; path?: string }[];
+}
+
+export type ExportFormat = 'xlsx' | 'json' | 'ca';
+
+export async function exportPeriod(
+  id: string,
+  format: ExportFormat,
+  options: { acceptUnsupported?: boolean } = {},
+): Promise<GstExportResult> {
+  const { period, itc } = await withReadTransaction(async (tx) => {
+    await assertFeature(tx, 'gst_workings');
+    const row = await gstRepository.findPeriod(tx, id);
+    if (!row) throw new NotFoundError('GST return period');
+    // Nothing to hand over until it has been computed: an empty file would look like a return
+    // with no supplies in it.
+    if (row.status === 'open' || !row.workings) {
+      throw new UnprocessableError(
+        'Prepare this return before exporting it.',
+        ErrorCode.UNPROCESSABLE,
+      );
+    }
+    const itcRows =
+      format === 'ca' && row.returnType === 'gstr3b'
+        ? await itcRepository.list(
+            tx,
+            {
+              gstin: row.gstin,
+              from: row.periodFrom,
+              to: row.periodTo,
+              state: undefined,
+              itcCategory: undefined,
+              supplierId: undefined,
+            },
+            5000,
+            undefined,
+          )
+        : [];
+    return { period: row, itc: itcRows };
+  });
+
+  const label = `${period.returnType}-${period.gstin}-${period.periodYear}-${String(
+    period.periodMonth,
+  ).padStart(2, '0')}`;
+
+  if (period.returnType === 'cmp08') {
+    if (format === 'json') {
+      throw new UnprocessableError(
+        'No official schema has been supplied for CMP-08, so no portal JSON is produced.',
+        ErrorCode.UNPROCESSABLE,
+      );
+    }
+    const buffer = await buildWorkbook(cmp08Sheets(period));
+    const objectKey = await upload('export', SPREADSHEET_CONTENT_TYPE, buffer);
+    return { objectKey, filename: `${label}.xlsx`, contentType: SPREADSHEET_CONTENT_TYPE };
+  }
+
+  const stored = requireStored(period);
+
+  if (format === 'json') {
+    const exported = exportPayload(period.returnType, stored.model, {
+      year: period.periodYear,
+      month: period.periodMonth,
+    });
+    const blocking = exported.issues.filter((i) => i.severity === 'error');
+    const onlyUnsupported = blocking.every((i) => i.code === 'section_unsupported');
+    if (blocking.length > 0 && !(options.acceptUnsupported && onlyUnsupported)) {
+      throw new UnprocessableError(
+        'The portal file cannot be produced as it stands.',
+        ErrorCode.UNPROCESSABLE,
+        { details: { mapperId: exported.mapperId, issues: exported.issues } },
+      );
+    }
+    const partial = blocking.length > 0;
+    const buffer = Buffer.from(JSON.stringify(exported.payload, null, 2), 'utf8');
+    const objectKey = await upload('export', JSON_CONTENT_TYPE, buffer);
+    return {
+      objectKey,
+      filename: `${label}${partial ? '-partial-DRAFT' : exported.portalReady ? '' : '-DRAFT'}.json`,
+      contentType: JSON_CONTENT_TYPE,
+      payloadStatus: partial ? 'draft_partial' : exported.portalReady ? 'portal_ready' : 'draft',
+      mapperId: exported.mapperId,
+      schemaSha256: exported.schemaSha256,
+      issues: exported.issues,
+    };
+  }
+
+  const used = new Set<string>();
+  const sheets: SheetSpec[] = [];
+
+  if (format === 'ca') {
+    sheets.push(summarySheet(period, stored, used));
+    used.add('Issues');
+  }
+  for (const s of stored.sheets) sheets.push(toSheetSpec(s, used));
+  if (format === 'ca') {
+    sheets.push(issueSheet(stored.issues));
+    if (period.returnType === 'gstr3b') sheets.push(itcSheet(itc, used));
+  }
+
+  const buffer = await buildWorkbook(sheets);
+  const objectKey = await upload('export', SPREADSHEET_CONTENT_TYPE, buffer);
+  return {
+    objectKey,
+    filename: `${label}${format === 'ca' ? '-CA-package' : ''}.xlsx`,
+    contentType: SPREADSHEET_CONTENT_TYPE,
+  };
+}
+
+function summarySheet(period: GstReturnPeriodRow, w: StoredWorkings, used: Set<string>): SheetSpec {
+  used.add('Summary');
+  const rows: Row[] = [
+    { item: 'Return', value: period.returnType.toUpperCase() },
+    { item: 'GSTIN', value: period.gstin },
+    {
+      item: 'Period',
+      value: `${String(period.periodMonth).padStart(2, '0')}-${period.periodYear}`,
+    },
+    { item: 'Prepared at', value: period.preparedAt ? period.preparedAt.toISOString() : '' },
+    { item: 'Status', value: period.status },
+    { item: 'Issues to review', value: w.issues.filter((i) => i.severity !== 'info').length },
+    { item: '', value: '' },
+    ...w.summary.map((s) => ({
+      item: s.label,
+      value: `records ${s.records}; taxable ${(paiseToNumber(s.taxable) ?? 0).toFixed(2)}; IGST ${(paiseToNumber(s.igst) ?? 0).toFixed(2)}; CGST ${(paiseToNumber(s.cgst) ?? 0).toFixed(2)}; SGST ${(paiseToNumber(s.sgst) ?? 0).toFixed(2)}; cess ${(paiseToNumber(s.cess) ?? 0).toFixed(2)}`,
+    })),
+  ];
+  return {
+    name: 'Summary',
+    columns: [
+      { header: 'Item', key: 'item', format: 'text', width: 40 },
+      { header: 'Value', key: 'value', format: 'text', width: 110 },
+    ],
+    rows,
+  };
+}
+
+function itcSheet(
+  rows: readonly {
+    documentDate: string;
+    supplierGstin: string | null;
+    itcCategory: string;
+    isReverseCharge: boolean;
+    state: string;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    cess: number;
+    taxableAmount: number;
+  }[],
+  used: Set<string>,
+): SheetSpec {
+  return {
+    name: sheetName('ITC register', used),
+    columns: [
+      { header: 'Date', key: 'date', format: 'date' },
+      { header: 'Supplier GSTIN', key: 'gstin', format: 'text', width: 18 },
+      { header: 'Category', key: 'category', format: 'text', width: 16 },
+      { header: 'Reverse charge', key: 'rcm', format: 'text' },
+      { header: 'State', key: 'state', format: 'text' },
+      { header: 'Taxable', key: 'taxable', format: 'money' },
+      { header: 'IGST', key: 'igst', format: 'money' },
+      { header: 'CGST', key: 'cgst', format: 'money' },
+      { header: 'SGST', key: 'sgst', format: 'money' },
+      { header: 'Cess', key: 'cess', format: 'money' },
+    ],
+    rows: rows.map((r) => ({
+      date: r.documentDate,
+      gstin: r.supplierGstin ?? '',
+      category: r.itcCategory,
+      rcm: r.isReverseCharge ? 'Y' : 'N',
+      state: r.state,
+      taxable: paiseToNumber(r.taxableAmount),
+      igst: paiseToNumber(r.igst),
+      cgst: paiseToNumber(r.cgst),
+      sgst: paiseToNumber(r.sgst),
+      cess: paiseToNumber(r.cess),
+    })),
+  };
+}
+
+/** CMP-08 is a small summary: one sheet of label-and-figure rows. */
+function cmp08Sheets(period: GstReturnPeriodRow): SheetSpec[] {
   const workings = period.workings ?? {};
   const rows: Row[] = [];
-
   const push = (label: string, value: unknown) => {
     rows.push({ label, value: typeof value === 'number' ? paiseToNumber(value) : value });
   };
-
   const flatten = (prefix: string, value: unknown): void => {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') {
@@ -197,67 +344,15 @@ function summarySheets(period: GstReturnPeriodRow): SheetSpec[] {
       flatten(prefix ? `${prefix} / ${key}` : key, nested);
     }
   };
-
   flatten('', workings);
   return [
     {
-      name: period.returnType === 'cmp08' ? 'CMP-08' : 'GSTR-3B',
-      columns: [text('Item', 'label', 40), money('Amount', 'value')],
+      name: 'CMP-08',
+      columns: [
+        { header: 'Item', key: 'label', format: 'text', width: 40 },
+        { header: 'Amount', key: 'value', format: 'money' },
+      ],
       rows,
     },
   ];
-}
-
-export interface GstExportResult {
-  readonly objectKey: string;
-  readonly filename: string;
-  readonly contentType: string;
-}
-
-export async function exportPeriod(
-  id: string,
-  format: 'xlsx' | 'json',
-): Promise<GstExportResult> {
-  const period = await withReadTransaction(async (tx) => {
-    await assertFeature(tx, 'gst_workings');
-    const row = await gstRepository.findPeriod(tx, id);
-    if (!row) throw new NotFoundError('GST return period');
-    // Nothing to hand over until it has been computed, and inventing an empty
-    // file would look like a return with no supplies in it.
-    if (row.status === 'open' || !row.workings) {
-      throw new UnprocessableError(
-        'Prepare this return before exporting it.',
-        ErrorCode.UNPROCESSABLE,
-      );
-    }
-    return row;
-  });
-
-  const label = `${period.returnType}-${period.gstin}-${period.periodYear}-${String(
-    period.periodMonth,
-  ).padStart(2, '0')}`;
-
-  if (format === 'json') {
-    // The workings as stored, wrapped with the identifying header the portal's
-    // offline tool expects. Deliberately not reshaped into the portal's
-    // abbreviated keys: that mapping belongs with a filing integration that
-    // can be tested against the API, and inventing it here would produce a
-    // file that looks official and may not upload.
-    const payload = {
-      gstin: period.gstin,
-      ret_period: `${String(period.periodMonth).padStart(2, '0')}${period.periodYear}`,
-      return_type: period.returnType,
-      prepared_at: period.preparedAt,
-      workings: period.workings,
-    };
-    const buffer = Buffer.from(JSON.stringify(payload, null, 2), 'utf8');
-    const objectKey = await upload('export', JSON_CONTENT_TYPE, buffer);
-    return { objectKey, filename: `${label}.json`, contentType: JSON_CONTENT_TYPE };
-  }
-
-  const sheets =
-    period.returnType === 'gstr1' ? gstr1Sheets(period.workings ?? {}) : summarySheets(period);
-  const buffer = await buildWorkbook(sheets);
-  const objectKey = await upload('export', SPREADSHEET_CONTENT_TYPE, buffer);
-  return { objectKey, filename: `${label}.xlsx`, contentType: SPREADSHEET_CONTENT_TYPE };
 }

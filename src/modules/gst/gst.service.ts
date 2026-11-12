@@ -20,14 +20,7 @@
  */
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
-import {
-  classifyOutward,
-  periodOf,
-  sectionForOutward,
-  type Gstr1Table,
-  type SupplyCategory,
-  type SupplyType,
-} from '../../domain/gst/classify.js';
+import { periodOf } from '../../domain/gst/classify.js';
 import { compositionLiability, compositionQuarter } from '../../domain/gst/composition.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ConflictError, ErrorCode, NotFoundError, UnprocessableError } from '../../lib/errors.js';
@@ -37,7 +30,8 @@ import { businessEvents } from '../../observability/metrics.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
-import { gstRepository, type GstReturnPeriodRow, type OutwardDocumentRow } from './gst.repository.js';
+import { gstRepository, type GstReturnPeriodRow } from './gst.repository.js';
+import { computeGstr1, computeGstr3b, toStoredWorkings } from './returns/returns.service.js';
 import { itcRepository } from './itc.repository.js';
 import type {
   CreatePeriodBody,
@@ -45,8 +39,6 @@ import type {
   ItcRegisterQuery,
   ListPeriodsQuery,
 } from './gst.schemas.js';
-
-
 
 async function requirePeriod(tx: Tx, id: string, forUpdate = false): Promise<GstReturnPeriodRow> {
   const period = await gstRepository.findPeriod(tx, id, forUpdate);
@@ -287,239 +279,69 @@ export function filePeriod(id: string, body: FilePeriodBody) {
   });
 }
 
-// --- Workings --------------------------------------------------------------
+// --- Workings ---------------------------------------------------------------
 
 interface Workings {
   workings: Record<string, unknown>;
   totals: { totalTaxable: number; totalTax: number };
 }
 
-const taxOf = (document: OutwardDocumentRow): number =>
-  document.totalCgst + document.totalSgst + document.totalIgst + document.totalCess;
+const boundsOf = (period: GstReturnPeriodRow) => ({
+  gstin: period.gstin,
+  period: { year: period.periodYear, month: period.periodMonth },
+  from: period.periodFrom,
+  to: period.periodTo,
+});
 
 /**
- * GSTR-1: the outward supply tables.
- *
- * B2B, B2CL, exports, SEZ and the credit/debit-note tables are reported
- * document by document, because the buyer's credit depends on the individual
- * invoice. B2CS is a rate-wise aggregate per place of supply — the portal does
- * not want a row per corner-shop sale, and a shop doing two hundred bills a
- * day would produce a file nobody could upload.
+ * GSTR-1. The figures come from the line-level engine in `domain/gst/returns`; this function only
+ * stores them. The stored workings carry the sheets the app shows and the exports are rendered
+ * from, plus the neutral model the portal JSON mapper reads, so every output agrees.
  */
 async function buildGstr1(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const documents = await gstRepository.outwardDocuments(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const itemised: Record<string, unknown[]> = { b2b: [], b2cl: [], export: [], sez: [], cdnr: [], cdnur: [] };
-  // Keyed by place of supply and rate, which is what table 7 reports on.
-  const b2cs = new Map<string, { placeOfSupply: string; taxRatePercent: number; taxableAmount: number; tax: number }>();
-
-  let totalTaxable = 0;
-  let totalTax = 0;
-
-  for (const document of documents) {
-    const table: Gstr1Table = classifyOutward({
-      customerGstin: document.customerGstin,
-      supplyType: document.supplyType as SupplyType,
-      grandTotal: document.grandTotal,
-      isCreditOrDebitNote: document.kind === 'credit_note',
-      lineCategories: document.lineCategories as SupplyCategory[],
-    });
-
-    // A credit note reduces the period's supply, so it counts negatively
-    // towards the headline figures even though it is listed positively in its
-    // own table — which is how the portal expects both.
-    const sign = document.kind === 'credit_note' ? -1 : 1;
-    totalTaxable += sign * document.taxableAmount;
-    totalTax += sign * taxOf(document);
-
-    if (table === 'nil_exempt_non_gst') continue;
-
-    if (table === 'b2cs') {
-      for (const rate of document.taxSummary ?? []) {
-        const placeOfSupply = document.placeOfSupplyStateCode ?? 'unknown';
-        const key = `${placeOfSupply}|${rate.taxRatePercent}`;
-        const current = b2cs.get(key) ?? {
-          placeOfSupply,
-          taxRatePercent: rate.taxRatePercent,
-          taxableAmount: 0,
-          tax: 0,
-        };
-        current.taxableAmount += sign * rate.taxableAmount;
-        b2cs.set(key, current);
-      }
-      continue;
-    }
-
-    (itemised[table] ??= []).push({
-      documentNumber: document.documentNumber,
-      documentDate: document.documentDate,
-      customerGstin: document.customerGstin,
-      customerName: document.customerName,
-      placeOfSupply: document.placeOfSupplyStateCode,
-      supplyType: document.supplyType,
-      isReverseCharge: document.isReverseCharge,
-      taxableAmount: document.taxableAmount,
-      cgst: document.totalCgst,
-      sgst: document.totalSgst,
-      igst: document.totalIgst,
-      cess: document.totalCess,
-      invoiceValue: document.grandTotal,
-      ...(document.originalDocumentNumber
-        ? { originalDocumentNumber: document.originalDocumentNumber }
-        : {}),
-    });
-  }
-
-  const categories = await gstRepository.categoryTotals(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const hsn = await gstRepository.hsnSummary(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const documentsIssued = await gstRepository.documentsIssued(
-    tx,
-    period.periodFrom,
-    period.periodTo,
-  );
-
+  const w = await computeGstr1(tx, boundsOf(period));
   return {
-    workings: {
-      // Table numbers are carried in the keys so a client, an accountant and
-      // the portal's own JSON all agree on what each block is.
-      b2b: itemised['b2b'],
-      b2cl: itemised['b2cl'],
-      b2cs: [...b2cs.values()],
-      exports: itemised['export'],
-      sez: itemised['sez'],
-      cdnr: itemised['cdnr'],
-      cdnur: itemised['cdnur'],
-      nilExemptNonGst: categories.filter((row) => row.supplyCategory !== 'taxable'),
-      hsnSummary: hsn,
-      documentsIssued,
-    },
-    totals: { totalTaxable, totalTax },
+    workings: toStoredWorkings(w),
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }
 
 /**
- * GSTR-3B: the summary return.
- *
- * Section 3.1 is outward supply split by classification; table 4 is input tax
- * credit split the four ways the form requires. Reverse-charge inward supplies
- * appear in both — a liability under 3.1(d) and a credit under 4(A)(3) — and
- * netting them would understate both sides.
+ * GSTR-3B, built from the same outward figures as GSTR-1 plus the purchase side. When a GSTR-1 for
+ * the same registration and month has already been prepared, the two are compared and a difference
+ * is reported: it means bills changed after one of them was prepared.
  */
 async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const categories = await gstRepository.categoryTotals(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
+  const w = await computeGstr3b(tx, boundsOf(period));
+  const stored = await tx.one<{ totalTaxable: number | null; totalTax: number | null }>(
+    `SELECT total_taxable AS "totalTaxable", total_tax AS "totalTax" FROM gst_return_periods
+     WHERE gstin = $1 AND return_type = 'gstr1' AND period_year = $2 AND period_month = $3
+       AND status IN ('prepared', 'filed')`,
+    [period.gstin, period.periodYear, period.periodMonth],
   );
-  const documents = await gstRepository.outwardDocuments(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const sections: Record<string, { taxableAmount: number; cgst: number; sgst: number; igst: number; cess: number }> = {};
-  const add = (
-    section: string,
-    values: { taxableAmount: number; cgst: number; sgst: number; igst: number; cess: number },
-  ) => {
-    const current = (sections[section] ??= {
-      taxableAmount: 0,
-      cgst: 0,
-      sgst: 0,
-      igst: 0,
-      cess: 0,
-    });
-    current.taxableAmount += values.taxableAmount;
-    current.cgst += values.cgst;
-    current.sgst += values.sgst;
-    current.igst += values.igst;
-    current.cess += values.cess;
-  };
-
-  // Taxable value by section comes from the line classifications; the tax on
-  // it comes from the documents, because tax is a document-level total once
-  // charges and round-off are in it.
-  for (const row of categories) {
-    add(
-      sectionForOutward(row.supplyType as SupplyType, row.supplyCategory as SupplyCategory),
-      { taxableAmount: row.taxableAmount, cgst: 0, sgst: 0, igst: 0, cess: 0 },
-    );
-  }
-  for (const document of documents) {
-    // Tax on a reverse-charge sale is the buyer's to pay, not this shop's liability.
-    if (document.isReverseCharge) continue;
-    const sign = document.kind === 'credit_note' ? -1 : 1;
-    const zeroRated =
-      document.supplyType.startsWith('export') || document.supplyType.startsWith('sez');
-    add(zeroRated ? '3.1b' : '3.1a', {
-      taxableAmount: 0,
-      cgst: sign * document.totalCgst,
-      sgst: sign * document.totalSgst,
-      igst: sign * document.totalIgst,
-      cess: sign * document.totalCess,
+  const issues = [...w.issues];
+  if (stored && stored.totalTaxable !== null) {
+    const fresh = await computeGstr1(tx, boundsOf(period));
+    if (
+      Number(stored.totalTaxable) !== fresh.totals.taxable ||
+      Number(stored.totalTax) !== fresh.totals.tax
+    ) {
+      issues.push({
+        severity: 'error',
+        code: 'gstr1_changed_since_prepared',
+        message: `The prepared GSTR-1 shows taxable ${stored.totalTaxable} and tax ${stored.totalTax} (paise), but today's bills give ${fresh.totals.taxable} and ${fresh.totals.tax}. Prepare GSTR-1 again so both returns agree.`,
+      });
+    }
+  } else {
+    issues.push({
+      severity: 'info',
+      code: 'gstr1_not_prepared',
+      message: 'GSTR-1 for this month has not been prepared, so the two returns were not compared.',
     });
   }
-
-  const reverseCharge = (
-    await gstRepository.reverseChargeInward(tx, period.periodFrom, period.periodTo)
-  )[0];
-
-  const itc = await itcRepository.totalsForPeriod(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const totalTaxable =
-    Object.values(sections).reduce((sum, section) => sum + section.taxableAmount, 0) +
-    (reverseCharge?.taxableAmount ?? 0);
-  const totalTax =
-    Object.values(sections).reduce(
-      (sum, section) => sum + section.cgst + section.sgst + section.igst + section.cess,
-      0,
-    ) + (reverseCharge?.tax ?? 0);
-
   return {
-    workings: {
-      outwardSupplies: sections,
-      // 3.1(d) is an *inward* supply the shop self-assesses tax on, so it is
-      // not one of the outward sections. Its tax is a single self-assessed
-      // figure rather than a CGST/SGST/IGST split: the head depends on where
-      // the supplier was, and an unregistered supplier has no return to
-      // reconcile the split against. Reporting it as one number is what the
-      // form asks for and is the only figure that can be defended.
-      inwardReverseCharge: {
-        taxableAmount: reverseCharge?.taxableAmount ?? 0,
-        selfAssessedTax: reverseCharge?.tax ?? 0,
-      },
-      inputTaxCredit: {
-        // 4(A): credit available, by category.
-        available: itc.filter((row) => row.itcCategory !== 'ineligible' && !row.isReverseCharge),
-        reverseCharge: itc.filter((row) => row.isReverseCharge),
-        // 4(D): credit that is not available at all, which still has to be
-        // declared rather than quietly dropped.
-        ineligible: itc.filter((row) => row.itcCategory === 'ineligible'),
-      },
-    },
-    totals: { totalTaxable, totalTax },
+    workings: toStoredWorkings({ ...w, issues }),
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }
 

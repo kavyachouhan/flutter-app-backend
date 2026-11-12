@@ -95,21 +95,56 @@ function asString(value: unknown): string | null {
  * `b2b` is the ordinary case. The others matter because a credit note the
  * supplier filed reduces the credit the shop may claim, and treating it as an
  * invoice would have the shop claiming credit it has lost.
+ *
+ * Field names follow the official "GSTR2B - Get All Details" response schema
+ * (`data/gstn-schemas/GSTR2B`): invoices carry `inum`/`dt`/`val`/`txval` and flat
+ * `igst`/`cgst`/`sgst`/`cess`; notes `ntnum`/`dt`; ISD documents `docnum`/`docdt`;
+ * imports `boenum`/`boedt`. The older `idt`/`nt_num`/`camt` names are still read so
+ * a file saved from an earlier tool keeps working.
  */
 const SUPPLIER_BLOCKS: Readonly<Record<string, string>> = {
   b2b: 'b2b',
   b2ba: 'b2b_amended',
   cdnr: 'credit_note',
   cdnra: 'credit_note_amended',
+  ecom: 'ecom',
+  ecoma: 'ecom_amended',
+  isd: 'isd',
+  isda: 'isd_amended',
   impg: 'import_goods',
   impgsez: 'import_goods_sez',
 };
+
+/** Blocks in the schema that are not read yet; reported so they are never mistaken for empty. */
+const UNREAD_BLOCKS = ['itcrev'] as const;
+
+const IMS_STATUS: Readonly<Record<string, string>> = { A: 'accepted', R: 'rejected', N: 'pending' };
+
+/** A document's amount for one tax head: the flat total, else the sum of its rate-wise items. */
+function taxFrom(row: Record<string, unknown>, keys: readonly string[]): number {
+  const items = asArray(row['items']);
+  const read = (r: Record<string, unknown>): number => {
+    for (const key of keys) {
+      if (r[key] !== undefined) return toPaise(r[key]);
+    }
+    return 0;
+  };
+  // The document-level figure is the schema's total; items are the rate-wise breakdown of it.
+  const flat = read(row);
+  if (flat !== 0 || items.length === 0) return flat;
+  let total = 0;
+  for (const item of items) {
+    const record = asRecord(item);
+    if (record) total += read(record);
+  }
+  return total;
+}
 
 /**
  * Reads the statement.
  *
  * Shape, as the portal ships it:
- *   { data: { rtnprd, docdata: { b2b: [ { ctin, trdnm, inv: [ {...} ] } ] } } }
+ *   { data: { rtnprd, docdata: { b2b: [ { ctin, trdnm, supprd, inv: [ {...} ] } ] } } }
  *
  * Both `data` and `docdata` are optional wrappers in practice — some
  * downloads, and most hand-saved files, are already unwrapped — so each level
@@ -124,8 +159,15 @@ export function parseGstr2b(payload: unknown): ParseResult {
   const docData = asRecord(data['docdata']) ?? data;
   const statementPeriod = asString(data['rtnprd']);
 
-  for (const [block, documentType] of Object.entries(SUPPLIER_BLOCKS)) {
+  for (const unread of UNREAD_BLOCKS) {
+    if (docData[unread] !== undefined) {
+      errors.push({ path: unread, reason: 'this block is present but is not read yet' });
+    }
+  }
+
+  for (const [block, baseType] of Object.entries(SUPPLIER_BLOCKS)) {
     const suppliers = asArray(docData[block]);
+    const isImport = block === 'impg' || block === 'impgsez';
     suppliers.forEach((supplierValue, supplierIndex) => {
       const supplier = asRecord(supplierValue);
       const path = `${block}[${supplierIndex}]`;
@@ -134,13 +176,20 @@ export function parseGstr2b(payload: unknown): ParseResult {
         return;
       }
 
-      const supplierGstin = asString(supplier['ctin']);
+      const supplierGstin = asString(supplier['ctin']) ?? asString(supplier['etin']);
       const supplierName = asString(supplier['trdnm']);
 
-      // Invoices sit under `inv` for b2b, `nt` for credit and debit notes.
-      const rows = [...asArray(supplier['inv']), ...asArray(supplier['nt'])];
-      // An import block has no supplier GSTIN: the counterparty is customs.
-      const isImport = block.startsWith('impg');
+      // `impg` rows are the documents themselves (the counterparty is customs); everything else
+      // nests documents under inv / nt / doclist / boe.
+      const rows =
+        block === 'impg'
+          ? [supplier]
+          : [
+              ...asArray(supplier['inv']),
+              ...asArray(supplier['nt']),
+              ...asArray(supplier['doclist']),
+              ...asArray(supplier['boe']),
+            ];
       if (!supplierGstin && !isImport) {
         errors.push({ path, reason: 'supplier GSTIN (ctin) missing' });
         return;
@@ -154,8 +203,15 @@ export function parseGstr2b(payload: unknown): ParseResult {
           return;
         }
 
-        const invoiceNo = asString(row['inum']) ?? asString(row['nt_num']);
-        const invoiceDate = toIsoDate(row['idt'] ?? row['nt_dt']);
+        const invoiceNo =
+          asString(row['inum']) ??
+          asString(row['ntnum']) ??
+          asString(row['docnum']) ??
+          asString(row['boenum']) ??
+          asString(row['nt_num']);
+        const invoiceDate = toIsoDate(
+          row['dt'] ?? row['docdt'] ?? row['boedt'] ?? row['idt'] ?? row['nt_dt'],
+        );
         if (!invoiceNo || !invoiceDate) {
           // Reported, not skipped silently: a row we cannot identify would
           // otherwise look like a supplier who never filed, and send the
@@ -167,15 +223,20 @@ export function parseGstr2b(payload: unknown): ParseResult {
           return;
         }
 
-        // Tax sits in a nested `items` array on some documents and flat on
-        // others; both forms appear in real downloads.
-        const items = asArray(row['items']);
-        const taxFrom = (key: string): number => {
-          if (items.length === 0) return toPaise(row[key]);
-          let total = 0;
-          for (const item of items) total += toPaise(asRecord(item)?.[key]);
-          return total;
-        };
+        // A debit note adds credit and a credit note removes it; they are different documents.
+        const noteType = asString(row['typ']) ?? asString(row['doctyp']);
+        const documentType =
+          block.startsWith('cdnr') && noteType === 'D'
+            ? block === 'cdnr'
+              ? 'debit_note'
+              : 'debit_note_amended'
+            : block.startsWith('isd') && noteType === 'ISDC'
+              ? 'isd_credit_note'
+              : baseType;
+
+        // ISD documents carry no taxable value and an `itcelg` flag instead of `itcavl`.
+        const itcCode = asString(row['itcavl']) ?? asString(row['itcelg']);
+        const ims = asString(row['imsStatus']);
 
         invoices.push({
           supplierGstin: supplierGstin ?? 'CUSTOMS',
@@ -183,20 +244,29 @@ export function parseGstr2b(payload: unknown): ParseResult {
           invoiceNo,
           invoiceDate,
           documentType,
-          invoiceValue: toPaise(row['val']),
-          taxableAmount: taxFrom('txval'),
-          cgst: taxFrom('camt'),
-          sgst: taxFrom('samt'),
-          igst: taxFrom('iamt'),
-          cess: taxFrom('csamt'),
+          invoiceValue: toPaise(row['val'] ?? row['boeval']),
+          taxableAmount: taxFrom(row, ['txval']),
+          cgst: taxFrom(row, ['cgst', 'camt']),
+          sgst: taxFrom(row, ['sgst', 'samt']),
+          igst: taxFrom(row, ['igst', 'iamt']),
+          cess: taxFrom(row, ['cess', 'csamt']),
           placeOfSupply: asString(row['pos']),
           // 'Y' means yes in the portal's own encoding.
           isReverseCharge: asString(row['rev']) === 'Y',
-          itcAvailable:
-            asString(row['itcavl']) === null ? null : asString(row['itcavl']) === 'Y',
-          itcUnavailableReason: asString(row['rsn']),
-          filedPeriod: asString(row['fldprd']) ?? statementPeriod,
-          raw: row,
+          // Y = available, N = not available, T = temporarily unavailable (not an outright no).
+          itcAvailable: itcCode === null || itcCode === 'T' ? null : itcCode === 'Y',
+          itcUnavailableReason:
+            asString(row['rsn']) ?? (itcCode === 'T' ? 'Temporarily unavailable' : null),
+          filedPeriod:
+            asString(row['supprd']) ??
+            asString(supplier['supprd']) ??
+            asString(row['fldprd']) ??
+            statementPeriod,
+          raw: {
+            ...row,
+            ...(ims ? { imsStatusName: IMS_STATUS[ims] ?? ims } : {}),
+            ...(itcCode ? { itcCode } : {}),
+          },
         });
       });
     });

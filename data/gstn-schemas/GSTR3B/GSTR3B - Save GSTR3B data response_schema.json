@@ -1,0 +1,9 @@
+{
+   "type": "object",
+   "properties": {
+   "reference_id": {
+   "type": "string"
+   }
+   },
+   "required": ["reference_id"]
+   }

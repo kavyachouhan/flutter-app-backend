@@ -1,0 +1,11 @@
+####################################################################################################
+# PLEASE KEEP THE WIDTH OF THE LINES BELOW WITHIN 100 CHARACTERS.                                  #
+# MOST RECENT CHANGE AT THE TOP.                                                                   #                                                                                 #                                                          					   #
+####################################################################################################
+
+Release 2.0
+- 'Source Return Filing date' and 'Filing frequency of the Supplier' column added.
+- Records modified by the supplier after saving but before filing the return, are highlighted in yellow.
+
+Release 1.0
+- The Offline utility of IMS (Invoice Management System) dashboard is released.

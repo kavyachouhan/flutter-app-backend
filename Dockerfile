@@ -38,6 +38,8 @@ ENV NODE_ENV=production
 
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build     --chown=node:node /app/dist         ./dist
+# Official GSTN schemas + registry.json: read at export time to validate portal JSON.
+COPY --from=build     --chown=node:node /app/data/gstn-schemas ./data/gstn-schemas
 COPY --chown=node:node package.json ./
 
 USER node

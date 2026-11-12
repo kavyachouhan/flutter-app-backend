@@ -78,6 +78,13 @@ const PERIOD_COLUMNS = `
   prepared_at AS "preparedAt", prepared_by AS "preparedBy", filed_at AS "filedAt",
   filed_by AS "filedBy", arn, notes, created_at AS "createdAt"`;
 
+// The list is a table of rows; a prepared return's workings now hold every sheet, so they are left
+// out here and read only when one period is opened.
+const LIST_COLUMNS = PERIOD_COLUMNS.replace(
+  'status, workings,',
+  'status, NULL::jsonb AS workings,',
+);
+
 export const gstRepository = {
   findPeriod(tx: Tx, id: string, forUpdate = false): Promise<GstReturnPeriodRow | undefined> {
     return tx.one<GstReturnPeriodRow>(
@@ -99,12 +106,16 @@ export const gstRepository = {
 
   listPeriods(
     tx: Tx,
-    filter: { gstin: string | undefined; returnType: string | undefined; status: string | undefined },
+    filter: {
+      gstin: string | undefined;
+      returnType: string | undefined;
+      status: string | undefined;
+    },
     limit: number,
     cursor: Cursor | undefined,
   ): Promise<GstReturnPeriodRow[]> {
     return tx.many<GstReturnPeriodRow>(
-      `SELECT ${PERIOD_COLUMNS} FROM gst_return_periods
+      `SELECT ${LIST_COLUMNS} FROM gst_return_periods
        WHERE ($1::text IS NULL OR gstin = $1)
          AND ($2::text IS NULL OR return_type = $2)
          AND ($3::text IS NULL OR status = $3)
@@ -194,12 +205,7 @@ export const gstRepository = {
    * Void documents are excluded. A voided invoice was never a supply, and its
    * number is accounted for separately in the table-13 gap report.
    */
-  outwardDocuments(
-    tx: Tx,
-    gstin: string,
-    from: string,
-    to: string,
-  ): Promise<OutwardDocumentRow[]> {
+  outwardDocuments(tx: Tx, gstin: string, from: string, to: string): Promise<OutwardDocumentRow[]> {
     return tx.many<OutwardDocumentRow>(
       `SELECT i.id, 'invoice' AS kind, i.document_number AS "documentNumber",
               i.document_date AS "documentDate", i.customer_gstin AS "customerGstin",

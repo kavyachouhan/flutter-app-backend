@@ -1,0 +1,95 @@
+{
+  "id": "Get-B2CS-Schema",
+  "properties": {
+    "b2cs": {
+      "items": {
+        "properties": {
+		"flag":{
+			"description": "Status of Invoice",
+			"type": "string"
+			},
+          "chksum": {
+            "maxLength": 64,
+            "description": "Invoice checksum value",
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9]+$",
+            "minLength": 1
+          },
+          "etin": {
+            "description": "Ecom Gstin",
+            "type": "string",
+            "maxLength": 15,
+            "minLength": 15,
+            "pattern": "^[a-zA-Z0-9._\\s]+$"
+          },
+          "pos": {
+            "description": "Actual Place of Supply",
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string",
+			"pattern": "^(3[0-8]|[12][0-9]|0[1-9]|97)$"
+          },
+          "sply_ty": {
+            "description": "Supply Type of invoice",
+            "type": "string",
+            "enum": [
+              "INTER",
+              "INTRA"
+            ]
+          },
+		  "diff_percent":{
+                                 "description":"Differential percentage",
+								 "type":"number",
+								 "multipleOf": 0.01							 
+								 }, 
+          "rt": {
+            "description": "Rate as per invoice",
+            "type": "number"
+          },
+          "iamt": {
+            "description": "IGST Amount as per invoice",
+            "type": "number"
+          },
+          "camt": {
+            "description": "CGST Amount as per invoice",
+            "type": "number"
+          },
+          "samt": {
+            "description": "SGST Amount as per invoice",
+            "type": "number"
+          },
+          "csamt": {
+            "description": "Cess Amount as per invoice",
+            "type": "number"
+          },
+          "txval": {
+            "description": "Taxable value of Goods or Service as per invoice",
+            "type": "number",
+            "minLength": 1
+          },
+          "typ": {
+            "description": "Type of Ecom/ non-Ecom",
+            "type": "string",
+            "enum": [
+              "E",
+              "OE"
+            ]
+          }
+        },
+        "required": [
+          "rt",
+          "sply_ty",
+          "txval",
+          "chksum",
+          "typ"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "b2cs"
+  ],
+  "type": "object"
+}

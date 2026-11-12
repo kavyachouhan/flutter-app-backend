@@ -1,0 +1,8 @@
+{
+    "properties": {
+        "ack_num": {
+            "description":"Acknowledgement number",
+            "type":"string"
+        }
+    }
+}

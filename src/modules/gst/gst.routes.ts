@@ -27,7 +27,9 @@ export const gstRouter: Router = Router();
 // Every device bills with these, so any signed-in member may read them.
 export const updateRegistrationBody = z.object({ roundOffEnabled: z.boolean() });
 
-const ruleSetsQuery = { query: z.object({ since: z.string().datetime({ offset: true }).optional() }) };
+const ruleSetsQuery = {
+  query: z.object({ since: z.string().datetime({ offset: true }).optional() }),
+};
 gstRouter.get('/rule-sets', validate(ruleSetsQuery), async (req, res) => {
   const { query } = validated<typeof ruleSetsQuery>(req);
   res.json({ data: await ruleSets.listRuleSets(query.since) });
@@ -59,10 +61,15 @@ gstRouter.patch(
 // --- Return periods --------------------------------------------------------
 
 const listPeriods = { query: listPeriodsQuery };
-gstRouter.get('/periods', requirePermission('gst:read'), validate(listPeriods), async (req, res) => {
-  const { query } = validated<typeof listPeriods>(req);
-  res.json(await service.listPeriods(query));
-});
+gstRouter.get(
+  '/periods',
+  requirePermission('gst:read'),
+  validate(listPeriods),
+  async (req, res) => {
+    const { query } = validated<typeof listPeriods>(req);
+    res.json(await service.listPeriods(query));
+  },
+);
 
 const createPeriod = { body: createPeriodBody };
 gstRouter.post(
@@ -104,7 +111,11 @@ gstRouter.post(
 
 const exportPeriod = {
   params: idParams,
-  query: z.object({ format: z.enum(['xlsx', 'json']).default('xlsx') }),
+  query: z.object({
+    format: z.enum(['xlsx', 'json', 'ca']).default('xlsx'),
+    // JSON only: accept a file that leaves out sections no official schema covers yet.
+    acceptUnsupported: z.enum(['true', 'false']).default('false'),
+  }),
 };
 gstRouter.get(
   '/periods/:id/export',
@@ -112,7 +123,9 @@ gstRouter.get(
   validate(exportPeriod),
   async (req, res) => {
     const { params, query } = validated<typeof exportPeriod>(req);
-    const result = await exportService.exportPeriod(params.id, query.format);
+    const result = await exportService.exportPeriod(params.id, query.format, {
+      acceptUnsupported: query.acceptUnsupported === 'true',
+    });
     // Signed here rather than in the service, so the service stays testable
     // without a storage round trip — as with the spreadsheet exporter.
     const link = await signDownload(result.objectKey, result.filename);
