@@ -5,7 +5,14 @@
 import type { MapperVerification } from './mappers/types.js';
 import type { ReturnPeriod } from './model.js';
 
-export type RegistryForm = 'gstr1' | 'gstr3b' | 'gstr2b';
+export type RegistryForm =
+  | 'gstr1'
+  | 'gstr3b'
+  | 'gstr9'
+  | 'gstr2b'
+  | 'ledger_cash'
+  | 'ledger_liability'
+  | 'ledger_itc_reversal';
 
 export type ValidationSpec =
   | { readonly kind: 'single'; readonly schema: string }

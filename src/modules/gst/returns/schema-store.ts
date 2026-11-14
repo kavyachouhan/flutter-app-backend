@@ -4,6 +4,7 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv, { type ValidateFunction } from 'ajv';
@@ -75,12 +76,17 @@ export function schemaFingerprint(version: RegistryVersion, dir: string = schema
 
 // `multipleOfPrecision` matters: 0.07 / 0.01 is 7.000000000000001 in floating point, so without it
 // ajv rejects perfectly valid rupee amounts such as 0.07 or 1.15 against the portal's "multipleOf 0.01".
+// The ledger schemas the portal publishes declare JSON Schema draft-04 (with `id`, not `$id`), the
+// returns schemas draft-07. ajv 6 ships the draft-04 meta-schema but does not load it by default.
+const nodeRequire = createRequire(import.meta.url);
 const ajv = new Ajv({
   allErrors: true,
   unknownFormats: 'ignore',
   multipleOfPrecision: 2,
   logger: false,
+  schemaId: 'auto',
 });
+ajv.addMetaSchema(nodeRequire('ajv/lib/refs/json-schema-draft-04.json') as object);
 const compiled = new Map<string, ValidateFunction>();
 
 function compile(cacheKey: string, schema: unknown): ValidateFunction {
@@ -98,6 +104,37 @@ function toIssues(fn: ValidateFunction, prefix: string): MapperIssue[] {
     code: 'schema_invalid',
     message: `${e.dataPath || '(root)'} ${e.message ?? 'is invalid'}`,
     path: `${prefix}${e.dataPath}`,
+  }));
+}
+
+/** One schema violation with the keyword that raised it, for callers that treat keywords differently. */
+export interface DocumentError {
+  readonly keyword: string;
+  readonly path: string;
+  readonly message: string;
+}
+
+/**
+ * Validates an inbound document (a ledger the portal produced) against a single-schema version and
+ * returns every violation with its keyword. Unlike `validatePayload` it does not decide what is
+ * fatal: the caller does.
+ */
+export function validateDocument(
+  version: RegistryVersion,
+  document: unknown,
+  dir: string = schemaDir(),
+): DocumentError[] {
+  if (version.validation.kind !== 'single') {
+    throw new Error(`${version.id} has no single schema to validate a document against.`);
+  }
+  const server = version.serverPopulatedFields ?? [];
+  const schema = relaxRequired(readJson(path.join(dir, version.validation.schema)), server);
+  const fn = compile(`${version.id}:document`, schema);
+  fn(document);
+  return (fn.errors ?? []).map((e) => ({
+    keyword: e.keyword,
+    path: e.dataPath || '(root)',
+    message: e.message ?? 'is invalid',
   }));
 }
 

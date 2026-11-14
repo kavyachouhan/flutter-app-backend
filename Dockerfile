@@ -40,6 +40,8 @@ COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build     --chown=node:node /app/dist         ./dist
 # Official GSTN schemas + registry.json: read at export time to validate portal JSON.
 COPY --from=build     --chown=node:node /app/data/gstn-schemas ./data/gstn-schemas
+# Official ledger schemas and the ledger classification rules (read when ledgers are imported and when GSTR-9 is worked out).
+COPY --from=build     --chown=node:node /app/data/gstn-ledger ./data/gstn-ledger
 COPY --chown=node:node package.json ./
 
 USER node

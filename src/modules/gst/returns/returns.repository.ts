@@ -8,6 +8,8 @@ import type { SupplyCategory, SupplyType } from '../../../domain/gst/classify.js
 import type { EngineDoc, EngineLine } from '../../../domain/gst/returns/gstr1-engine.js';
 import type { IssuedNumberRow } from '../../../domain/gst/returns/docs-issued.js';
 import type { TaxAmounts, TaxedValue } from '../../../domain/gst/returns/model.js';
+import type { ItcRegisterRow } from '../../../domain/gst/returns/gstr9-engine.js';
+import type { InwardDoc } from '../../../domain/gst/returns/purchase-register.js';
 
 interface HeaderRow {
   id: string;
@@ -142,6 +144,232 @@ export const returnsRepository = {
           : null,
       lines: byDoc.get(h.id) ?? [],
     }));
+  },
+
+  /**
+   * Purchase bills and debit notes of a registration in the period, with lines, for the purchase
+   * register. Scoped through the outlet's registration; a legacy document whose outlet has none is
+   * kept, as the 3B inward loaders do. Void documents are left out.
+   */
+  async inwardDocuments(tx: Tx, gstin: string, from: string, to: string): Promise<InwardDoc[]> {
+    interface InHeader {
+      kind: 'bill' | 'debit_note';
+      id: string;
+      number: string;
+      date: string;
+      grandTotal: number | string;
+      supplierName: string | null;
+      supplierGstin: string | null;
+      supplierCountry: string;
+      supplierTreatment: string | null;
+      composition: boolean;
+      placeOfSupply: string | null;
+      supplyType: string;
+      reverseCharge: boolean;
+      itcCategory: InwardDoc['itcCategory'];
+      itcEligible: boolean;
+      boeNumber: string | null;
+      boeDate: string | null;
+      boePortCode: string | null;
+      origNumber: string | null;
+      origDate: string | null;
+      reasonCode: string | null;
+      registerItc: number | string | null;
+    }
+    const scope = `AND (r.gstin IS NULL OR r.gstin = $1)
+         AND x.document_date >= $2::date AND x.document_date <= $3::date AND x.status <> 'void'`;
+    const headers = await tx.many<InHeader>(
+      `SELECT 'bill' AS kind, x.id, x.supplier_invoice_no AS number,
+              x.supplier_invoice_date::text AS date, x.grand_total::bigint AS "grandTotal",
+              s.name AS "supplierName", x.supplier_gstin AS "supplierGstin",
+              s.country_code AS "supplierCountry", s.gst_treatment AS "supplierTreatment",
+              (s.registration_type = 'composition') AS composition,
+              x.place_of_supply_state_code AS "placeOfSupply", x.supply_type AS "supplyType",
+              x.is_reverse_charge AS "reverseCharge", x.itc_category AS "itcCategory",
+              x.itc_eligible AS "itcEligible", x.boe_number AS "boeNumber",
+              x.boe_date::text AS "boeDate", x.boe_port_code AS "boePortCode",
+              NULL::text AS "origNumber", NULL::text AS "origDate", NULL::text AS "reasonCode",
+              (SELECT SUM(i.cgst + i.sgst + i.igst + i.cess)::bigint FROM itc_register i
+                WHERE i.source_type = 'purchase_bill' AND i.source_id = x.id
+                  AND i.state <> 'reversed' AND i.itc_category <> 'ineligible') AS "registerItc"
+       FROM purchase_bills x
+       JOIN suppliers s ON s.id = x.supplier_id
+       LEFT JOIN outlets o ON o.id = x.outlet_id
+       LEFT JOIN gst_registrations r ON r.id = o.registration_id
+       WHERE true ${scope}
+       UNION ALL
+       SELECT 'debit_note', x.id, x.document_number, x.document_date::text,
+              x.grand_total::bigint, s.name, x.supplier_gstin, s.country_code, s.gst_treatment,
+              (s.registration_type = 'composition'), x.place_of_supply_state_code, x.supply_type,
+              x.is_reverse_charge, b.itc_category, b.itc_eligible, NULL, NULL, NULL,
+              x.original_document_number, COALESCE(x.original_document_date, b.document_date)::text,
+              x.reason_code,
+              (SELECT SUM(i.cgst + i.sgst + i.igst + i.cess)::bigint FROM itc_register i
+                WHERE i.source_type = 'debit_note' AND i.source_id = x.id
+                  AND i.state <> 'reversed' AND i.itc_category <> 'ineligible')
+       FROM debit_notes x
+       JOIN suppliers s ON s.id = x.supplier_id
+       JOIN purchase_bills b ON b.id = x.purchase_bill_id
+       LEFT JOIN outlets o ON o.id = x.outlet_id
+       LEFT JOIN gst_registrations r ON r.id = o.registration_id
+       WHERE true ${scope}`,
+      [gstin, from, to],
+    );
+
+    const lineSql = (table: string, fk: string, parent: string) =>
+      `SELECT l.${fk} AS "docId", l.supply_category AS category, l.hsn_code AS hsn, l.unit,
+              l.quantity, l.taxable_amount AS taxable, l.tax_rate_percent AS "ratePercent",
+              l.cess_rate_percent AS "cessRate", l.cgst, l.sgst, l.igst, l.cess
+       FROM ${table} l JOIN ${parent} x ON x.id = l.${fk}
+       LEFT JOIN outlets o ON o.id = x.outlet_id
+       LEFT JOIN gst_registrations r ON r.id = o.registration_id
+       WHERE true ${scope}`;
+    const lines = await tx.many<{
+      docId: string;
+      category: SupplyCategory;
+      hsn: string | null;
+      unit: string | null;
+      quantity: number | string;
+      taxable: number | string;
+      ratePercent: number | string;
+      cessRate: number | string;
+      cgst: number | string;
+      sgst: number | string;
+      igst: number | string;
+      cess: number | string;
+    }>(
+      `${lineSql('purchase_bill_lines', 'purchase_bill_id', 'purchase_bills')}
+       UNION ALL
+       ${lineSql('debit_note_lines', 'debit_note_id', 'debit_notes')}`,
+      [gstin, from, to],
+    );
+
+    const byDoc = new Map<string, InwardDoc['lines'][number][]>();
+    const headerById = new Map(headers.map((h) => [h.id, h]));
+    for (const l of lines) {
+      const h = headerById.get(l.docId);
+      const taxable = n(l.taxable);
+      const rate = n(l.ratePercent);
+      let cgst = n(l.cgst);
+      let sgst = n(l.sgst);
+      let igst = n(l.igst);
+      let cess = n(l.cess);
+      // A reverse-charge bill carries no tax (the supplier charged none): the liability is worked
+      // out from the line rate, exactly as `inwardReverseCharge` does for GSTR-3B.
+      if (h?.reverseCharge && cgst + sgst + igst === 0 && taxable > 0) {
+        if (h.supplyType === 'intra_state') {
+          cgst = Math.round((taxable * rate) / 200);
+          sgst = Math.round((taxable * rate) / 200);
+        } else {
+          igst = Math.round((taxable * rate) / 100);
+        }
+      }
+      if (h?.reverseCharge && cess === 0) cess = Math.round((taxable * n(l.cessRate)) / 100);
+      const list = byDoc.get(l.docId) ?? [];
+      list.push({
+        category: l.category,
+        hsn: l.hsn && l.hsn.trim() !== '' ? l.hsn.trim() : null,
+        unit: l.unit && l.unit.trim() !== '' ? l.unit.trim().toUpperCase() : null,
+        quantity: n(l.quantity),
+        taxable,
+        ratePercent: rate,
+        cgst,
+        sgst,
+        igst,
+        cess,
+      });
+      byDoc.set(l.docId, list);
+    }
+
+    return headers.map((h) => ({
+      kind: h.kind,
+      id: h.id,
+      number: h.number,
+      date: h.date,
+      grandTotal: n(h.grandTotal),
+      supplierName: h.supplierName,
+      supplierGstin: h.supplierGstin,
+      supplierCountry: h.supplierCountry,
+      supplierTreatment: h.supplierTreatment,
+      composition: h.composition,
+      placeOfSupply: h.placeOfSupply,
+      interState: h.supplyType !== 'intra_state',
+      reverseCharge: h.reverseCharge,
+      itcCategory: h.itcCategory,
+      itcEligible: h.itcEligible,
+      boeNumber: h.boeNumber,
+      boeDate: h.boeDate,
+      boePortCode: h.boePortCode,
+      original: h.origNumber && h.origDate ? { number: h.origNumber, date: h.origDate } : null,
+      reasonCode: h.reasonCode,
+      // A debit note's register row is negative; the engine signs notes itself.
+      registerItc:
+        h.registerItc === null ? null : h.kind === 'debit_note' ? -Math.abs(n(h.registerItc)) : n(h.registerItc),
+      lines: byDoc.get(h.id) ?? [],
+    }));
+  },
+
+  /**
+   * The credit register for a window, grouped by what decides its GSTR-9 Table 6 row: category,
+   * reverse charge, whether the supplier is registered, bill of entry, and country. Reversed
+   * entries are left out, as in the 3B loaders. Signed: debit notes already carry negatives.
+   */
+  async itcRegisterRows(tx: Tx, gstin: string, from: string, to: string): Promise<ItcRegisterRow[]> {
+    const rows = await tx.many<{
+      category: ItcRegisterRow['category'];
+      rcm: boolean;
+      registered: boolean;
+      importGoods: boolean;
+      foreign: boolean;
+      igst: number | string;
+      cgst: number | string;
+      sgst: number | string;
+      cess: number | string;
+      rows: number | string;
+    }>(
+      `SELECT r.itc_category AS category, r.is_reverse_charge AS rcm,
+              (r.supplier_gstin IS NOT NULL) AS registered,
+              (COALESCE(pb.boe_number, pb2.boe_number) IS NOT NULL) AS "importGoods",
+              (COALESCE(s.country_code, 'IN') <> 'IN') AS foreign,
+              SUM(r.igst)::bigint AS igst, SUM(r.cgst)::bigint AS cgst,
+              SUM(r.sgst)::bigint AS sgst, SUM(r.cess)::bigint AS cess, COUNT(*)::int AS rows
+       FROM itc_register r
+       LEFT JOIN purchase_bills pb ON r.source_type = 'purchase_bill' AND pb.id = r.source_id
+       LEFT JOIN debit_notes dn ON r.source_type = 'debit_note' AND dn.id = r.source_id
+       LEFT JOIN purchase_bills pb2 ON pb2.id = dn.purchase_bill_id
+       LEFT JOIN suppliers s ON s.id = r.supplier_id
+       WHERE r.gstin = $1 AND r.document_date >= $2::date AND r.document_date <= $3::date
+         AND r.state <> 'reversed'
+       GROUP BY 1, 2, 3, 4, 5`,
+      [gstin, from, to],
+    );
+    return rows.map((r) => ({
+      category: r.category,
+      reverseCharge: r.rcm,
+      supplierRegistered: r.registered,
+      importGoods: r.importGoods,
+      foreignSupplier: r.foreign,
+      tax: { igst: n(r.igst), cgst: n(r.cgst), sgst: n(r.sgst), cess: n(r.cess) },
+      rows: n(r.rows),
+    }));
+  },
+
+  /** Descriptions from the HSN/SAC master for the codes in use; a code the master lacks is absent. */
+  async hsnDescriptions(tx: Tx, codes: readonly string[]): Promise<Map<string, string>> {
+    if (codes.length === 0) return new Map();
+    const rows = await tx.many<{ code: string; description: string }>(
+      'SELECT code, description FROM hsn_master WHERE code = ANY($1::text[])',
+      [[...new Set(codes)]],
+    );
+    return new Map(rows.map((r) => [r.code, r.description]));
+  },
+
+  /** Codes the HSN/SAC master lists as services (empty when no master is loaded). */
+  async masterServiceCodes(tx: Tx): Promise<Set<string>> {
+    const rows = await tx.many<{ code: string }>(
+      `SELECT code FROM hsn_master WHERE kind = 'service'`,
+    );
+    return new Set(rows.map((r) => r.code));
   },
 
   /** Every number the registry holds for documents dated in the period (table 13). */

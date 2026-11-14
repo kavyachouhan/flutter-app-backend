@@ -1,0 +1,565 @@
+{
+   "$schema":"http://json-schema.org/draft-04/schema#",
+   "definitions":{
+
+   },
+   "properties":{
+      "cl_bal":{
+         "properties":{
+            "tot_rng_bal":{
+               "description":" total Closing  Balance",
+               "type":"number"
+            },
+            "cessbal":{
+               "properties":{
+                  "tx":{
+                     "description":" Tax Balance",
+                     "type":"number"
+                  },
+                   "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                  "oth":{
+                     "description":"others Balance",
+                     "type":"number"
+                  },
+                  "fee":{
+                     "description":"fees Balance",
+                     "type":"number"
+                  },
+                  "tot":{
+                     "description":"total Balance",
+                     "type":"number"
+                  }
+               },
+               "required":[
+                  "oth",
+                  "fee",
+                  "tx",
+                  "tot",
+                  "pen",
+                  "intr"
+               ],
+               "type":"object"
+            },
+            "cgstbal":{
+               "properties":{
+                  "tx":{
+                     "description":" Tax Balance",
+                     "type":"number"
+                  },
+                  "intr":{
+                     "description":"interest Balance",
+                     "type":"number"
+                  },
+                  "pen":{
+                     "description":"penalty Balance",
+                     "type":"number"
+                  },
+                  "oth":{
+                     "description":"others Balance",
+                     "type":"number"
+                  },
+                  "fee":{
+                     "description":"fees Balance",
+                     "type":"number"
+                  },
+                  "tot":{
+                     "description":"total Balance",
+                     "type":"number"
+                  }
+               },
+               "required":[
+                  "oth",
+                  "fee",
+                  "tx",
+                  "tot",
+                  "pen",
+                  "intr"
+               ],
+               "type":"object"
+            },
+            "desc":{
+                  "type":"string",
+               "description":"closing balance ",
+               "pattern":"^[a-zA-Z0-9\\s]+$"
+            },
+            "igstbal":{
+               "properties":{
+                  "tx":{
+                     "description":" Tax Balance",
+                     "type":"number"
+                  },
+                  "intr":{
+                     "description":"interest Balance",
+                     "type":"number"
+                  },
+                  "pen":{
+                     "description":"penalty Balance",
+                     "type":"number"
+                  },
+                  "oth":{
+                     "description":"others Balance",
+                     "type":"number"
+                  },
+                  "fee":{
+                     "description":"fees Balance",
+                     "type":"number"
+                  },
+                  "tot":{
+                     "description":"total Balance",
+                     "type":"number"
+                  }
+               },
+               "required":[
+                  "oth",
+                  "fee",
+                  "tx",
+                  "tot",
+                  "pen",
+                  "intr"
+               ],
+               "type":"object"
+            },
+            "sgstbal":{
+              
+               "properties":{
+                  "tx":{
+                     "description":" Tax Balance",
+                     "type":"number"
+                  },
+                  "intr":{
+                     "description":"interest Balance",
+                     "type":"number"
+                  },
+                  "pen":{
+                     "description":"penalty Balance",
+                     "type":"number"
+                  },
+                  "oth":{
+                     "description":"others Balance",
+                     "type":"number"
+                  },
+                  "fee":{
+                     "description":"fees Balance",
+                     "type":"number"
+                  },
+                  "tot":{
+                     "description":"total Balance",
+                     "type":"number"
+                  }
+               },
+               "required":[
+                  "oth",
+                  "fee",
+                  "tx",
+                  "tot",
+                  "pen",
+                  "intr"
+               ],
+               "type":"object"
+            }
+         },
+         "required":[
+            "cessbal",
+            "igstbal",
+            "sgstbal",
+            "tot_rng_bal",
+            "desc",
+            "cgstbal"
+         ],
+         "type":"object"
+      },
+      "gstin":{
+         "description":"GSTIN",
+         "maxLength":15,
+         "minLength":15,
+         "pattern":"^[a-zA-Z0-9]+$",
+         "type":"string"
+      },
+      	"fr_dt": {
+		"type": "string",
+	    "description": "fr_dt",
+	    "examples": ["082017"]
+	  },
+	  "to_dt": {
+	    "type": "string",
+        "description": "to_dt",
+        "examples": ["022018"]
+	 },
+      "tr":{
+        
+         "items":{
+         
+            "properties":{
+               "tot_tr_amt":{
+                   "description":" total transaction amount ",
+                  "type":"number"
+               },
+               "tot_rng_bal":{
+                  "description":"total transaction Running  balance ",
+                  "type":"number"
+               },
+               "cess":{
+               
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                     "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "cessbal":{
+                
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                     "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "cgst":{
+                  
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                     "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "cgstbal":{
+                
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                     "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "desc":{
+                     "description":" Desciption about transaction",
+                  "pattern":"^[a-zA-Z0-9\\s()/\\-]+$|(^Reverse charge and supplies made)",
+                  "type":"string"
+               },
+
+               "dt":{
+                 "description":"Transaction date ",
+                  "type":"string",
+                  "pattern":"^((0[1-9]|[12][0-9]|3[01])[/](0[1-9]|1[012])[/]((19|20|30)\\d\\d))*$"
+               },
+               "igst":{
+                 
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                     "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "igstbal":{
+                 
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                       "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "ref_no":{
+                   "description":" Reference number ",
+                  "type":"string",
+                  "pattern":"^[a-zA-Z0-9]+$"
+                  
+               },
+               "sgst":{
+                 
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                       "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "sgstbal":{
+               
+                  "properties":{
+                     "tx":{
+                        "description":" Tax Balance",
+                        "type":"number"
+                     },
+                      "intr":{
+                        "description":"interest Balance",
+                        "type":"number"
+                     },
+                     "pen":{
+                        "description":"penalty Balance",
+                        "type":"number"
+                     },
+                     "oth":{
+                        "description":"others Balance",
+                        "type":"number"
+                     },
+                     "fee":{
+                        "description":"fees Balance",
+                        "type":"number"
+                     },
+                     "tot":{
+                        "description":"total Balance",
+                        "type":"number"
+                     }
+                  },
+                  "required":[
+                     "oth",
+                     "fee",
+                     "tx",
+                     "tot",
+                     "pen",
+                     "intr"
+                  ],
+                  "type":"object"
+               },
+               "tr_typ":{
+                  "description":"Describes whether it is Credit or Debit",
+                  "type":"string",
+                  "pattern":"^[Cr,Dr]+$"
+               }
+            },
+            "required":[
+               "dschrg_typ",
+               "igst",
+               "cessbal",
+               "tot_tr_amt",
+               "sgst",
+               "igstbal",
+               "sgstbal",
+               "cess",
+               "ref_no",
+               "cgstbal",
+               "tot_rng_bal",
+               "dt",
+               "cgst",
+               "tr_typ",
+               "desc"
+            ],
+            "type":"object"
+         },
+         "type":"array"
+      }
+   },
+   "required":[
+      "fr_dt",  
+	  "to_dt",
+      "gstin",
+      "tr",
+      "cl_bal"
+   ],
+   "type":"object"
+}

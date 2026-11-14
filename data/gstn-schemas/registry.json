@@ -55,6 +55,70 @@
         }
       ]
     },
+    "gstr9": {
+      "versions": [
+        {
+          "id": "gstr9-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_checked_mapping_unverified",
+          "schemaSnapshot": "2026-11",
+          "validation": {
+            "kind": "single",
+            "schema": "GSTR9/GSTR9 - Save GSTR9 data request_schema.json"
+          },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "unsupportedSections": ["table8", "table10", "table14", "table15", "table16"],
+          "notes": "Official Save request schema, validated. Which key is which row is read from the form and the GSTR-9 Offline Tool v2.2, not confirmed by a sample file, so every export is a draft. Rows the engine does not compute are omitted (never zero) so the portal keeps what was entered. Table 8 is not written: the schema's descriptions of its keys are copied from other rows. 6A, 6A1, 6A2, 6J and 6O are computed by the portal; 6A1, 6A2 and 8H1 exist in the Offline Tool but not in this schema."
+        }
+      ]
+    },
+    "ledger_cash": {
+      "versions": [
+        {
+          "id": "ledger-cash-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Cash Ledger Details response_schema.json" },
+          "serverPopulatedFields": ["refNo", "igstbal", "cgstbal", "sgstbal", "cessbal"],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Cash Ledger Details response. The schema is inconsistent with itself: it requires refNo but names the property ref_no, and requires igstbal, cgstbal, sgstbal and cessbal inside op_bal and cl_bal, which define igst, cgst, sgst and cess instead. Those four balance keys and refNo are dropped from required (they are not used). Free-text patterns (desc) are reported as warnings, not refusals."
+        }
+      ]
+    },
+    "ledger_liability": {
+      "versions": [
+        {
+          "id": "ledger-liability-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Liability Ledger Details For Return Liability response_schema.json" },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Liability Ledger Details For Return Liability response."
+        }
+      ]
+    },
+    "ledger_itc_reversal": {
+      "versions": [
+        {
+          "id": "ledger-itc-reversal-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Credit Reversal and Re-claimed Details response_schema.json" },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Credit Reversal and Re-claimed Details response. itc4b2 is credit reversed, itc4d1 credit reclaimed."
+        }
+      ]
+    },
     "gstr2b": {
       "versions": [
         {

@@ -8,7 +8,13 @@ export type MapperVerification =
    * schemas, for an upload payload no official request schema was supplied for). The shape is a
    * best reading, not a confirmed contract: exports are labelled draft.
    */
-  | 'derived_from_related_schema';
+  | 'derived_from_related_schema'
+  /**
+   * The payload's structure is the official request schema and is validated against it, but which
+   * key is which row of the form is a reading, not a confirmed pairing (no sample file exists).
+   * Exports are labelled draft.
+   */
+  | 'schema_checked_mapping_unverified';
 
 export interface MapperIssue {
   readonly severity: 'error' | 'warning';
@@ -22,7 +28,7 @@ export interface MapperIssue {
 export interface MapperMeta {
   /** e.g. `gstr3b-v2026.11`: form + the month the schema snapshot was captured. */
   readonly id: string;
-  readonly form: 'gstr1' | 'gstr3b';
+  readonly form: 'gstr1' | 'gstr3b' | 'gstr9';
   readonly verification: MapperVerification;
 }
 

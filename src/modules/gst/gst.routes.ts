@@ -6,6 +6,10 @@ import { idParams } from '../../lib/validators.js';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import * as exportService from './export.service.js';
+import { importLedgerBody, listLedgerImportsQuery } from './ledgers/ledger.schemas.js';
+import * as ledgers from './ledgers/ledger.service.js';
+import { hsnSalesQuery, sacQuery, transactionReportQuery } from './reports/gst-reports.schemas.js';
+import { exportTransactionReport, hsnSalesReport, sacReport } from './reports/gst-reports.service.js';
 import * as reconciliation from './reconciliation.service.js';
 import * as service from './gst.service.js';
 import * as registrations from './registrations.service.js';
@@ -18,6 +22,7 @@ import {
   itcRegisterQuery,
   listMatchesQuery,
   listPeriodsQuery,
+  preparePeriodBody,
 } from './gst.schemas.js';
 
 export const gstRouter: Router = Router();
@@ -88,13 +93,14 @@ gstRouter.get('/periods/:id', requirePermission('gst:read'), validate(byId), asy
   res.json({ data: await service.getPeriod(params.id) });
 });
 
+const prepare = { params: idParams, body: preparePeriodBody };
 gstRouter.post(
   '/periods/:id/prepare',
   requirePermission('gst:manage'),
-  validate(byId),
+  validate(prepare),
   async (req, res) => {
-    const { params } = validated<typeof byId>(req);
-    res.json({ data: await service.preparePeriod(params.id) });
+    const { params, body } = validated<typeof prepare>(req);
+    res.json({ data: await service.preparePeriod(params.id, body) });
   },
 );
 
@@ -130,6 +136,84 @@ gstRouter.get(
     // without a storage round trip — as with the spreadsheet exporter.
     const link = await signDownload(result.objectKey, result.filename);
     res.json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
+  },
+);
+
+// --- Reports ---------------------------------------------------------------
+
+const transactionReport = { query: transactionReportQuery };
+gstRouter.get(
+  '/reports/transactions',
+  requirePermission('gst:read'),
+  validate(transactionReport),
+  async (req, res) => {
+    const { query } = validated<typeof transactionReport>(req);
+    const result = await exportTransactionReport(query);
+    const link = await signDownload(result.objectKey, result.filename);
+    res.json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
+  },
+);
+
+/** A table report is either shown (json) or handed over as a signed workbook link. */
+async function sendTableReport(
+  res: import('express').Response,
+  out: Awaited<ReturnType<typeof hsnSalesReport>>,
+): Promise<void> {
+  if (out.kind === 'json') {
+    res.json({ data: out.report });
+    return;
+  }
+  const link = await signDownload(out.objectKey, out.filename);
+  res.json({
+    data: {
+      objectKey: out.objectKey,
+      filename: out.filename,
+      contentType: out.contentType,
+      downloadUrl: link.url,
+      expiresAt: link.expiresAt,
+      issues: out.report.issues,
+    },
+  });
+}
+
+const hsnSales = { query: hsnSalesQuery };
+gstRouter.get(
+  '/reports/hsn-sales',
+  requirePermission('gst:read'),
+  validate(hsnSales),
+  async (req, res) => {
+    const { query } = validated<typeof hsnSales>(req);
+    await sendTableReport(res, await hsnSalesReport(query));
+  },
+);
+
+const sac = { query: sacQuery };
+gstRouter.get('/reports/sac', requirePermission('gst:read'), validate(sac), async (req, res) => {
+  const { query } = validated<typeof sac>(req);
+  await sendTableReport(res, await sacReport(query));
+});
+
+// --- Electronic ledgers ------------------------------------------------------
+
+const importLedger = { body: importLedgerBody };
+gstRouter.post(
+  '/ledger-imports',
+  requirePermission('gst:manage'),
+  validate(importLedger),
+  async (req, res) => {
+    const { body } = validated<typeof importLedger>(req);
+    res.status(201).json({ data: await ledgers.importLedger(body) });
+  },
+);
+
+const listLedgers = { query: listLedgerImportsQuery };
+gstRouter.get(
+  '/ledger-imports',
+  requirePermission('gst:read'),
+  validate(listLedgers),
+  async (req, res) => {
+    const { query } = validated<typeof listLedgers>(req);
+    res.json({ data: await ledgers.listLedgerImports(query) });
   },
 );
 

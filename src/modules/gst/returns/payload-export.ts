@@ -4,7 +4,12 @@
  */
 import { MAPPERS } from '../../../domain/gst/returns/mappers/index.js';
 import type { MapperIssue, MapperVerification } from '../../../domain/gst/returns/mappers/types.js';
-import type { Gstr1Return, Gstr3bReturn, ReturnPeriod } from '../../../domain/gst/returns/model.js';
+import type {
+  Gstr1Return,
+  Gstr3bReturn,
+  Gstr9Return,
+  ReturnPeriod,
+} from '../../../domain/gst/returns/model.js';
 import {
   selectVersion,
   type RegistryForm,
@@ -30,8 +35,8 @@ export interface PayloadExport {
 }
 
 export function exportPayload(
-  form: 'gstr1' | 'gstr3b',
-  model: Gstr1Return | Gstr3bReturn,
+  form: 'gstr1' | 'gstr3b' | 'gstr9',
+  model: Gstr1Return | Gstr3bReturn | Gstr9Return,
   period: ReturnPeriod,
   registry: SchemaRegistry = loadRegistry(),
 ): PayloadExport {

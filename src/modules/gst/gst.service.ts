@@ -21,20 +21,22 @@
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { periodOf } from '../../domain/gst/classify.js';
-import { compositionLiability, compositionQuarter } from '../../domain/gst/composition.js';
+import { compositionLiability } from '../../domain/gst/composition.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ConflictError, ErrorCode, NotFoundError, UnprocessableError } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { recordAudit } from '../audit/audit.js';
 import { businessEvents } from '../../observability/metrics.js';
 import { assertFeature } from '../entitlements/entitlements.js';
-import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { gstRepository, type GstReturnPeriodRow } from './gst.repository.js';
+import { fyEndMonth, periodWindow } from './period-window.js';
+import { computeGstr9 } from './returns/gstr9.service.js';
 import { computeGstr1, computeGstr3b, toStoredWorkings } from './returns/returns.service.js';
 import { itcRepository } from './itc.repository.js';
 import type {
   CreatePeriodBody,
+  PreparePeriodBody,
   FilePeriodBody,
   ItcRegisterQuery,
   ListPeriodsQuery,
@@ -46,85 +48,10 @@ async function requirePeriod(tx: Tx, id: string, forUpdate = false): Promise<Gst
   return period;
 }
 
-/**
- * Every GSTIN this business files under: the tenant's, plus any outlet that
- * overrides it.
- *
- * Exported because the reports need the same list — filing is per
- * registration, and there is no other helper that resolves it.
- */
-export async function filingGstins(tx: Tx): Promise<string[]> {
-  const settings = await tenantsRepository.getSettings(tx);
-  const outlets = await outletsRepository.listOutlets(tx, null);
-  const gstins = new Set<string>();
-  if (settings.gstin) gstins.add(settings.gstin);
-  for (const outlet of outlets) if (outlet.gstin) gstins.add(outlet.gstin);
-  return [...gstins];
-}
+export { periodWindow } from './period-window.js';
 
-async function resolveGstin(tx: Tx, requested: string | undefined): Promise<string> {
-  const available = await filingGstins(tx);
-  if (requested) {
-    if (!available.includes(requested)) {
-      throw new UnprocessableError(
-        'That GSTIN does not belong to this business.',
-        ErrorCode.UNPROCESSABLE,
-        { details: { gstin: requested, available } },
-      );
-    }
-    return requested;
-  }
-  const only = available[0];
-  if (!only) {
-    throw new UnprocessableError(
-      'This business is not GST registered, so it has no returns to file.',
-      ErrorCode.UNPROCESSABLE,
-    );
-  }
-  if (available.length > 1) {
-    throw new UnprocessableError(
-      'This business files under more than one GSTIN; name the one you mean.',
-      ErrorCode.UNPROCESSABLE,
-      { details: { available } },
-    );
-  }
-  return only;
-}
-
-/** Last day of a month, without constructing a date in the wrong timezone. */
-function lastDayOf(year: number, month: number): string {
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  const firstOfNext = new Date(Date.UTC(nextYear, nextMonth - 1, 1));
-  const last = new Date(firstOfNext.getTime() - 86_400_000);
-  return last.toISOString().slice(0, 10);
-}
-
-/**
- * The window a period covers.
- *
- * CMP-08 is quarterly on the financial year; GSTR-1 and 3B are monthly unless
- * the shop is on QRMP, in which case GSTR-1 is quarterly too. Getting this
- * wrong files a correct set of figures against the wrong months, which is
- * harder to spot than a wrong figure.
- */
-async function periodWindow(
-  tx: Tx,
-  returnType: string,
-  year: number,
-  month: number,
-): Promise<{ from: string; to: string }> {
-  const settings = await tenantsRepository.getSettings(tx);
-  const quarterly = returnType === 'cmp08' || settings.filingFrequency === 'qrmp';
-  if (!quarterly) {
-    return { from: `${year}-${String(month).padStart(2, '0')}-01`, to: lastDayOf(year, month) };
-  }
-  const quarter = compositionQuarter(year, month, settings.fyStartMonth);
-  return {
-    from: `${quarter.fromYear}-${String(quarter.fromMonth).padStart(2, '0')}-01`,
-    to: lastDayOf(quarter.toYear, quarter.toMonth),
-  };
-}
+export { filingGstins, resolveGstin } from './gstin-scope.js';
+import { resolveGstin } from './gstin-scope.js';
 
 export async function listPeriods(query: ListPeriodsQuery) {
   const page = parsePage(query);
@@ -161,7 +88,7 @@ export function createPeriod(body: CreatePeriodBody) {
     // it does not owe and leaves the one it does unfiled.
     if (settings.isComposition && body.returnType !== 'cmp08') {
       throw new UnprocessableError(
-        'A composition dealer files CMP-08, not GSTR-1 or GSTR-3B.',
+        'A composition dealer files CMP-08 (and GSTR-9A), not GSTR-1, GSTR-3B or GSTR-9.',
         ErrorCode.UNPROCESSABLE,
       );
     }
@@ -172,16 +99,20 @@ export function createPeriod(body: CreatePeriodBody) {
       );
     }
 
+    // A GSTR-9 period is a financial year: the year is the one it starts in and the month is the
+    // year's last, whatever the client sent, so there is one period per year and registration.
+    const periodMonth =
+      body.returnType === 'gstr9' ? fyEndMonth(settings.fyStartMonth) : body.periodMonth;
     const scope = {
       gstin,
       returnType: body.returnType,
       periodYear: body.periodYear,
-      periodMonth: body.periodMonth,
+      periodMonth,
     };
     const duplicate = await gstRepository.findPeriodByScope(tx, scope);
     if (duplicate) return duplicate;
 
-    const window = await periodWindow(tx, body.returnType, body.periodYear, body.periodMonth);
+    const window = await periodWindow(tx, body.returnType, body.periodYear, periodMonth);
     await gstRepository.insertPeriod(tx, {
       id: body.id,
       ...scope,
@@ -201,7 +132,7 @@ export function createPeriod(body: CreatePeriodBody) {
  * changing it silently would be the one genuinely dangerous thing this module
  * could do.
  */
-export function preparePeriod(id: string) {
+export function preparePeriod(id: string, options: PreparePeriodBody = {}) {
   const auth = requireAuthContext();
 
   return withTransaction(async (tx) => {
@@ -225,7 +156,9 @@ export function preparePeriod(id: string) {
         ? await buildGstr1(tx, period)
         : period.returnType === 'gstr3b'
           ? await buildGstr3b(tx, period)
-          : await buildCmp08(tx, period);
+          : period.returnType === 'gstr9'
+            ? await buildGstr9Period(tx, period, options)
+            : await buildCmp08(tx, period);
 
     await gstRepository.savePrepared(tx, id, workings.workings, workings.totals, auth.userId);
     await recordAudit(tx, {
@@ -302,6 +235,26 @@ async function buildGstr1(tx: Tx, period: GstReturnPeriodRow): Promise<Workings>
   const w = await computeGstr1(tx, boundsOf(period));
   return {
     workings: toStoredWorkings(w),
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
+  };
+}
+
+/**
+ * GSTR-9, the annual return: summed from the year's period returns (see `gstr9.service`). The
+ * option chosen when preparing is stored with the workings, so a re-prepare keeps it unless the
+ * caller says otherwise.
+ */
+async function buildGstr9Period(
+  tx: Tx,
+  period: GstReturnPeriodRow,
+  options: PreparePeriodBody,
+): Promise<Workings> {
+  const previous = (period.workings as { options?: { considerNonTaxAsExempt?: boolean } } | null)
+    ?.options?.considerNonTaxAsExempt;
+  const considerNonTaxAsExempt = options.considerNonTaxAsExempt ?? previous ?? false;
+  const w = await computeGstr9(tx, period, { considerNonTaxAsExempt });
+  return {
+    workings: { ...toStoredWorkings(w), options: { considerNonTaxAsExempt } },
     totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }

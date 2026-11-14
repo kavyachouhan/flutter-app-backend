@@ -3,11 +3,13 @@
  */
 import { gstr1Mapper } from './gstr1-v2026.11.js';
 import { gstr3bMapper } from './gstr3b-v2026.11.js';
+import { gstr9Mapper } from './gstr9-v2026.11.js';
 import type { ReturnMapper } from './types.js';
 
 export const MAPPERS: Readonly<Record<string, ReturnMapper<never, unknown>>> = {
   [gstr1Mapper.meta.id]: gstr1Mapper,
   [gstr3bMapper.meta.id]: gstr3bMapper,
+  [gstr9Mapper.meta.id]: gstr9Mapper,
 };
 
-export { gstr1Mapper, gstr3bMapper };
+export { gstr1Mapper, gstr3bMapper, gstr9Mapper };

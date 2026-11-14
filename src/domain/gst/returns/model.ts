@@ -254,3 +254,95 @@ export interface Gstr3bReturn {
   readonly interest?: TaxAmounts;
   readonly lateFee?: { readonly cgst: Paise; readonly sgst: Paise };
 }
+
+// --- GSTR-9 -----------------------------------------------------------------
+
+/** GSTR-9 Table 6 splits credit by what was bought: inputs, capital goods, input services. */
+export type Gstr9ItcType = 'ip' | 'cg' | 'is';
+
+export interface Gstr9Hsn {
+  readonly hsn: string;
+  readonly uqc: string;
+  /** Thousandths of a unit. */
+  readonly quantity: number;
+  readonly ratePercent: number;
+  readonly value: TaxedValue;
+}
+
+/** One head of Table 9: tax payable, and tax paid when the ledgers were imported. */
+export interface Gstr9TaxHead {
+  readonly payable: Paise;
+  /** Null when no ledger covers the year: paid is unknown, not zero. */
+  readonly paid: Paise | null;
+}
+
+/**
+ * What BillBanao means by an annual return: the figures of Tables 4 to 9, 17 and 18 for one
+ * GSTIN and financial year, in paise. Amounts are positive as the form shows them (credit notes
+ * are listed in their own row and subtracted in the sub-total), and no portal key names appear
+ * here: the versioned mapper does that.
+ */
+export interface Gstr9Return {
+  readonly gstin: string;
+  readonly fy: { readonly startYear: number; readonly endYear: number };
+  /** Table 4: supplies on which tax is payable. */
+  readonly t4: {
+    readonly b2c: TaxedValue;
+    readonly b2b: TaxedValue;
+    readonly exp: TaxedValue;
+    readonly sez: TaxedValue;
+    readonly deemed: TaxedValue;
+    readonly advances: TaxedValue;
+    /** 4G: inward supplies on which tax is paid under reverse charge. */
+    readonly inwardReverseCharge: TaxedValue;
+    readonly ecommerce: TaxedValue;
+    readonly creditNotes: TaxedValue;
+    readonly debitNotes: TaxedValue;
+    readonly amendmentsAdded: TaxedValue;
+    readonly amendmentsReduced: TaxedValue;
+  };
+  /** Table 5: outward supplies on which tax is not payable. Values only. */
+  readonly t5: {
+    readonly zeroRated: Paise;
+    readonly sez: Paise;
+    readonly reverseCharge: Paise;
+    readonly ecommerce: Paise;
+    readonly exempt: Paise;
+    readonly nilRated: Paise;
+    readonly nonGst: Paise;
+    readonly creditNotes: Paise;
+    readonly debitNotes: Paise;
+    readonly amendmentsAdded: Paise;
+    readonly amendmentsReduced: Paise;
+  };
+  /** Table 6: credit availed through GSTR-3B. */
+  readonly t6: {
+    readonly total3b: TaxAmounts;
+    readonly nonReverseCharge: Readonly<Record<Gstr9ItcType, TaxAmounts>>;
+    readonly reverseChargeUnregistered: Readonly<Record<Gstr9ItcType, TaxAmounts>>;
+    readonly reverseChargeRegistered: Readonly<Record<Gstr9ItcType, TaxAmounts>>;
+    readonly importGoods: Readonly<Record<'ip' | 'cg', TaxAmounts>>;
+    readonly importServices: TaxAmounts;
+    readonly isd: TaxAmounts;
+    readonly reclaimed: TaxAmounts;
+  };
+  /** Table 7: reversals. Only what the books can tell apart; the rest stays zero and is reported. */
+  readonly t7: { readonly section17: TaxAmounts; readonly other: TaxAmounts };
+  /** Table 9: tax payable and paid. */
+  readonly t9: {
+    readonly igst: Gstr9TaxHead;
+    readonly cgst: Gstr9TaxHead;
+    readonly sgst: Gstr9TaxHead;
+    readonly cess: Gstr9TaxHead;
+    readonly interest: Gstr9TaxHead;
+    readonly lateFee: Gstr9TaxHead;
+    readonly penalty: Gstr9TaxHead;
+    readonly other: Gstr9TaxHead;
+  };
+  /** Table 17: outward supplies by HSN. */
+  readonly hsnOutward: readonly Gstr9Hsn[];
+  /** Table 18: inward supplies by HSN. */
+  readonly hsnInward: readonly Gstr9Hsn[];
+  /** Tables and rows this engine does not compute, so the file is never presented as complete. */
+  readonly notComputed: readonly string[];
+}

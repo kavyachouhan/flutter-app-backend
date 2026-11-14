@@ -14,6 +14,13 @@
 import { STATE_NAMES } from '../../print/states.js';
 import { B2CL_THRESHOLD_PAISE, type SupplyCategory, type SupplyType } from '../classify.js';
 import {
+  addHsnLine,
+  hsnColumns,
+  hsnSheetRows,
+  sortedHsn,
+  type HsnAcc,
+} from './hsn-summary.js';
+import {
   ZERO_TAXED,
   type Gstr1B2bParty,
   type Gstr1B2clGroup,
@@ -41,6 +48,9 @@ import {
   type SummaryLine,
   type WorkingIssue,
 } from './sheets.js';
+
+/** Issue code meaning: e-invoiced invoices are in the sheets but not in the neutral model. */
+export const EINVOICE_LEFT_OUT_CODE = 'einvoice_left_out_of_model';
 
 export interface EngineLine {
   readonly category: SupplyCategory;
@@ -197,14 +207,6 @@ interface MutableB2cs {
   value: TaxedValue;
 }
 
-interface HsnAcc {
-  hsn: string;
-  uqc: string;
-  ratePercent: number;
-  quantity: number;
-  value: TaxedValue;
-}
-
 export function buildGstr1(input: Gstr1Input): Gstr1Workings {
   const issues: WorkingIssue[] = [];
   const issue = (i: WorkingIssue) => issues.push(i);
@@ -332,18 +334,7 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
     for (const l of d.lines) {
       if (!l.hsn) missingHsn++;
       if (!l.uqc) missingUqc++;
-      const target = recipient && !isExport(d.supplyType) ? hsnB2b : hsnB2c;
-      const key = `${l.hsn ?? 'NA'}|${l.uqc ?? 'OTH'}|${l.ratePercent}`;
-      const cur = target.get(key) ?? {
-        hsn: l.hsn ?? 'NA',
-        uqc: l.uqc ?? 'OTH',
-        ratePercent: l.ratePercent,
-        quantity: 0,
-        value: ZERO_TAXED,
-      };
-      cur.quantity += sign * l.quantity;
-      cur.value = add(cur.value, lineValue(l), sign);
-      target.set(key, cur);
+      addHsnLine(recipient && !isExport(d.supplyType) ? hsnB2b : hsnB2c, l, sign);
     }
 
     if (taxableLines.length === 0) continue; // only table 8 / HSN contributions
@@ -562,7 +553,10 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
   if (einvoiceCount > 0) {
     issue({
       severity: 'info',
-      code: 'einvoice_in_workings',
+      // Distinct codes: GSTR-9 must know when a stored model leaves e-invoiced invoices out.
+      code: input.options.excludeEinvoiceFromPortal
+        ? EINVOICE_LEFT_OUT_CODE
+        : 'einvoice_in_workings',
       count: einvoiceCount,
       message: input.options.excludeEinvoiceFromPortal
         ? `${einvoiceCount} e-invoiced invoice(s) are shown here but left out of the portal file: the portal fills them in from the IRP.`
@@ -600,10 +594,8 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([recipientGstin, ns]) => ({ recipientGstin, notes: sortDocs(ns) }));
 
-  const hsnRows = (m: Map<string, HsnAcc>) =>
-    [...m.values()].sort((a, b) => a.hsn.localeCompare(b.hsn) || a.ratePercent - b.ratePercent);
-  const hsnB2bRows = hsnRows(hsnB2b);
-  const hsnB2cRows = hsnRows(hsnB2c);
+  const hsnB2bRows = sortedHsn(hsnB2b);
+  const hsnB2cRows = sortedHsn(hsnB2c);
 
   const NIL_SUPPLY: Readonly<Record<string, NilSupply>> = {
     INTRB2B: 'inter_state_registered',
@@ -678,21 +670,6 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
     const v = nil.get(key) ?? { nil: 0, exempt: 0, nonGst: 0 };
     return { description: label, nil: v.nil, exempt: v.exempt, nonGst: v.nonGst };
   });
-
-  const hsnSheetRows = (rows: HsnAcc[]) =>
-    rows.map((r) => ({
-      hsn: r.hsn,
-      description: null,
-      uqc: r.uqc,
-      quantity: r.quantity,
-      totalValue: r.value.taxable + r.value.igst + r.value.cgst + r.value.sgst + r.value.cess,
-      rate: r.ratePercent,
-      taxable: r.value.taxable,
-      igst: r.value.igst,
-      cgst: r.value.cgst,
-      sgst: r.value.sgst,
-      cess: r.value.cess,
-    }));
 
   const sheets: Sheet[] = [
     makeSheet(
@@ -939,18 +916,3 @@ function noteColumns(registered: boolean) {
   ];
 }
 
-function hsnColumns() {
-  return [
-    col('hsn', 'HSN'),
-    col('description', 'Description'),
-    col('uqc', 'UQC'),
-    col('quantity', 'Total Quantity', 'quantity', true),
-    col('totalValue', 'Total Value', 'money', true),
-    col('rate', 'Rate', 'percent'),
-    col('taxable', 'Taxable Value', 'money', true),
-    col('igst', 'Integrated Tax Amount', 'money', true),
-    col('cgst', 'Central Tax Amount', 'money', true),
-    col('sgst', 'State/UT Tax Amount', 'money', true),
-    col('cess', 'Cess Amount', 'money', true),
-  ];
-}

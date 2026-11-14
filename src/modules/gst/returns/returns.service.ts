@@ -6,8 +6,13 @@
  */
 import type { Tx } from '../../../db/tx.js';
 import { buildDocsIssued } from '../../../domain/gst/returns/docs-issued.js';
-import { buildGstr1, type Gstr1Workings } from '../../../domain/gst/returns/gstr1-engine.js';
+import {
+  buildGstr1,
+  type EngineDoc,
+  type Gstr1Workings,
+} from '../../../domain/gst/returns/gstr1-engine.js';
 import { buildGstr3b, type Gstr3bWorkings } from '../../../domain/gst/returns/gstr3b-engine.js';
+import type { Gstr9Workings } from '../../../domain/gst/returns/gstr9-engine.js';
 import type { ReturnPeriod, TaxAmounts, TaxedValue } from '../../../domain/gst/returns/model.js';
 import { col, makeSheet, type WorkingIssue } from '../../../domain/gst/returns/sheets.js';
 import { returnsRepository } from './returns.repository.js';
@@ -24,9 +29,22 @@ const ZERO: TaxAmounts = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
 export async function computeGstr1(
   tx: Tx,
   p: PeriodBounds,
-  options: { excludeEinvoiceFromPortal?: boolean } = {},
+  options: {
+    excludeEinvoiceFromPortal?: boolean;
+    includeNonTax?: boolean;
+    /** Documents already loaded for (a superset of) the window; the caller has filtered them. */
+    documents?: readonly EngineDoc[];
+    /** Leave out the documents-issued table, for callers that do not use it. */
+    skipDocsIssued?: boolean;
+  } = {},
 ): Promise<Gstr1Workings> {
-  const documents = await returnsRepository.outwardDocuments(tx, p.gstin, p.from, p.to);
+  const all = options.documents ?? (await returnsRepository.outwardDocuments(tx, p.gstin, p.from, p.to));
+  // "Don't consider non tax transactions": a document with no taxable line is not part of the
+  // report. Applied before the engine so every table and total agrees.
+  const documents =
+    options.includeNonTax === false
+      ? all.filter((d) => d.lines.some((l) => l.category === 'taxable'))
+      : all;
   const base = buildGstr1({
     gstin: p.gstin,
     period: p.period,
@@ -34,6 +52,7 @@ export async function computeGstr1(
     options: { excludeEinvoiceFromPortal: options.excludeEinvoiceFromPortal ?? true },
   });
 
+  if (options.skipDocsIssued) return base;
   const numbers = await returnsRepository.issuedNumbers(tx, p.gstin, p.from, p.to);
   const docs = buildDocsIssued(numbers);
   return {
@@ -44,8 +63,13 @@ export async function computeGstr1(
   };
 }
 
-export async function computeGstr3b(tx: Tx, p: PeriodBounds): Promise<Gstr3bWorkings> {
-  const gstr1 = await computeGstr1(tx, p);
+export async function computeGstr3b(
+  tx: Tx,
+  p: PeriodBounds,
+  /** A GSTR-1 already worked out for the same window: its net totals do not depend on options. */
+  precomputed?: Gstr1Workings,
+): Promise<Gstr3bWorkings> {
+  const gstr1 = precomputed ?? (await computeGstr1(tx, p));
   const rcm = await returnsRepository.inwardReverseCharge(tx, p.from, p.to);
   const credit = await returnsRepository.inwardCredit(tx, p.gstin, p.from, p.to);
   const exempt = await returnsRepository.inwardExempt(tx, p.from, p.to);
@@ -169,7 +193,9 @@ export async function computeGstr3b(tx: Tx, p: PeriodBounds): Promise<Gstr3bWork
 }
 
 /** The stored, JSON-safe form of a workings object (drops engine-internal maps). */
-export function toStoredWorkings(w: Gstr1Workings | Gstr3bWorkings): Record<string, unknown> {
+export function toStoredWorkings(
+  w: Gstr1Workings | Gstr3bWorkings | Gstr9Workings,
+): Record<string, unknown> {
   const { net: _net, ...rest } = w as Gstr1Workings;
   void _net;
   return rest;

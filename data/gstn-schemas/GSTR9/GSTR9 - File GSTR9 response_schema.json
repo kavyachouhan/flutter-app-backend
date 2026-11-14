@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "ack_no": {
+	  "description":"Acknowledgement no",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ack_no"
+  ]
+}

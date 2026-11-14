@@ -13,23 +13,17 @@
  * say-so.
  */
 import { withReadTransaction } from '../../db/tx.js';
-import type { Gstr1Return, Gstr3bReturn } from '../../domain/gst/returns/model.js';
-import type {
-  Sheet,
-  SheetColumn as ReturnColumn,
-  WorkingIssue,
-} from '../../domain/gst/returns/sheets.js';
+import type { Gstr1Return, Gstr3bReturn, Gstr9Return } from '../../domain/gst/returns/model.js';
+import type { Sheet, WorkingIssue } from '../../domain/gst/returns/sheets.js';
 import { NotFoundError, UnprocessableError, ErrorCode } from '../../lib/errors.js';
 import { upload } from '../../lib/storage.js';
 import {
   buildWorkbook,
   paiseToNumber,
-  quantityToNumber,
   SPREADSHEET_CONTENT_TYPE,
-  type ColumnFormat,
-  type SheetColumn,
   type SheetSpec,
 } from '../exports/workbook.js';
+import { issueSheet, sheetName, toSheetSpec } from './sheet-workbook.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { gstRepository, type GstReturnPeriodRow } from './gst.repository.js';
 import { itcRepository } from './itc.repository.js';
@@ -39,62 +33,12 @@ const JSON_CONTENT_TYPE = 'application/json';
 
 type Row = Record<string, unknown>;
 
-const FORMAT: Readonly<Record<ReturnColumn['kind'], ColumnFormat>> = {
-  text: 'text',
-  money: 'money',
-  number: 'number',
-  percent: 'number',
-  date: 'date',
-  quantity: 'quantity',
-};
-
-const convert = (kind: ReturnColumn['kind'], value: unknown): unknown => {
-  if (typeof value !== 'number') return value ?? null;
-  if (kind === 'money') return paiseToNumber(value);
-  if (kind === 'quantity') return quantityToNumber(value);
-  return value;
-};
-
-/** Excel sheet names: at most 31 characters and none of `\ / ? * [ ] :`. */
-const sheetName = (title: string, used: Set<string>): string => {
-  const base =
-    title
-      .replace(/[\\/?*[\]:]/g, ' ')
-      .slice(0, 31)
-      .trim() || 'Sheet';
-  let name = base;
-  for (let i = 2; used.has(name); i++) name = `${base.slice(0, 28)} ${i}`;
-  used.add(name);
-  return name;
-};
-
-/** A stored return sheet as a workbook sheet, with a totals row when any column totals. */
-function toSheetSpec(sheet: Sheet, used: Set<string>): SheetSpec {
-  const columns: SheetColumn[] = sheet.columns.map((c) => ({
-    header: c.label,
-    key: c.key,
-    format: FORMAT[c.kind],
-    width: c.kind === 'text' ? 22 : 16,
-  }));
-  const rows: Row[] = sheet.rows.map((row) => {
-    const out: Row = {};
-    for (const c of sheet.columns) out[c.key] = convert(c.kind, row[c.key]);
-    return out;
-  });
-  if (sheet.columns.some((c) => c.total) && sheet.rows.length > 0) {
-    const first = sheet.columns[0];
-    const totals: Row = {};
-    for (const c of sheet.columns) {
-      totals[c.key] = c.total ? convert(c.kind, sheet.totals[c.key] ?? 0) : null;
-    }
-    if (first && !first.total) totals[first.key] = 'Total';
-    rows.push(totals);
-  }
-  return { name: sheetName(sheet.id === 'b2b' ? 'b2b,sez,de' : sheet.id, used), columns, rows };
-}
+/** A stored return sheet as a workbook sheet; GSTR-1's b2b sheet keeps the offline tool's name. */
+const periodSheetSpec = (sheet: Sheet, used: Set<string>) =>
+  toSheetSpec(sheet, used, sheet.id === 'b2b' ? 'b2b,sez,de' : sheet.id);
 
 interface StoredWorkings {
-  form: 'gstr1' | 'gstr3b';
+  form: 'gstr1' | 'gstr3b' | 'gstr9';
   sheets: Sheet[];
   issues: WorkingIssue[];
   summary: {
@@ -107,7 +51,7 @@ interface StoredWorkings {
     sgst: number;
     cess: number;
   }[];
-  model: Gstr1Return | Gstr3bReturn;
+  model: Gstr1Return | Gstr3bReturn | Gstr9Return;
 }
 
 function requireStored(period: GstReturnPeriodRow): StoredWorkings {
@@ -120,18 +64,6 @@ function requireStored(period: GstReturnPeriodRow): StoredWorkings {
   }
   return w as StoredWorkings;
 }
-
-const issueSheet = (issues: readonly WorkingIssue[]): SheetSpec => ({
-  name: 'Issues',
-  columns: [
-    { header: 'Severity', key: 'severity', format: 'text', width: 10 },
-    { header: 'Code', key: 'code', format: 'text', width: 30 },
-    { header: 'Count', key: 'count', format: 'number', width: 8 },
-    { header: 'Reference', key: 'ref', format: 'text', width: 20 },
-    { header: 'What to check', key: 'message', format: 'text', width: 90 },
-  ],
-  rows: issues.map((i) => ({ ...i, count: i.count ?? null, ref: i.ref ?? '' })),
-});
 
 export interface GstExportResult {
   readonly objectKey: string;
@@ -236,7 +168,7 @@ export async function exportPeriod(
     sheets.push(summarySheet(period, stored, used));
     used.add('Issues');
   }
-  for (const s of stored.sheets) sheets.push(toSheetSpec(s, used));
+  for (const s of stored.sheets) sheets.push(periodSheetSpec(s, used));
   if (format === 'ca') {
     sheets.push(issueSheet(stored.issues));
     if (period.returnType === 'gstr3b') sheets.push(itcSheet(itc, used));

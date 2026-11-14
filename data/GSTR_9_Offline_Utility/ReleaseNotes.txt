@@ -1,0 +1,88 @@
+Release 2.2 (28/09/2026)
+-Label has been updated for Table 6A1 to align it with the notified format.
+
+Release 2.1 (06/10/2025)
+Table-6
+- Addition of two fields (6A1 and 6A2) in Table 6, along with label changes for fields 6H, 6J, and 6M.
+- Removal of Equality check from Table 6M.
+
+Table-7
+- Addition of two fields (7A1 and 7A2) in Table 7.
+
+Table-8
+- Introduction of a new field (8H1) in Table 8 and label changes for Tables 8B, 8H, and 8I.
+
+Table-9
+- Addition of two columns in Table 9.
+
+Table 10,11,12,13
+- Label changes done for Tables 10, 11, 12, and 13.
+
+Table 14
+- Addition of one new column in Table 14.
+
+Table 17
+-Removal of differential percent checkbox from Table 17.
+
+Table 18
+-Removal of differential percent checkbox from Table 18.
+
+Release 2.0 (21/09/2025)
+
+-Addition of new tax rate - 8% and 40%
+
+Release 1.9 (30/09/2024)
+Table-4 
+- Inserted a new row G1 after row G, dedicated to reporting 9(5) supplies by ECO.
+- Updated the subtotal in row H to encompass values from rows A to G1.
+
+Table-5
+- Inserted a new row C1 after row C, specifically for reporting 9(5) supplies by the supplier.
+- Updated the total turnover calculation in row N to reduce the impact of ECO supplies as reported in 4G1.
+
+Table-6
+- Validation check that CGST and SGST should be equal has been removed from 6K and 6L.
+
+Table-7
+- Validation check that CGST and SGST should be equal has been removed from Table 7.
+
+Table-8
+- From the financial year 2023-24 onwards, Table 8A shall be auto populated with data from GSTR-2B. Corresponding 8A heading has been updated accordingly.
+- Table 8B heading has been updated.
+
+Release 1.8 (09/08/2023)
+- Negative values allowed in Table 17 and Table 18.
+- Rounding off allowed in Table 17 and Table 18 in total tax amount for each HSN/SAC Code.
+- Validation check that CGST and SGST should be equal added.
+- Table 14 Tax Payable Major Tax Head (IGST,CGST,SGST/UTGST,Cess) shall be auto-populated from difference of Table 10 - Table 11.
+- Table 17 shall be non-mandatory for the Taxpayers having turnover more than 5 crore in previous financial year and Nil turnover in current year. 
+
+Release 1.7 (31/05/2023)
+- FY 2022-23 added in the financial year dropdown and Updated HSN Codes.
+
+Release 1.6 (02/02/2023)
+- Added 6% in the Rate of tax (%) column in table 17 and 18
+
+Release 1.5 (04/08/2022)
+- The 'Read me' worksheet updated.
+- FY 2021-22 added in the financial year dropdown.
+
+Release 1.4 (01/08/2021)
+- The Rate of tax (%) updated in tables table 17 & 18.
+- FY 2020-21 added in the financial year dropdown.
+
+Release 1.3 (12/11/2020)
+- Label Changes in Table 8C, the table heading of tables 10, 11, 12, 13 and 14 updated.
+- The ‘Read Me’ worksheet updated. 
+
+Release 1.2
+- Label Changes in Table 8C, and the table headings of tables 10, 11, 12 & 13 and 14 updated.
+- For few fields, negative values can be entered. The same is updated in ‘Read me’ worksheet.
+- For HSN of services, UQC and QTY not required to be provided. 
+- HSN with 2 digit code can also be provided in tables 17 & 18.
+
+Release 1.1
+- The ‘Read me’ worksheet updated. 
+
+Release 1.0
+- The Offline utility of Form GSTR-9 Annual Released.

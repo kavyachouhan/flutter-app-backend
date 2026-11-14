@@ -1,0 +1,771 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "definitions": {
+            "bal": {
+                "type": "number",
+                "multipleOf": 0.01,
+                "maximum": 9999999999999.99,
+                "minimum": 0.00
+            },
+            "gstin": {
+                "maxLength": 15,
+                "minLength": 15,
+                "pattern": "[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[Zz1-9A-Ja-j]{1}[0-9a-zA-Z]{1}",
+                "type": "string"
+            },
+            "tax_period": {
+                "pattern": "^(((19|20)\\d\\d)(0[1-9]|1[012]))$",
+                "type": "string"
+            },
+            "fr_dt":{
+                "type": "string",
+                "pattern": "^((0[1-9]|[12][0-9]|3[01])[/](0[1-9]|1[012])[/]((19|20)\\d\\d))*$"
+              },
+            "to_dt":{
+                "type": "string",
+                "pattern": "^((0[1-9]|[12][0-9]|3[01])[/](0[1-9]|1[012])[/]((19|20)\\d\\d))*$"
+          }
+    },
+  "properties": {
+    "gstin": {
+      "description": "GSTIN",
+      "maxLength": 15,
+      "minLength": 15,
+       "gstin": {"$ref": "#/definitions/gstin"}
+    },
+    "fr_dt": {
+      "description": "from date",
+      "fr_dt": {"$ref": "#/definitions/fr_dt"}
+    },
+    "to_dt": {
+      "description": "to date",
+       "to_dt": {"$ref": "#/definitions/to_dt"}
+    },
+    "op_bal": {
+      "description": "Opening Balance",
+      "type": "object",
+      "properties": {
+        "desc": {
+          "description": "description about opening balance",
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9\\s]+$"
+        },
+        "tot_rng_bal": {
+          "description": " total opening balance",
+          "tot_rng_bal": {"$ref": "#/definitions/bal"}
+        },
+        "igst": {
+          "description": "IGST",
+          "type": "object",
+          "properties": {
+            "tx": {
+              "description": "tax balance",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+               "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen":{"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+              "oth":{"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total igst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "cgst": {
+          "description": "CGST",
+          "type": "object",
+          "properties": {
+            "tx": {
+              "description": "tax balance",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen":{"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+              "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total cgst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "sgst": {
+          "description": "SGST",
+          "type": "object",
+          "properties": {
+            "tx": {
+              "description": "tax balance",
+               "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen":{"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+              "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total sgst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "cess": {
+          "description": "CESS",
+          "type": "object",
+          "properties": {
+             "tx": {
+              "description": "tax balance",
+               "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen":{"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+              "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total cess balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        }
+      },
+      "required": [
+        "desc",
+        "tot_rng_bal",
+        "igstbal",
+        "cgstbal",
+        "sgstbal",
+        "cessbal"
+      ]
+    },
+    "tr": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "dpt_dt": {
+            "description": "deposited date",
+            "dpt_dt": {"$ref": "#/definitions/fr_dt"}
+          },
+          "rpt_dt": {
+            "description": "reporting date",
+             "rpt_dt": {"$ref": "#/definitions/fr_dt"}
+          },
+          "desc": {
+            "description": " Transaction description",
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9\\s]+$"
+          },
+          "dpt_time": {
+            "description": " deposit time stamp",
+            "type": "string"
+          },
+          "ref_no": {
+            "description": " Reference number",
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9]+$"
+          },
+          "tot_tr_amt": {
+            "description": " total Transaction amount",
+            "type": "number"
+          },
+          "tot_rng_bal": {
+            "description": " total transaction  balance",
+            "type": "number"
+          },
+          "ret_period": {
+            "description": "Return Period",
+            "type": "string"
+          },
+          "tr_typ": {
+            "description": "Transaction Type to specify credit or debit",
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9\\s]+$"
+          },
+          "igst": {
+            "description": "IGST",
+            "type": "object",
+            "properties": {
+              "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "cgst": {
+            "description": "CGST",
+            "type": "object",
+            "properties": {
+              "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "sgst": {
+            "description": "SGST",
+            "type": "object",
+            "properties": {
+               "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "cess": {
+            "description": "CESS",
+            "type": "object",
+            "properties": {
+               "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "igstbal": {
+            "description": "IGST",
+            "type": "object",
+            "properties": {
+               "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "cgstbal": {
+            "description": "CGST",
+            "type": "object",
+            "properties": {
+              "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "sgstbal": {
+            "description": "SGST",
+            "type": "object",
+            "properties": {
+              "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          },
+          "cessbal": {
+            "description": "CESS",
+            "type": "object",
+            "properties": {
+               "tx": {
+                "description": "tax",
+                "tx": {"$ref": "#/definitions/bal"}
+              },
+              "intr": {
+                "description": "interest",
+                 "intr": {"$ref": "#/definitions/bal"}
+              },
+              "pen": {
+                "description": "penalty",
+                 "pen": {"$ref": "#/definitions/bal"}
+              },
+              "oth": {
+                "description": "others",
+                 "oth": {"$ref": "#/definitions/bal"}
+              },
+              "fee": {
+                "description": "fee",
+                 "fee": {"$ref": "#/definitions/bal"}
+              },
+              "tot": {
+                "description": "total",
+                 "tot": {"$ref": "#/definitions/bal"}
+              }
+            },
+            "required": [
+              "tx",
+              "intr",
+              "pen",
+              "oth",
+              "fee",
+              "tot"
+            ]
+          }
+        },
+        "required": [
+          "dpt_dt",
+          "desc",
+          "refNo",
+          "tot_rng_bal",
+          "tot_tr_amt",
+          "tr_typ",
+          "igst",
+          "cgst",
+          "sgst",
+          "cess",
+          "igstbal",
+          "cgstbal",
+          "sgstbal",
+          "cessbal"
+        ]
+      }
+    },
+    "cl_bal": {
+      "description": "Closing Balance",
+      "type": "object",
+      "properties": {
+        "desc": {
+          "description": "description about Closing balance",
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9\\s]+$"
+        },
+        "tot_rng_bal": {
+          "description": " total closing balance",
+          "tot_rng_bal": {"$ref": "#/definitions/bal"}
+        },
+        "igst": {
+          "description": "IGST",
+          "type": "object",
+          "properties": {
+            "tx": {
+              "description": " tax balance ",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen": {"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+             "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total igst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "cgst": {
+          "description": "CGST",
+          "type": "object",
+          "properties": {
+            "tx": {
+              "description": " tax balance ",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen": {"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+             "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total cgst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "sgst": {
+          "description": "SGST",
+          "type": "object",
+          "properties": {
+           "tx": {
+              "description": " tax balance ",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen": {"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+             "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total sgst balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        },
+        "cess": {
+          "description": "CESS",
+          "type": "object",
+          "properties": {
+           "tx": {
+              "description": " tax balance ",
+              "tx": {"$ref": "#/definitions/bal"}
+            },
+            "intr": {
+              "description": "interest balance",
+              "intr": {"$ref": "#/definitions/bal"}
+            },
+            "pen": {
+              "description": "penalty balance",
+              "pen": {"$ref": "#/definitions/bal"}
+            },
+            "oth": {
+              "description": "others balance",
+             "oth": {"$ref": "#/definitions/bal"}
+            },
+            "fee": {
+              "description": "fee balance",
+              "fee": {"$ref": "#/definitions/bal"}
+            },
+            "tot": {
+              "description": "total cess balance",
+              "tot": {"$ref": "#/definitions/bal"}
+            }
+          },
+          "required": [
+            "tx",
+            "intr",
+            "pen",
+            "oth",
+            "fee",
+            "tot"
+          ]
+        }
+      },
+      "required": [
+        "desc",
+        "tot_rng_bal",
+        "igstbal",
+        "cgstbal",
+        "sgstbal",
+        "cessbal"
+      ]
+    }
+  },
+  "required": [
+    "gstin",
+    "fr_dt",
+    "to_dt",
+    "tr",
+    "op_bal",
+    "cl_bal"
+  ]
+}

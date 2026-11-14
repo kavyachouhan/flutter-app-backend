@@ -22,9 +22,12 @@ import {
   listMatchesQuery,
   listPeriodsQuery,
   MATCH_TYPES,
+  preparePeriodBody,
   RETURN_STATUSES,
   RETURN_TYPES,
 } from './gst.schemas.js';
+import { importLedgerBody, listLedgerImportsQuery } from './ledgers/ledger.schemas.js';
+import { hsnSalesQuery, sacQuery, transactionReportQuery } from './reports/gst-reports.schemas.js';
 
 const gstRegistration = z.object({
   id: uuid,
@@ -224,6 +227,126 @@ const match = registry.register(
 
 registry.registerPath({
   method: 'get',
+  path: '/v1/gst/reports/transactions',
+  tags: ['GST'],
+  summary: 'GSTR transaction report (Excel)',
+  description: [
+    'GSTR-1 sales, GSTR-1 credit/debit notes, and the purchase register in the layout of the',
+    'official GSTR-2 offline template, for one month and registration.',
+    '',
+    'Worked out live from current documents with the same engines as the prepared returns; it is',
+    'not snapshotted. GSTR-2 has been suspended since 2017, so the purchase files are registers',
+    'for reconciliation, not filings, and there is no portal JSON for them.',
+  ].join('\n'),
+  security: accessTokenSecurity,
+  request: { query: transactionReportQuery },
+  responses: {
+    200: jsonResponse(
+      'A signed download link.',
+      dataEnvelope(
+        z.object({
+          filename: z.string(),
+          downloadUrl: z.string(),
+          expiresAt: timestamp,
+          rows: z.number().int(),
+          issues: z.array(z.record(z.unknown())),
+        }),
+      ),
+    ),
+    ...errorResponses(400, 401, 403, 422),
+  },
+});
+
+const tableReportResponses = {
+  200: jsonResponse(
+    'With format=json: the tables, in the shape a prepared return is read in. With xlsx or ca: a signed download link.',
+    dataEnvelope(z.record(z.unknown())),
+  ),
+  ...errorResponses(400, 401, 403, 422),
+};
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/reports/hsn-sales',
+  tags: ['GST'],
+  summary: 'Sales summary by HSN',
+  description:
+    'Issued invoices and notes of one registration between two dates, by HSN code, unit and rate, net of credit notes, split into registered-buyer and other as in GSTR-1 Table 12. Uses the same accumulation as Table 12, so the figures agree.',
+  security: accessTokenSecurity,
+  request: { query: hsnSalesQuery },
+  responses: tableReportResponses,
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/reports/sac',
+  tags: ['GST'],
+  summary: 'SAC (services) report',
+  description:
+    'Service lines (chapter 99 or listed as services in the HSN/SAC master) by SAC, transaction type and rate, for sales, sale returns, purchases and purchase returns. There is no separate SAC return: services are reported in the HSN tables of GSTR-1 and GSTR-9, so this is an analysis view.',
+  security: accessTokenSecurity,
+  request: { query: sacQuery },
+  responses: tableReportResponses,
+});
+
+const ledgerImport = registry.register(
+  'GstLedgerImport',
+  z.object({
+    id: uuid,
+    gstin: z.string(),
+    kind: z.enum(['cash', 'liability', 'itc_reversal']),
+    periodFrom: calendarDate,
+    periodTo: calendarDate,
+    parserId: z.string(),
+    entryCount: z.number().int(),
+    newEntryCount: z.number().int().openapi({
+      description: 'Entries not already held from an earlier, overlapping file.',
+    }),
+    issues: z.array(z.record(z.unknown())),
+    createdAt: timestamp,
+  }),
+);
+
+registry.registerPath({
+  method: 'post',
+  path: '/v1/gst/ledger-imports',
+  tags: ['GST'],
+  summary: 'Import a GSTN ledger file',
+  description: [
+    'Takes a ledger exactly as the GST portal produced it (cash ledger, return-liability ledger, or',
+    'credit reversal and re-claim ledger) and keeps its entries.',
+    '',
+    'The file is checked against the official schema and refused when it is not that ledger, is for',
+    'another GSTIN, or has a window that cannot be read. The same document is accepted once; an entry',
+    'that arrives again in an overlapping file is kept once.',
+    '',
+    'Credit reclaimed (6H) and reversed come from the credit reversal ledger. Tax paid through cash or',
+    'credit is read by a rule set that is empty until it has been checked against real ledger files,',
+    'so GSTR-9 shows tax paid as unknown rather than guessing.',
+  ].join('\n'),
+  security: accessTokenSecurity,
+  request: { body: { content: { 'application/json': { schema: importLedgerBody } } } },
+  responses: {
+    201: jsonResponse('Imported (or already imported).', dataEnvelope(ledgerImport)),
+    ...errorResponses(400, 401, 403, 422),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/ledger-imports',
+  tags: ['GST'],
+  summary: 'Imported ledger files',
+  security: accessTokenSecurity,
+  request: { query: listLedgerImportsQuery },
+  responses: {
+    200: jsonResponse('Newest first.', dataEnvelope(z.array(ledgerImport))),
+    ...errorResponses(401, 403),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/v1/gst/periods',
   tags: ['GST'],
   summary: 'Return periods',
@@ -287,9 +410,16 @@ registry.registerPath({
     'the B2CS rate-wise aggregate, the nil/exempt/non-GST totals, the HSN summary and the',
     'documents-issued table. GSTR-3B carries the 3.1 sections, the self-assessed reverse-charge',
     'liability, and input tax credit split the four ways table 4 requires.',
+    '',
+    "GSTR-9 is summed from the financial year's period returns (filed, else prepared, else worked",
+    'out from the books and flagged) and reconciled against the books. The optional body field',
+    '`considerNonTaxAsExempt` reports non-GST outward supplies as exempted (5D) instead of 5F.',
   ].join('\n'),
   security: accessTokenSecurity,
-  request: { params: z.object({ id: uuid }) },
+  request: {
+    params: z.object({ id: uuid }),
+    body: { required: false, content: { 'application/json': { schema: preparePeriodBody } } },
+  },
   responses: {
     200: jsonResponse('Prepared.', dataEnvelope(returnPeriod)),
     ...errorResponses(409),
