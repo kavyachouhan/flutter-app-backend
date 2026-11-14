@@ -119,18 +119,6 @@ export async function exportPeriod(
     period.periodMonth,
   ).padStart(2, '0')}`;
 
-  if (period.returnType === 'cmp08') {
-    if (format === 'json') {
-      throw new UnprocessableError(
-        'No official schema has been supplied for CMP-08, so no portal JSON is produced.',
-        ErrorCode.UNPROCESSABLE,
-      );
-    }
-    const buffer = await buildWorkbook(cmp08Sheets(period));
-    const objectKey = await upload('export', SPREADSHEET_CONTENT_TYPE, buffer);
-    return { objectKey, filename: `${label}.xlsx`, contentType: SPREADSHEET_CONTENT_TYPE };
-  }
-
   const stored = requireStored(period);
 
   if (format === 'json') {
@@ -253,38 +241,4 @@ function itcSheet(
       cess: paiseToNumber(r.cess),
     })),
   };
-}
-
-/** CMP-08 is a small summary: one sheet of label-and-figure rows. */
-function cmp08Sheets(period: GstReturnPeriodRow): SheetSpec[] {
-  const workings = period.workings ?? {};
-  const rows: Row[] = [];
-  const push = (label: string, value: unknown) => {
-    rows.push({ label, value: typeof value === 'number' ? paiseToNumber(value) : value });
-  };
-  const flatten = (prefix: string, value: unknown): void => {
-    if (value === null || value === undefined) return;
-    if (typeof value !== 'object') {
-      push(prefix, value);
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((entry, index) => flatten(`${prefix}[${index}]`, entry));
-      return;
-    }
-    for (const [key, nested] of Object.entries(value as Row)) {
-      flatten(prefix ? `${prefix} / ${key}` : key, nested);
-    }
-  };
-  flatten('', workings);
-  return [
-    {
-      name: 'CMP-08',
-      columns: [
-        { header: 'Item', key: 'label', format: 'text', width: 40 },
-        { header: 'Amount', key: 'value', format: 'money' },
-      ],
-      rows,
-    },
-  ];
 }

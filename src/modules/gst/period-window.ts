@@ -1,8 +1,8 @@
 /**
  * The window of dates a return period covers.
  *
- * CMP-08 is quarterly on the financial year; GSTR-1 and 3B are monthly unless the shop is on
- * QRMP, in which case they are quarterly too; GSTR-9 is the whole financial year. Getting this
+ * GSTR-1 and 3B are monthly unless the shop is on QRMP, in which case they are quarterly on the
+ * financial year; GSTR-9 is the whole financial year. Getting this
  * wrong files a correct set of figures against the wrong months, which is harder to spot than a
  * wrong figure.
  */
@@ -46,7 +46,7 @@ export function windowFromSettings(
 ): { from: string; to: string } {
   // For GSTR-9 the "year" is the year the financial year starts in; the month is ignored.
   if (returnType === 'gstr9') return fyWindow(year, settings.fyStartMonth);
-  const quarterly = returnType === 'cmp08' || settings.filingFrequency === 'qrmp';
+  const quarterly = settings.filingFrequency === 'qrmp';
   if (!quarterly) {
     return { from: `${year}-${String(month).padStart(2, '0')}-01`, to: lastDayOf(year, month) };
   }

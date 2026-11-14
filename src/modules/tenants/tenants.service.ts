@@ -104,7 +104,7 @@ export async function onboardTenant(userId: string, body: CreateTenantBody) {
         isComposition,
         // A composition shop is asked for its category and rate in settings,
         // not at onboarding: the scheme has four rates and guessing one would
-        // put a wrong figure on the first CMP-08.
+        // put a wrong rate on the shop's settings.
         compositionCategory: body.compositionCategory ?? null,
         // pg reads NUMERIC back as a string, so the row type is a string; the
         // wire takes a number, which is the right shape for a percentage.

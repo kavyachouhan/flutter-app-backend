@@ -108,7 +108,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
       {
         name: 'GST',
         description:
-          'GSTR-1 and 3B workings, the input tax credit register, GSTR-2B reconciliation and CMP-08. Nothing here files a return on the shop’s behalf.',
+          'GSTR-1, GSTR-3B and GSTR-9 workings, GST reports, the input tax credit register and GSTR-2B reconciliation. Nothing here files a return on the shop’s behalf.',
       },
       {
         name: 'Pricing',

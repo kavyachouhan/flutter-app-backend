@@ -83,7 +83,14 @@ export interface ReportDefinition {
    * tables). The catalogue lists them so plan and role gating stay in one place, but they are
    * not run through the generic table kernel: they have no `run`.
    */
-  readonly screen?: 'gst-transactions' | 'gstr9' | 'hsn-sales' | 'sac';
+  readonly screen?:
+    | 'gstr1'
+    | 'gstr2b'
+    | 'gstr3b'
+    | 'gst-transactions'
+    | 'gstr9'
+    | 'hsn-sales'
+    | 'sac';
   run?(tx: Tx, params: ReportParams): Promise<ReportRow[]>;
 }
 

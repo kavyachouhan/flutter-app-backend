@@ -1,5 +1,5 @@
 /**
- * GSTR-1 and 3B workings, the ITC register, and CMP-08.
+ * GSTR-1, GSTR-3B and GSTR-9 workings, and the ITC register.
  *
  * Three rules shape this module, and all three are about not telling the
  * department something untrue.
@@ -21,7 +21,6 @@
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { periodOf } from '../../domain/gst/classify.js';
-import { compositionLiability } from '../../domain/gst/composition.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ConflictError, ErrorCode, NotFoundError, UnprocessableError } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
@@ -83,18 +82,12 @@ export function createPeriod(body: CreatePeriodBody) {
     const gstin = await resolveGstin(tx, body.gstin);
     const settings = await tenantsRepository.getSettings(tx);
 
-    // A composition dealer files CMP-08, not GSTR-1 and 3B, and a regular
-    // dealer the reverse. Offering the wrong one is how a shop files a return
-    // it does not owe and leaves the one it does unfiled.
-    if (settings.isComposition && body.returnType !== 'cmp08') {
+    // A composition dealer files CMP-08 and GSTR-4, not GSTR-1, 3B or 9, and those returns are
+    // not part of this version. Offering a regular return would have the shop file one it does
+    // not owe.
+    if (settings.isComposition) {
       throw new UnprocessableError(
-        'A composition dealer files CMP-08 (and GSTR-9A), not GSTR-1, GSTR-3B or GSTR-9.',
-        ErrorCode.UNPROCESSABLE,
-      );
-    }
-    if (!settings.isComposition && body.returnType === 'cmp08') {
-      throw new UnprocessableError(
-        'CMP-08 applies only under the composition scheme.',
+        'GST returns for composition dealers (CMP-08, GSTR-4) are not supported in this version. GSTR-1, GSTR-3B and GSTR-9 apply only to regular dealers.',
         ErrorCode.UNPROCESSABLE,
       );
     }
@@ -156,9 +149,7 @@ export function preparePeriod(id: string, options: PreparePeriodBody = {}) {
         ? await buildGstr1(tx, period)
         : period.returnType === 'gstr3b'
           ? await buildGstr3b(tx, period)
-          : period.returnType === 'gstr9'
-            ? await buildGstr9Period(tx, period, options)
-            : await buildCmp08(tx, period);
+          : await buildGstr9Period(tx, period, options);
 
     await gstRepository.savePrepared(tx, id, workings.workings, workings.totals, auth.userId);
     await recordAudit(tx, {
@@ -295,45 +286,6 @@ async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings
   return {
     workings: toStoredWorkings({ ...w, issues }),
     totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
-  };
-}
-
-/** CMP-08: flat tax on turnover, plus any reverse-charge tax owed on top. */
-async function buildCmp08(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const settings = await tenantsRepository.getSettings(tx);
-  if (settings.compositionRatePercent === null) {
-    throw new UnprocessableError(
-      'Set the composition category and rate in settings before preparing CMP-08.',
-      ErrorCode.UNPROCESSABLE,
-    );
-  }
-
-  const turnover = await gstRepository.compositionTurnover(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const reverseCharge = (
-    await gstRepository.reverseChargeInward(tx, period.periodFrom, period.periodTo)
-  )[0];
-
-  const liability = compositionLiability(
-    {
-      outwardSupplies: turnover?.outwardSupplies ?? 0,
-      reverseChargeInward: reverseCharge?.taxableAmount ?? 0,
-      reverseChargeTax: reverseCharge?.tax ?? 0,
-    },
-    Number(settings.compositionRatePercent),
-  );
-
-  return {
-    workings: {
-      category: settings.compositionCategory,
-      ...liability,
-      reverseChargeInward: reverseCharge?.taxableAmount ?? 0,
-    },
-    totals: { totalTaxable: liability.turnover, totalTax: liability.totalPayable },
   };
 }
 
