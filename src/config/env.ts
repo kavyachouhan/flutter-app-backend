@@ -85,6 +85,11 @@ const envSchema = z.object({
   // --- Bulk import ----------------------------------------------------------
   // Ingest reads the file once; analyse and apply then advance in chunks, so
   // these bound one request's work, not the size of an import.
+  // When the API purges businesses whose owners deleted them: "HH:MM" Indian
+  // time, daily (default 02:00), or "off". See modules/account/purge-scheduler.ts.
+  ACCOUNT_PURGE_DAILY_AT: optional(
+    z.string().regex(/^(off|([01]\d|2[0-3]):[0-5]\d)$/, 'must be HH:MM (24-hour) or off'),
+  ),
   IMPORT_MAX_ROWS: required(positiveInt),
   IMPORT_ANALYSE_CHUNK_ROWS: required(positiveInt),
   IMPORT_APPLY_CHUNK_ROWS: required(positiveInt),

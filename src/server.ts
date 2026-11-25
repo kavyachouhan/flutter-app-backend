@@ -4,8 +4,13 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { closePool } from './db/pool.js';
 import { closeRedis, connectRedis } from './cache/redis.js';
+import {
+  startAccountPurgeSchedule,
+  type PurgeSchedule,
+} from './modules/account/purge-scheduler.js';
 
 let server: Server | undefined;
+let purgeSchedule: PurgeSchedule | undefined;
 let shuttingDown = false;
 
 async function start(): Promise<void> {
@@ -32,6 +37,9 @@ async function start(): Promise<void> {
     logger.fatal({ err: error }, 'HTTP server error');
     process.exit(1);
   });
+
+  // Deleted businesses' data, purged daily (ACCOUNT_PURGE_DAILY_AT).
+  purgeSchedule = startAccountPurgeSchedule();
 }
 
 /**
@@ -43,6 +51,8 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) process.exit(1);
   shuttingDown = true;
   logger.info(`${signal} received, draining`);
+  // A purge already running is one transaction: cut off, it simply rolls back.
+  purgeSchedule?.stop();
 
   const forceExit = setTimeout(() => {
     logger.error('Shutdown timed out with requests in flight');
