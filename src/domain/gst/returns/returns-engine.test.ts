@@ -120,6 +120,23 @@ describe('GSTR-1 classification', () => {
     });
   });
 
+  it('uses the ₹1 lakh B2CL threshold from 01.08.2024 and ₹2.5 lakh before (Rule 59(4), 12/2024)', () => {
+    // ₹1.5 lakh taxable + 18% IGST = ₹1.77 lakh invoice value.
+    const sale = (number: string, date: string) =>
+      doc({
+        number,
+        date,
+        supplyType: 'inter_state',
+        placeOfSupply: '29',
+        lines: [line({ taxable: 15_000_000, ratePercent: 18 })],
+      });
+    const after = run([sale('INV/A', '2024-08-01')]);
+    expect(after.model.b2cl).toHaveLength(1);
+    const before = run([sale('INV/B', '2024-07-31')]);
+    expect(before.model.b2cl).toHaveLength(0);
+    expect(before.model.b2cs).toHaveLength(1);
+  });
+
   it('keeps an intra-state sale of any size in B2CS', () => {
     const w = run([doc({ number: 'INV/5', lines: [intra(90_000_000, 5)] })]);
     expect(w.model.b2cl).toHaveLength(0);

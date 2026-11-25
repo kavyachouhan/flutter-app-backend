@@ -149,6 +149,13 @@ export const createInvoiceBody = z.object({
   supplyType: declaredSupplyType.optional(),
   /** Reverse charge: the recipient pays the tax, so this document carries none. */
   isReverseCharge: z.boolean().optional(),
+  /**
+   * Sold through an e-commerce operator (Amazon, Flipkart, Swiggy...). `marketplace` needs the
+   * operator's GSTIN: the sale is still reported in GSTR-1 tables 4-10, and the operator-wise
+   * total goes in table 14 (26/2022-CT). Omitted, the sale is direct.
+   */
+  salesChannel: z.enum(['direct', 'marketplace']).optional(),
+  ecoGstin: gstin.optional(),
   pricesIncludeTax: z.boolean(),
   roundOff: z.boolean(),
   lines: z.array(line).nonempty(),

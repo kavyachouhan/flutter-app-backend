@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { closeOwnerClient } from './setup/database.js';
+import { closeOwnerClient, ownerClient } from './setup/database.js';
 import { createTenant, type TenantFixture } from './setup/tenant.js';
 import { createSeries, invoicePayload, leaseBlock, today } from './setup/fixtures.js';
 import { data, error } from './setup/body.js';
@@ -279,6 +279,65 @@ describe('GSTR-1 and GSTR-3B', () => {
         p.workings?.issues.find((i) => i.code === 'gstr1_changed_since_prepared')?.severity,
       ).toBe('error');
     });
+  });
+
+  it('records a marketplace sale with the operator GSTIN and refuses one without it', async () => {
+    const eco = validGstin('29');
+    const buyer = await customer({});
+    const payload = () => {
+      invoiceSeq += 1;
+      return invoicePayload(shop, {
+        seriesId: invoices,
+        sequenceNo: invoiceSeq,
+        customerId: buyer,
+        lines: [{ itemId, quantity: 1, unitPrice: 10_000, taxRatePercent: 18 }],
+      });
+    };
+    const res = await shop
+      .post('/v1/invoices')
+      .send({ ...payload(), salesChannel: 'marketplace', ecoGstin: eco })
+      .expect(201);
+    expect(data<{ salesChannel: string; ecoGstin: string }>(res)).toMatchObject({
+      salesChannel: 'marketplace',
+      ecoGstin: eco,
+    });
+    await shop.post('/v1/invoices').send({ ...payload(), salesChannel: 'marketplace' }).expect(422);
+  });
+
+  it('locks the period on filing and keeps the filed row immutable (0050)', async () => {
+    const id = randomUUID();
+    const earlier = month <= 2 ? 10 + month : month - 2;
+    const earlierYear = month <= 2 ? year - 1 : year;
+    await shop
+      .post('/v1/gst/periods')
+      .send({ id, gstin, returnType: 'gstr3b', periodYear: earlierYear, periodMonth: earlier })
+      .expect(201);
+    await shop.post(`/v1/gst/periods/${id}/prepare`).expect(200);
+    await shop.post(`/v1/gst/periods/${id}/file`).send({ confirm: true, arn: 'AA2701260000099' }).expect(200);
+
+    const owner = await ownerClient();
+    const reg = await owner.query<{ through: string; epoch: string; events: string }>(
+      `SELECT r.gstr3b_locked_through::text AS through, r.lock_epoch::text AS epoch,
+              (SELECT count(*) FROM gst_period_lock_events e
+                WHERE e.registration_id = r.id AND e.lock_level = 'gstr3b_filed')::text AS events
+       FROM gst_registrations r WHERE r.gstin = $1 AND r.deleted_at IS NULL`,
+      [gstin],
+    );
+    const period = await owner.query<{ to: string }>(
+      'SELECT period_to::text AS to FROM gst_return_periods WHERE id = $1',
+      [id],
+    );
+    expect(reg.rows[0]?.through).toBe(period.rows[0]?.to);
+    expect(Number(reg.rows[0]?.events)).toBeGreaterThanOrEqual(1);
+
+    // Even the owner role cannot change a filed return's figures or delete it.
+    await expect(
+      owner.query(`UPDATE gst_return_periods SET workings = '{}'::jsonb WHERE id = $1`, [id]),
+    ).rejects.toThrow(/filed/);
+    await expect(owner.query('DELETE FROM gst_return_periods WHERE id = $1', [id])).rejects.toThrow(
+      /filed/,
+    );
+    await shop.post(`/v1/gst/periods/${id}/prepare`).expect(409);
   });
 
   it('refuses to export a return that was never prepared', async () => {

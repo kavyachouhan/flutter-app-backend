@@ -129,6 +129,59 @@ export const gstRepository = {
     );
   },
 
+  /**
+   * Records the period lock on the registration that files under `gstin` (migration 0050):
+   * an append-only lock event, the registration's `*_locked_through` raised, and its lock
+   * epoch bumped. Returns false when the GSTIN has no registration row (legacy tenant data);
+   * the filed row is still immutable through its own trigger.
+   */
+  /** The registration's filing frequency on a date (monthly when nothing is recorded). */
+  async filingFrequencyOn(tx: Tx, gstin: string, date: string): Promise<'monthly' | 'qrmp'> {
+    const row = await tx.one<{ frequency: 'monthly' | 'qrmp' }>(
+      `SELECT p.filing_frequency AS frequency
+       FROM gst_registrations r
+       JOIN gst_registration_profiles p ON p.registration_id = r.id
+       WHERE r.gstin = $1 AND r.deleted_at IS NULL
+         AND p.effective_from <= $2::date AND (p.effective_to IS NULL OR p.effective_to > $2::date)
+       LIMIT 1`,
+      [gstin, date],
+    );
+    return row?.frequency ?? 'monthly';
+  },
+
+  /** The tenant's (PAN-level) aggregate turnover records, every source. */
+  turnoverRecords(
+    tx: Tx,
+  ): Promise<{ fyStartYear: number; aggregateTurnover: number; source: 'declared' | 'app_computed' | 'portal_verified' }[]> {
+    return tx
+      .many<{ fyStartYear: number; aggregateTurnover: string | number; source: 'declared' | 'app_computed' | 'portal_verified' }>(
+        `SELECT fy_start_year AS "fyStartYear", aggregate_turnover AS "aggregateTurnover", source
+         FROM entity_turnover_by_fy`,
+      )
+      .then((rows) => rows.map((r) => ({ ...r, aggregateTurnover: Number(r.aggregateTurnover) })));
+  },
+
+  async recordPeriodLock(
+    tx: Tx,
+    gstin: string,
+    level: 'gstr1_filed' | 'gstr3b_filed',
+    through: string,
+    userId: string,
+  ): Promise<boolean> {
+    const reg = await tx.one<{ id: string }>(
+      `SELECT id FROM gst_registrations WHERE gstin = $1 AND deleted_at IS NULL`,
+      [gstin],
+    );
+    if (!reg) return false;
+    await tx.query(`SELECT app.record_gst_period_lock($1, $2, $3::date, $4)`, [
+      reg.id,
+      level,
+      through,
+      userId,
+    ]);
+    return true;
+  },
+
   async markFiled(
     tx: Tx,
     id: string,

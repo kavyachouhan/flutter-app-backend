@@ -27,6 +27,7 @@ import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
+import { gstr3bFiledForItc } from '../gst/filing-state.js';
 import { itcRepository } from '../gst/itc.repository.js';
 import { numberForDocument } from '../purchases/numbering.js';
 import { purchasesRepository } from '../purchases/purchases.repository.js';
@@ -377,6 +378,13 @@ export async function voidDebitNote(id: string, reason: string) {
     if (!header) throw new NotFoundError('Debit note');
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { note: await loadNote(tx, id), voided: false };
+
+    if (await gstr3bFiledForItc(tx, 'debit_note', id)) {
+      throw new UnprocessableError(
+        'This debit note is in a filed GSTR-3B, so it can no longer be cancelled. Correct it in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
 
     await debitNotesRepository.markVoid(tx, id, reason, auth.userId);
 

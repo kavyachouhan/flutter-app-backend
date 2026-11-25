@@ -70,9 +70,9 @@ export async function computeGstr3b(
   precomputed?: Gstr1Workings,
 ): Promise<Gstr3bWorkings> {
   const gstr1 = precomputed ?? (await computeGstr1(tx, p));
-  const rcm = await returnsRepository.inwardReverseCharge(tx, p.from, p.to);
+  const rcm = await returnsRepository.inwardReverseCharge(tx, p.gstin, p.from, p.to);
   const credit = await returnsRepository.inwardCredit(tx, p.gstin, p.from, p.to);
-  const exempt = await returnsRepository.inwardExempt(tx, p.from, p.to);
+  const exempt = await returnsRepository.inwardExempt(tx, p.gstin, p.from, p.to);
 
   const tax = (v: TaxedValue): TaxAmounts => ({
     igst: v.igst,
@@ -131,7 +131,7 @@ export async function computeGstr3b(
       severity: 'info',
       code: 'rcm_time_of_supply',
       message:
-        'Reverse-charge purchases are placed in the month of the bill date. The time-of-supply rule for reverse charge is not applied here; check bills near a month end.',
+        'Reverse-charge purchases are placed in the month of the bill date. From 01.11.2024 the time of supply for reverse charge is the date of the self-invoice you issue (s.13(3)(c), within 30 days of receipt under Rule 47A); check bills near a month end.',
     },
     ...gstr1.issues
       .filter((i) => i.severity === 'error')
@@ -170,13 +170,30 @@ export async function computeGstr3b(
         },
       ),
     );
-    const off = rows.filter((r) => r.difference !== 0);
-    if (off.length > 0) {
+    // Above 2B is the case the law acts on: credit can be taken only to the extent it is in
+    // GSTR-2B (s.16(2)(aa), from 01.01.2022), and a 3B claim above 2B is intimated in
+    // DRC-01C under Rule 88D. Below 2B is usually timing (a bill not yet entered, goods in
+    // transit) and stays a note.
+    const excess = rows.filter((r) => r.difference > 0);
+    const short = rows.filter((r) => r.difference < 0);
+    if (excess.length > 0) {
+      const rupees = (paise: number) => (paise / 100).toFixed(2);
       extra.push({
         severity: 'warning',
-        code: 'itc_differs_from_2b',
-        count: off.length,
-        message: `Eligible credit per books differs from GSTR-2B in ${off.map((r) => r.head).join(', ')}. Review the reconciliation before claiming.`,
+        code: 'itc_exceeds_2b',
+        count: excess.length,
+        message: `Eligible credit per books is more than GSTR-2B shows (${excess
+          .map((r) => `${r.head} ₹${rupees(r.difference)}`)
+          .join(', ')}). Credit can be claimed only to the extent it appears in GSTR-2B (s.16(2)(aa)); claiming more in GSTR-3B brings a DRC-01C intimation (Rule 88D). Claim the 2B figure for these heads unless the difference is a reclaim of credit reversed earlier (Rule 37/37A) or an import not yet in 2B.`,
+        ref: '2b_vs_books',
+      });
+    }
+    if (short.length > 0) {
+      extra.push({
+        severity: 'info',
+        code: 'itc_below_2b',
+        count: short.length,
+        message: `GSTR-2B shows more credit than the books in ${short.map((r) => r.head).join(', ')}. Usually a supplier bill not yet entered; review the reconciliation.`,
         ref: '2b_vs_books',
       });
     }

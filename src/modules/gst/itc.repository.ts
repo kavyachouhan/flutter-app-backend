@@ -62,13 +62,30 @@ export const itcRepository = {
    * not double the credit. The unique index is the real guarantee; this makes
    * the replay silent rather than an error the caller has to interpret.
    */
+  /**
+   * The GSTIN is taken from the registration the database resolved on the
+   * source document (purchase_bills / debit_notes `registration_id`, set by the
+   * document trigger from the outlet's registration in force on the document
+   * date). `entry.gstin` is only a fallback for documents with no resolved
+   * registration (non-GST tenants). The old code used the outlet or settings
+   * GSTIN with an empty-string default, which put credit under '' or under the
+   * wrong registration for multi-GSTIN tenants.
+   */
   async insert(tx: Tx, entry: NewItcEntry): Promise<void> {
     await tx.query(
       `INSERT INTO itc_register (id, tenant_id, gstin, source_type, source_id, supplier_id,
          supplier_gstin, document_date, itc_category, ineligible_reason, is_reverse_charge,
          cgst, sgst, igst, cess, taxable_amount, state)
-       VALUES ($1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-         $14, $15, $16)
+       VALUES ($1, app.current_tenant_id(),
+         COALESCE(
+           (SELECT r.gstin FROM purchase_bills d JOIN gst_registrations r ON r.id = d.registration_id
+             WHERE $3 = 'purchase_bill' AND d.id = $4
+            UNION ALL
+            SELECT r.gstin FROM debit_notes d JOIN gst_registrations r ON r.id = d.registration_id
+             WHERE $3 = 'debit_note' AND d.id = $4
+            LIMIT 1),
+           NULLIF($2, ''), ''),
+         $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (tenant_id, source_type, source_id) DO NOTHING`,
       [
         entry.id,
@@ -212,7 +229,7 @@ export const itcRepository = {
       `INSERT INTO itc_register (id, tenant_id, gstin, source_type, source_id, supplier_id,
          supplier_gstin, document_date, itc_category, is_reverse_charge,
          cgst, sgst, igst, cess, taxable_amount, state)
-       SELECT gen_random_uuid(), app.current_tenant_id(), $1, 'purchase_bill', b.id, b.supplier_id,
+       SELECT gen_random_uuid(), app.current_tenant_id(), COALESCE(reg.gstin, $1), 'purchase_bill', b.id, b.supplier_id,
               b.supplier_gstin, b.supplier_invoice_date,
               category.value, b.is_reverse_charge,
               b.total_cgst, b.total_sgst, b.total_igst, b.total_cess, b.taxable_amount,
@@ -228,7 +245,11 @@ export const itcRepository = {
            CASE WHEN b.itc_eligible THEN 'inputs' ELSE 'ineligible' END
          ) AS value
        ) AS category
+       LEFT JOIN gst_registrations reg ON reg.id = b.registration_id
+       -- Only this registration's bills (or legacy bills with no resolved registration):
+       -- a multi-GSTIN tenant's bills must not all land under the GSTIN being prepared.
        WHERE b.status <> 'void'
+         AND (reg.gstin IS NULL OR reg.gstin = $1)
          AND NOT EXISTS (
            SELECT 1 FROM itc_register r
            WHERE r.source_type = 'purchase_bill' AND r.source_id = b.id)

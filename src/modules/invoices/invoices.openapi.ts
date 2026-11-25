@@ -160,6 +160,8 @@ export const invoiceSchema = registry.register(
     taxMode: taxModeSchema,
     supplyType: supplyTypeSchema,
     isReverseCharge: z.boolean(),
+    salesChannel: z.enum(['direct', 'marketplace']),
+    ecoGstin: z.string().nullable(),
     pricesIncludeTax: z.boolean(),
     roundOffEnabled: z.boolean(),
     grossAmount: paise,

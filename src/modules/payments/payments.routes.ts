@@ -5,7 +5,12 @@ import { idParams } from '../../lib/validators.js';
 import { buildPaymentReceiptPayload } from '../print/print.service.js';
 import { printPayloadQuery } from '../print/print.schemas.js';
 import * as paymentsService from './payments.service.js';
-import { createReceiptBody, listPaymentsQuery, voidPaymentBody } from './payments.schemas.js';
+import {
+  allocateReceiptBody,
+  createReceiptBody,
+  listPaymentsQuery,
+  voidPaymentBody,
+} from './payments.schemas.js';
 
 export const paymentsRouter: Router = Router();
 
@@ -29,6 +34,17 @@ paymentsRouter.post(
   async (req, res) => {
     const { body } = validated<typeof create>(req);
     res.status(201).json({ data: await paymentsService.createReceipt(body) });
+  },
+);
+
+const allocateSchemas = { params: idParams, body: allocateReceiptBody };
+paymentsRouter.post(
+  '/:id/allocations',
+  requirePermission('payments:create'),
+  validate(allocateSchemas),
+  async (req, res) => {
+    const { params, body } = validated<typeof allocateSchemas>(req);
+    res.json({ data: await paymentsService.allocateReceipt(params.id, body) });
   },
 );
 

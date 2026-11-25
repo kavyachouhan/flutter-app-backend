@@ -44,6 +44,7 @@ import { accessibleOutletIds, assertOutletAccess } from '../../middleware/author
 import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import { gstr3bFiledForItc } from '../gst/filing-state.js';
 import { itcRepository } from '../gst/itc.repository.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
@@ -508,6 +509,13 @@ export async function voidPurchaseBill(id: string, reason: string) {
     if (!header) throw new NotFoundError('Purchase bill');
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { bill: await loadBill(tx, id), voided: false };
+
+    if (await gstr3bFiledForItc(tx, 'purchase_bill', id)) {
+      throw new UnprocessableError(
+        'The input tax credit on this bill is in a filed GSTR-3B, so the bill can no longer be cancelled. Raise a debit note or correct it in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
 
     if (header.amountPaid > 0) {
       throw new UnprocessableError(

@@ -399,6 +399,7 @@ export const returnsRepository = {
   /** Reverse-charge inward supplies: value, and self-assessed tax by head, split by import or not. */
   async inwardReverseCharge(
     tx: Tx,
+    gstin: string,
     from: string,
     to: string,
   ): Promise<{
@@ -434,10 +435,12 @@ export const returnsRepository = {
        FROM purchase_bill_lines l
        JOIN purchase_bills b ON b.id = l.purchase_bill_id
        JOIN suppliers s ON s.id = b.supplier_id
+       LEFT JOIN gst_registrations reg ON reg.id = b.registration_id
        WHERE b.is_reverse_charge AND b.status <> 'void'
-         AND b.document_date >= $1::date AND b.document_date <= $2::date
+         AND (reg.gstin IS NULL OR reg.gstin = $1)
+         AND b.document_date >= $2::date AND b.document_date <= $3::date
        GROUP BY 1, 2`,
-      [from, to],
+      [gstin, from, to],
     );
     const z: TaxedValue = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
     let domestic = z;
@@ -592,6 +595,7 @@ export const returnsRepository = {
   /** Inward exempt, nil-rated and non-GST supplies (3B table 5), net of purchase returns. */
   async inwardExempt(
     tx: Tx,
+    gstin: string,
     from: string,
     to: string,
   ): Promise<{ gst: { inter: number; intra: number }; nonGst: { inter: number; intra: number } }> {
@@ -602,7 +606,9 @@ export const returnsRepository = {
          FROM purchase_bill_lines l
          JOIN purchase_bills b ON b.id = l.purchase_bill_id
          JOIN suppliers s ON s.id = b.supplier_id
-         WHERE b.status <> 'void' AND b.document_date >= $1::date AND b.document_date <= $2::date
+         LEFT JOIN gst_registrations reg ON reg.id = b.registration_id
+         WHERE b.status <> 'void' AND b.document_date >= $2::date AND b.document_date <= $3::date
+           AND (reg.gstin IS NULL OR reg.gstin = $1)
            AND (l.supply_category <> 'taxable' OR s.registration_type = 'composition')
          UNION ALL
          SELECT CASE WHEN l.supply_category = 'non_gst' THEN 'nongst' ELSE 'gst' END,
@@ -610,10 +616,12 @@ export const returnsRepository = {
          FROM debit_note_lines l
          JOIN debit_notes d ON d.id = l.debit_note_id
          JOIN suppliers s ON s.id = d.supplier_id
-         WHERE d.status <> 'void' AND d.document_date >= $1::date AND d.document_date <= $2::date
+         LEFT JOIN gst_registrations reg ON reg.id = d.registration_id
+         WHERE d.status <> 'void' AND d.document_date >= $2::date AND d.document_date <= $3::date
+           AND (reg.gstin IS NULL OR reg.gstin = $1)
            AND (l.supply_category <> 'taxable' OR s.registration_type = 'composition')
        ) x GROUP BY bucket, inter`,
-      [from, to],
+      [gstin, from, to],
     );
     const out = { gst: { inter: 0, intra: 0 }, nonGst: { inter: 0, intra: 0 } };
     for (const r of rows) {

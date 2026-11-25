@@ -12,7 +12,7 @@
  * `model.otherSections`.
  */
 import { STATE_NAMES } from '../../print/states.js';
-import { B2CL_THRESHOLD_PAISE, type SupplyCategory, type SupplyType } from '../classify.js';
+import { b2clThresholdPaise, type SupplyCategory, type SupplyType } from '../classify.js';
 import {
   addHsnLine,
   hsnColumns,
@@ -462,7 +462,7 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
 
     // ---- Unregistered recipients ---------------------------------------------------------------
     if (!isNote) {
-      const large = isInter(d.supplyType) && d.grandTotal > B2CL_THRESHOLD_PAISE;
+      const large = isInter(d.supplyType) && d.grandTotal > b2clThresholdPaise(d.date);
       if (large) {
         const inv = {
           number: d.number,
@@ -496,7 +496,7 @@ export function buildGstr1(input: Gstr1Input): Gstr1Workings {
       const originalWasLarge =
         original !== null &&
         isInter(original.supplyType) &&
-        original.grandTotal > B2CL_THRESHOLD_PAISE;
+        original.grandTotal > b2clThresholdPaise(original.date);
       if (original === null) {
         issue({
           severity: 'warning',

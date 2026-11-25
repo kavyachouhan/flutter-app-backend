@@ -276,7 +276,7 @@ export function reconcileImport(id: string) {
 
       const window = comparisonWindow(job);
       const portal = await reconciliationRepository.portalInvoices(tx, id);
-      const books = await reconciliationRepository.bookInvoices(tx, window.from, window.to);
+      const books = await reconciliationRepository.bookInvoices(tx, job.gstin, window.from, window.to);
 
       const results = reconcile(portal, books, RECONCILE_RULES);
       await reconciliationRepository.replaceMatches(

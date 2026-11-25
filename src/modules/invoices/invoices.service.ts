@@ -65,6 +65,32 @@ import { assertRule46, decideInvoiceSupply, dispatchSnapshot, sellerSnapshot } f
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
 import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js';
 
+/**
+ * The sales channel columns (0039 CHECK: a marketplace sale needs a valid operator GSTIN, and a
+ * direct one must not carry one). Refused here with a readable message rather than the CHECK's.
+ */
+function salesChannelOf(body: CreateInvoiceBody): {
+  salesChannel: 'direct' | 'marketplace';
+  ecoGstin: string | null;
+} {
+  const channel = body.salesChannel ?? (body.ecoGstin ? 'marketplace' : 'direct');
+  if (channel === 'marketplace' && !body.ecoGstin) {
+    throw new UnprocessableError(
+      "A marketplace sale needs the e-commerce operator's GSTIN.",
+      ErrorCode.UNPROCESSABLE,
+      { details: { field: 'ecoGstin' } },
+    );
+  }
+  if (channel === 'direct' && body.ecoGstin) {
+    throw new UnprocessableError(
+      'An e-commerce operator GSTIN is given for a direct sale. Set the sales channel to marketplace or leave the GSTIN out.',
+      ErrorCode.UNPROCESSABLE,
+      { details: { field: 'ecoGstin' } },
+    );
+  }
+  return { salesChannel: channel, ecoGstin: channel === 'marketplace' ? (body.ecoGstin ?? null) : null };
+}
+
 export interface Warning {
   code: WarningCodeValue;
   details: Record<string, unknown>;
@@ -390,6 +416,7 @@ export async function createInvoice(body: CreateInvoiceBody) {
       issuedAt: body.issuedAt,
       issuedBy: auth.userId,
       documentType,
+      ...salesChannelOf(body),
       supply: {
         scenario: supply.scenario,
         provision: supply.provision,

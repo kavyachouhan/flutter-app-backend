@@ -11,7 +11,12 @@ import {
   timestamp,
   uuid,
 } from '../../openapi/registry.js';
-import { createReceiptBody, listPaymentsQuery, voidPaymentBody } from './payments.schemas.js';
+import {
+  allocateReceiptBody,
+  createReceiptBody,
+  listPaymentsQuery,
+  voidPaymentBody,
+} from './payments.schemas.js';
 
 export const paymentAllocationSchema = registry.register(
   'PaymentAllocation',
@@ -82,4 +87,22 @@ registry.registerPath({
     body: { content: { 'application/json': { schema: voidPaymentBody } } },
   },
   responses: { 200: jsonResponse('Voided.', dataEnvelope(paymentSchema)), ...errorResponses(409) },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/v1/payments/{id}/allocations',
+  tags: ['Payments'],
+  summary: 'Settle invoices from an advance on a receipt',
+  description:
+    "Allocates the unallocated part of a khata receipt to the customer's invoices. No ledger entry is written; the receipt already credited the khata.",
+  security: accessTokenSecurity,
+  request: {
+    params: idParams,
+    body: { content: { 'application/json': { schema: allocateReceiptBody } } },
+  },
+  responses: {
+    200: jsonResponse('Allocated.', dataEnvelope(paymentSchema)),
+    ...errorResponses(422),
+  },
 });

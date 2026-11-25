@@ -214,6 +214,52 @@ describe('billing', () => {
 
     expect(await khataOf(t, customer.id)).toBe(0);
   });
+
+  it('settles a later invoice from an advance kept on the khata', async () => {
+    const item = await createItem(t);
+    const customer = await createCustomer(t, { name: 'Advance Customer' });
+    const receiptId = randomUUID();
+    await t
+      .post('/v1/payments')
+      .send({
+        id: receiptId,
+        outletId: t.outletId,
+        customerId: customer.id,
+        mode: 'cash',
+        amount: 50_000_000,
+        receivedAt: new Date().toISOString(),
+      })
+      .expect(201);
+    const invoice = data<Invoice>(
+      await t
+        .post('/v1/invoices')
+        .send(
+          invoicePayload(t, {
+            seriesId: series.id,
+            sequenceNo: await sequence(),
+            customerId: customer.id,
+            lines: [{ itemId: item.id, quantity: 1000, unitPrice: 10_000, taxRatePercent: 18 }],
+          }),
+        )
+        .expect(201),
+    );
+    // The advance already offsets the invoice on the khata; allocating only links them.
+    const before = await khataOf(t, customer.id);
+    const res = await t
+      .post(`/v1/payments/${receiptId}/allocations`)
+      .send({ allocations: [{ invoiceId: invoice.id, amount: invoice.grandTotal }] })
+      .expect(200);
+    expect(
+      data<{ allocations: { invoiceId: string; amount: number }[] }>(res).allocations,
+    ).toEqual([expect.objectContaining({ invoiceId: invoice.id, amount: invoice.grandTotal })]);
+    expect(await khataOf(t, customer.id)).toBe(before);
+
+    // The same invoice twice, and more than is left on the receipt, are refused.
+    await t
+      .post(`/v1/payments/${receiptId}/allocations`)
+      .send({ allocations: [{ invoiceId: invoice.id, amount: 1 }] })
+      .expect(422);
+  });
 });
 
 async function balanceOf(t: TenantFixture, itemId: string): Promise<number> {

@@ -33,6 +33,14 @@ import { fyEndMonth, periodWindow } from './period-window.js';
 import { computeGstr9 } from './returns/gstr9.service.js';
 import { computeGstr1, computeGstr3b, toStoredWorkings } from './returns/returns.service.js';
 import { itcRepository } from './itc.repository.js';
+import {
+  annualReturnObligation,
+  isTimeBarred,
+  standardDueDate,
+  timeBarredFrom,
+} from '../../domain/gst/filing-obligations.js';
+import { resolvedTurnover } from '../../domain/gst/entity.js';
+import type { WorkingIssue } from '../../domain/gst/returns/sheets.js';
 import type {
   CreatePeriodBody,
   PreparePeriodBody,
@@ -150,6 +158,7 @@ export function preparePeriod(id: string, options: PreparePeriodBody = {}) {
         : period.returnType === 'gstr3b'
           ? await buildGstr3b(tx, period)
           : await buildGstr9Period(tx, period, options);
+    await addObligationIssues(tx, period, workings);
 
     await gstRepository.savePrepared(tx, id, workings.workings, workings.totals, auth.userId);
     await recordAudit(tx, {
@@ -186,6 +195,18 @@ export function filePeriod(id: string, body: FilePeriodBody) {
     if (period.status === 'filed') return period;
 
     await gstRepository.markFiled(tx, id, auth.userId, body.arn ?? null, body.notes ?? null);
+    // GSTR-1 and GSTR-3B lock the period on the registration (GSTR-9 has no lock level):
+    // documents dated in it can then only be corrected by notes or amendments.
+    let locked = false;
+    if (period.returnType === 'gstr1' || period.returnType === 'gstr3b') {
+      locked = await gstRepository.recordPeriodLock(
+        tx,
+        period.gstin,
+        period.returnType === 'gstr1' ? 'gstr1_filed' : 'gstr3b_filed',
+        period.periodTo,
+        auth.userId,
+      );
+    }
     await recordAudit(tx, {
       action: 'gst_return.filed',
       entityType: 'gst_return_period',
@@ -196,6 +217,7 @@ export function filePeriod(id: string, body: FilePeriodBody) {
         period: `${period.periodYear}-${String(period.periodMonth).padStart(2, '0')}`,
         arn: body.arn ?? null,
         totalTax: period.totalTax,
+        periodLocked: locked,
       },
     });
     businessEvents.inc({ event: 'gst_return.filed' });
@@ -204,6 +226,50 @@ export function filePeriod(id: string, body: FilePeriodBody) {
 }
 
 // --- Workings ---------------------------------------------------------------
+
+/**
+ * Warnings about the obligation itself, added to every prepared return (see
+ * `domain/gst/filing-obligations.ts`): the three-year bar on filing (s.37(5), 39(11), 44(2))
+ * and, for GSTR-9, whether the annual return is optional at this turnover. Warnings only;
+ * nothing is blocked.
+ */
+async function addObligationIssues(
+  tx: Tx,
+  period: GstReturnPeriodRow,
+  workings: Workings,
+): Promise<void> {
+  const extra: WorkingIssue[] = [];
+  const freq = await gstRepository.filingFrequencyOn(tx, period.gstin, period.periodTo);
+  const due = standardDueDate(period.returnType, period.periodYear, period.periodMonth, freq);
+  const today = new Date().toISOString().slice(0, 10);
+  if (isTimeBarred(due, today)) {
+    extra.push({
+      severity: 'warning',
+      code: 'return_time_barred',
+      message: `This return was due on ${due} and cannot be filed after ${timeBarredFrom(due)} (three years from the due date: s.37(5), 39(11) and 44(2), in force from 01.10.2023). The portal will not accept it.`,
+    });
+  }
+  if (period.returnType === 'gstr9') {
+    const turnover = await gstRepository.turnoverRecords(tx);
+    const obligation = annualReturnObligation(
+      period.periodYear,
+      resolvedTurnover({ exemptionCategory: 'none', turnover }, period.periodYear),
+    );
+    if (obligation.status !== 'required') {
+      extra.push({
+        severity: 'info',
+        code: obligation.status === 'optional' ? 'gstr9_optional' : 'gstr9_obligation_unknown',
+        message:
+          obligation.status === 'optional'
+            ? `GSTR-9 is optional for this year. ${obligation.basis}`
+            : `GSTR-9 may be optional for this year. ${obligation.basis}`,
+      });
+    }
+  }
+  if (extra.length === 0) return;
+  const stored = workings.workings as { issues?: WorkingIssue[] };
+  stored.issues = [...(stored.issues ?? []), ...extra];
+}
 
 interface Workings {
   workings: Record<string, unknown>;
