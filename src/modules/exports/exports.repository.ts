@@ -24,6 +24,8 @@ export interface ExportItemRow {
   reorderLevel: number | null;
   itemType: 'goods' | 'service';
   trackStock: boolean;
+  pricesIncludeTax: boolean;
+  discountPercent: string | null;
 }
 
 export interface ExportCustomerRow {
@@ -33,9 +35,26 @@ export interface ExportCustomerRow {
   gstin: string | null;
   stateCode: string | null;
   addressLine1: string | null;
+  addressLine2: string | null;
   city: string | null;
   pincode: string | null;
   creditLimit: number | null;
+  notes: string | null;
+  balance: number;
+}
+
+export interface ExportSupplierRow {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  gstin: string | null;
+  stateCode: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  pincode: string | null;
+  paymentTermsDays: number | null;
+  notes: string | null;
   balance: number;
 }
 
@@ -87,7 +106,9 @@ export const exportsRepository = {
               i.purchase_price    AS "purchasePrice",
               i.reorder_level     AS "reorderLevel",
               i.item_type         AS "itemType",
-              i.track_stock       AS "trackStock"
+              i.track_stock       AS "trackStock",
+              i.prices_include_tax AS "pricesIncludeTax",
+              i.discount_percent  AS "discountPercent"
        FROM items i
        LEFT JOIN categories c ON c.id = i.category_id AND c.deleted_at IS NULL
        WHERE i.deleted_at IS NULL AND ($1::boolean OR i.is_active)
@@ -100,13 +121,29 @@ export const exportsRepository = {
   customers(tx: Tx, limit: number): Promise<ExportCustomerRow[]> {
     return tx.many<ExportCustomerRow>(
       `SELECT c.name, c.phone, c.email, c.gstin, c.state_code AS "stateCode",
-              c.address_line1 AS "addressLine1", c.city, c.pincode,
-              c.credit_limit AS "creditLimit",
+              c.address_line1 AS "addressLine1", c.address_line2 AS "addressLine2",
+              c.city, c.pincode, c.credit_limit AS "creditLimit", c.notes,
               COALESCE(b.balance, 0) AS balance
        FROM customers c
        LEFT JOIN customer_balances b ON b.customer_id = c.id
        WHERE c.deleted_at IS NULL
        ORDER BY c.name, c.id
+       LIMIT $1`,
+      [limit],
+    );
+  },
+
+  /** Balance is what the shop owes the supplier (credit - debit on their ledger). */
+  suppliers(tx: Tx, limit: number): Promise<ExportSupplierRow[]> {
+    return tx.many<ExportSupplierRow>(
+      `SELECT s.name, s.phone, s.email, s.gstin, s.state_code AS "stateCode",
+              s.address_line1 AS "addressLine1", s.address_line2 AS "addressLine2",
+              s.city, s.pincode, s.payment_terms_days AS "paymentTermsDays", s.notes,
+              COALESCE(b.balance, 0) AS balance
+       FROM suppliers s
+       LEFT JOIN supplier_balances b ON b.supplier_id = s.id
+       WHERE s.deleted_at IS NULL
+       ORDER BY s.name, s.id
        LIMIT $1`,
       [limit],
     );

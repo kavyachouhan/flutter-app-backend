@@ -113,6 +113,8 @@ export const ErrorCode = {
   IMPORT_COLUMN_UNMAPPED: 'IMPORT_COLUMN_UNMAPPED',
   /** The uploaded file could not be read as a spreadsheet. */
   IMPORT_UNREADABLE: 'IMPORT_UNREADABLE',
+  /** The spreadsheet carries macros, embedded objects, or expands far beyond its size. */
+  IMPORT_UNSAFE: 'IMPORT_UNSAFE',
 
   /** A push carried more operations than SYNC_PUSH_MAX_OPERATIONS. */
   SYNC_BATCH_TOO_LARGE: 'SYNC_BATCH_TOO_LARGE',

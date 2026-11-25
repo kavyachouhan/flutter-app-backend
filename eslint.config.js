@@ -62,6 +62,7 @@ export default tseslint.config(
       'src/config/env.ts',
       'src/db/migrate.ts',
       'src/db/bootstrap.ts',
+      'src/db/purge-deleted-accounts.ts',
       'tests/integration/setup/write-env-file.ts',
       'eslint.config.js',
     ],

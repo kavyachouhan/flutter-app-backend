@@ -25,7 +25,10 @@
  */
 import { Readable } from 'node:stream';
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { ErrorCode, UnprocessableError, ValidationError } from '../../lib/errors.js';
+import { checkFileSignature } from '../../lib/storage.js';
+import { assertSpreadsheetSafe, XLS_MACRO_SHEET_MESSAGE } from './file-safety.js';
 
 export interface SheetData {
   readonly headers: string[];
@@ -75,14 +78,30 @@ export async function readSpreadsheet(
   objectKey: string,
   maxRows: number,
 ): Promise<SheetData> {
-  const csv = objectKey.toLowerCase().endsWith('.csv');
+  const extension = objectKey.toLowerCase().split('.').pop() ?? '';
+  // The upload went straight to storage on a signed URL, so the bytes have
+  // not been looked at yet. They must be what the extension says — SheetJS in
+  // particular will happily read an HTML page or plain text named ".xls" —
+  // and a program or a script is refused outright.
+  const signatureProblem = checkFileSignature(extension, buffer.subarray(0, 4096));
+  if (signatureProblem) {
+    throw new UnprocessableError(
+      `${signatureProblem} Choose an Excel (.xlsx or .xls) or CSV file.`,
+      ErrorCode.IMPORT_UNSAFE,
+    );
+  }
+  // Before any parser touches it: a macro, an embedded object or a zip bomb
+  // is refused here rather than discovered inside the library.
+  assertSpreadsheetSafe(buffer, extension);
   try {
-    return csv ? await readCsv(buffer, maxRows) : await readXlsx(buffer, maxRows);
+    if (extension === 'csv') return await readCsv(buffer, maxRows);
+    if (extension === 'xls') return readXls(buffer, maxRows);
+    return await readXlsx(buffer, maxRows);
   } catch (error) {
     // A row-cap breach is a decision, not a parse failure; let it through.
     if (error instanceof ValidationError || error instanceof UnprocessableError) throw error;
     throw new UnprocessableError(
-      'That file could not be read as a spreadsheet. Save it as .xlsx or .csv and try again.',
+      'That file could not be read as a spreadsheet. Save it as .xlsx, .xls or .csv and try again.',
       ErrorCode.IMPORT_UNREADABLE,
       { cause: error },
     );
@@ -116,6 +135,107 @@ async function readXlsx(buffer: Buffer, maxRows: number): Promise<SheetData> {
     throw new UnprocessableError('That file has no sheets.', ErrorCode.IMPORT_UNREADABLE);
   }
   return walk(worksheet, maxRows);
+}
+
+/**
+ * The old Excel 97–2003 format, which Vyapar and other billing apps still
+ * export. ExcelJS cannot read it, so SheetJS does — first sheet only, the same
+ * rule as for .xlsx.
+ *
+ * Cells are converted by hand rather than through SheetJS's formatter: its
+ * "General" format writes a 12-digit phone number as 9.19877E+11, which would
+ * import as nonsense. A number is written out in full; only a cell formatted
+ * as a date becomes one.
+ */
+/** SheetJS's number-format helpers, which its own typings leave as `any`. */
+interface NumberFormats {
+  is_date(format: string | number): boolean;
+  parse_date_code(value: number): { y: number; m: number; d: number } | null;
+}
+const SSF = XLSX.SSF as unknown as NumberFormats;
+
+function readXls(buffer: Buffer, maxRows: number): SheetData {
+  const workbook = XLSX.read(buffer, {
+    type: 'buffer',
+    cellNF: true,
+    cellFormula: false,
+    cellHTML: false,
+    cellStyles: false,
+    bookVBA: true,
+  });
+  if (workbook.vbaraw) {
+    throw new UnprocessableError(XLS_MACRO_SHEET_MESSAGE, ErrorCode.IMPORT_UNSAFE);
+  }
+  const firstName = workbook.SheetNames[0];
+  const sheet = firstName === undefined ? undefined : workbook.Sheets[firstName];
+  if (!sheet || !sheet['!ref']) {
+    throw new UnprocessableError('That file has no sheets.', ErrorCode.IMPORT_UNREADABLE);
+  }
+  // Excel 4.0 macro sheets are sheets, not storages, so file-safety cannot see them.
+  for (const name of workbook.SheetNames) {
+    if ((workbook.Sheets[name] as { '!type'?: string } | undefined)?.['!type'] === 'macro') {
+      throw new UnprocessableError(XLS_MACRO_SHEET_MESSAGE, ErrorCode.IMPORT_UNSAFE);
+    }
+  }
+
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  let headers: string[] | null = null;
+  let width = 0;
+  const rows: { rowNo: number; cells: string[] }[] = [];
+
+  for (let r = range.s.r; r <= range.e.r; r += 1) {
+    const read = (c: number) =>
+      xlsCellToText(sheet[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined);
+    if (headers === null) {
+      const candidate: string[] = [];
+      for (let c = range.s.c; c <= range.e.c; c += 1) candidate.push(read(c));
+      // Trailing blank header cells are not columns.
+      while (candidate.length > 0 && candidate[candidate.length - 1] === '') candidate.pop();
+      if (!isBlank(candidate)) {
+        headers = candidate;
+        width = candidate.length;
+      }
+      continue;
+    }
+    const cells: string[] = [];
+    for (let c = range.s.c; c < range.s.c + width; c += 1) cells.push(read(c));
+    if (isBlank(cells)) continue;
+    assertWithinCap(rows.length + 1, maxRows);
+    rows.push({ rowNo: r + 1, cells });
+  }
+
+  if (headers === null) {
+    throw new UnprocessableError('That file has no header row.', ErrorCode.IMPORT_COLUMN_UNMAPPED);
+  }
+  return { headers, rows };
+}
+
+function xlsCellToText(cell: XLSX.CellObject | undefined): string {
+  if (!cell || cell.v === undefined || cell.v === null) return '';
+  switch (cell.t) {
+    case 's':
+      return String(cell.v).trim();
+    case 'b':
+      return cell.v ? 'TRUE' : 'FALSE';
+    case 'e':
+    case 'z':
+      return '';
+    case 'd':
+      return cell.v instanceof Date ? cell.v.toISOString().slice(0, 10) : String(cell.v);
+    case 'n': {
+      const value = Number(cell.v);
+      if (cell.z !== undefined && SSF.is_date(cell.z)) {
+        const parts = SSF.parse_date_code(value);
+        if (parts) {
+          const pad = (n: number) => String(n).padStart(2, '0');
+          return `${parts.y}-${pad(parts.m)}-${pad(parts.d)}`;
+        }
+      }
+      return Number.isInteger(value) ? value.toFixed(0) : String(value);
+    }
+    default:
+      return String(cell.v).trim();
+  }
 }
 
 async function readCsv(buffer: Buffer, maxRows: number): Promise<SheetData> {
