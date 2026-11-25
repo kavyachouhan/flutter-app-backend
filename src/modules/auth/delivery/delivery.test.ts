@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakeProvider } from './providers/fake.js';
 import { createMsg91Provider } from './providers/msg91.js';
 import { createTwilioProvider } from './providers/twilio.js';
+import { createTwoFactorProvider } from './providers/twofactor.js';
 import { __testing, getOtpDeliveryProvider } from './registry.js';
 import {
   DeliveryError,
@@ -83,7 +84,13 @@ describe('registry', () => {
   });
 
   it('has a factory for every provider the environment schema accepts', () => {
-    expect(__testing.providerNames.sort()).toEqual(['console', 'fake', 'msg91', 'twilio']);
+    expect(__testing.providerNames.sort()).toEqual([
+      'console',
+      'fake',
+      'msg91',
+      'twilio',
+      'twofactor',
+    ]);
   });
 });
 
@@ -208,5 +215,67 @@ describe('msg91 provider', () => {
       createMsg91Provider(settings, stubFetch(jsonResponse(429, {}))).sendOtp(INPUT),
     );
     expect(error.retryable).toBe(true);
+  });
+});
+
+describe('2factor provider', () => {
+  const settings = {
+    baseUrl: 'https://2factor.invalid/API/V1/',
+    apiKey: 'secret-key',
+    templateName: 'OTP1',
+    timeoutMs: 1000,
+  };
+
+  it('sends key, phone, code and template in the path, as 2Factor expects', async () => {
+    const { fetch, calls } = stubFetch(
+      jsonResponse(200, { Status: 'Success', Details: 'session-1' }),
+    );
+    await expect(createTwoFactorProvider(settings, { fetch }).sendOtp(INPUT)).resolves.toEqual({
+      provider: 'twofactor',
+      channel: 'sms',
+      providerMessageId: 'session-1',
+    });
+    expect(calls[0]!.url).toBe(
+      'https://2factor.invalid/API/V1/secret-key/SMS/919876543210/482913/OTP1',
+    );
+    expect(calls[0]!.init?.method).toBe('GET');
+  });
+
+  it('treats an in-body error on HTTP 200 as terminal', async () => {
+    const error = await rejection(
+      createTwoFactorProvider(
+        settings,
+        stubFetch(jsonResponse(200, { Status: 'Error', Details: 'Invalid Phone Number' })),
+      ).sendOtp(INPUT),
+    );
+    expect(error).toMatchObject({ provider: 'twofactor', retryable: false });
+  });
+
+  it('a refused key or number is terminal; throttling and outages are retryable', async () => {
+    const refused = await rejection(
+      createTwoFactorProvider(
+        settings,
+        stubFetch(jsonResponse(400, { Status: 'Error', Details: 'Invalid API Key' })),
+      ).sendOtp(INPUT),
+    );
+    expect(refused.retryable).toBe(false);
+    const busy = await rejection(
+      createTwoFactorProvider(settings, stubFetch(jsonResponse(503, {}))).sendOtp(INPUT),
+    );
+    expect(busy.retryable).toBe(true);
+  });
+
+  // The key is in the URL, so nothing the error carries may contain it.
+  it('never puts the API key into an error, even when the network fails', async () => {
+    const error = await rejection(
+      createTwoFactorProvider(
+        settings,
+        stubFetch(new TypeError('fetch failed for https://2factor.invalid/secret-key')),
+      ).sendOtp(INPUT),
+    );
+    expect(error.retryable).toBe(true);
+    expect(JSON.stringify({ message: error.message, cause: error.cause })).not.toContain(
+      'secret-key',
+    );
   });
 });

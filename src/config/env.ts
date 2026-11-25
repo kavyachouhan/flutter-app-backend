@@ -156,7 +156,7 @@ const envSchema = z.object({
   // The vendor is expected to change; a provider is one file under
   // src/modules/auth/delivery/providers plus its own keys below. `console`
   // and `fake` never deliver and are refused in production.
-  OTP_DELIVERY_PROVIDER: required(z.enum(['console', 'fake', 'twilio', 'msg91'])),
+  OTP_DELIVERY_PROVIDER: required(z.enum(['console', 'fake', 'twilio', 'msg91', 'twofactor'])),
   OTP_DELIVERY_TIMEOUT_MS: required(positiveInt),
 
   TWILIO_API_BASE_URL: optional(z.string().url()),
@@ -168,6 +168,11 @@ const envSchema = z.object({
   MSG91_API_BASE_URL: optional(z.string().url()),
   MSG91_AUTH_KEY: optional(z.string().min(1)),
   MSG91_TEMPLATE_ID: optional(z.string().min(1)),
+
+  // 2Factor.in. The key is a secret: it travels in the request path.
+  TWOFACTOR_API_BASE_URL: optional(z.string().url()),
+  TWOFACTOR_API_KEY: optional(z.string().min(1)),
+  TWOFACTOR_OTP_TEMPLATE: optional(z.string().regex(/^[A-Za-z0-9_-]+$/)),
 
   // Development-only; refused under APP_ENV=production.
   AUTH_DEV_BYPASS: required(bool),
@@ -305,6 +310,7 @@ const OTP_PROVIDER_REQUIRED_KEYS = {
     'TWILIO_OTP_MESSAGE_TEMPLATE',
   ],
   msg91: ['MSG91_API_BASE_URL', 'MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'],
+  twofactor: ['TWOFACTOR_API_KEY', 'TWOFACTOR_OTP_TEMPLATE'],
 } as const satisfies Record<RawEnv['OTP_DELIVERY_PROVIDER'], readonly (keyof RawEnv)[]>;
 
 /** Providers that only pretend to deliver. */
