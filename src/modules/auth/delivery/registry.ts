@@ -11,6 +11,7 @@ import { createConsoleProvider } from './providers/console.js';
 import { fakeOtpDelivery } from './providers/fake.js';
 import { createMsg91Provider } from './providers/msg91.js';
 import { createTwilioProvider } from './providers/twilio.js';
+import { createTwoFactorProvider } from './providers/twofactor.js';
 import type { OtpDeliveryProvider } from './types.js';
 
 type ProviderName = typeof env.OTP_DELIVERY_PROVIDER;
@@ -40,6 +41,13 @@ const FACTORIES: Record<ProviderName, () => OtpDeliveryProvider> = {
       baseUrl: configured('MSG91_API_BASE_URL', env.MSG91_API_BASE_URL),
       authKey: configured('MSG91_AUTH_KEY', env.MSG91_AUTH_KEY),
       templateId: configured('MSG91_TEMPLATE_ID', env.MSG91_TEMPLATE_ID),
+      timeoutMs: env.OTP_DELIVERY_TIMEOUT_MS,
+    }),
+  twofactor: () =>
+    createTwoFactorProvider({
+      baseUrl: env.TWOFACTOR_API_BASE_URL ?? 'https://2factor.in/API/V1',
+      apiKey: configured('TWOFACTOR_API_KEY', env.TWOFACTOR_API_KEY),
+      templateName: configured('TWOFACTOR_OTP_TEMPLATE', env.TWOFACTOR_OTP_TEMPLATE),
       timeoutMs: env.OTP_DELIVERY_TIMEOUT_MS,
     }),
 };

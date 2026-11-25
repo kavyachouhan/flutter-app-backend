@@ -85,6 +85,11 @@ const envSchema = z.object({
   // --- Bulk import ----------------------------------------------------------
   // Ingest reads the file once; analyse and apply then advance in chunks, so
   // these bound one request's work, not the size of an import.
+  // When the API purges businesses whose owners deleted them: "HH:MM" Indian
+  // time, daily (default 02:00), or "off". See modules/account/purge-scheduler.ts.
+  ACCOUNT_PURGE_DAILY_AT: optional(
+    z.string().regex(/^(off|([01]\d|2[0-3]):[0-5]\d)$/, 'must be HH:MM (24-hour) or off'),
+  ),
   IMPORT_MAX_ROWS: required(positiveInt),
   IMPORT_ANALYSE_CHUNK_ROWS: required(positiveInt),
   IMPORT_APPLY_CHUNK_ROWS: required(positiveInt),
@@ -151,7 +156,7 @@ const envSchema = z.object({
   // The vendor is expected to change; a provider is one file under
   // src/modules/auth/delivery/providers plus its own keys below. `console`
   // and `fake` never deliver and are refused in production.
-  OTP_DELIVERY_PROVIDER: required(z.enum(['console', 'fake', 'twilio', 'msg91'])),
+  OTP_DELIVERY_PROVIDER: required(z.enum(['console', 'fake', 'twilio', 'msg91', 'twofactor'])),
   OTP_DELIVERY_TIMEOUT_MS: required(positiveInt),
 
   TWILIO_API_BASE_URL: optional(z.string().url()),
@@ -163,6 +168,15 @@ const envSchema = z.object({
   MSG91_API_BASE_URL: optional(z.string().url()),
   MSG91_AUTH_KEY: optional(z.string().min(1)),
   MSG91_TEMPLATE_ID: optional(z.string().min(1)),
+
+  // 2Factor.in. The key is a secret: it travels in the request path.
+  TWOFACTOR_API_BASE_URL: optional(z.string().url()),
+  TWOFACTOR_API_KEY: optional(z.string().min(1)),
+  TWOFACTOR_OTP_TEMPLATE: optional(z.string().regex(/^[A-Za-z0-9_-]+$/)),
+
+  // Demo switch (modules/auth/demo-otp.ts): true = no SMS, the code is 000000;
+  // false = a real code by SMS. Refused in production.
+  DEMO_OTP_ENABLED: optional(bool),
 
   // Development-only; refused under APP_ENV=production.
   AUTH_DEV_BYPASS: required(bool),
@@ -300,6 +314,7 @@ const OTP_PROVIDER_REQUIRED_KEYS = {
     'TWILIO_OTP_MESSAGE_TEMPLATE',
   ],
   msg91: ['MSG91_API_BASE_URL', 'MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID'],
+  twofactor: ['TWOFACTOR_API_KEY', 'TWOFACTOR_OTP_TEMPLATE'],
 } as const satisfies Record<RawEnv['OTP_DELIVERY_PROVIDER'], readonly (keyof RawEnv)[]>;
 
 /** Providers that only pretend to deliver. */
@@ -348,6 +363,9 @@ function assertProductionSafety(parsed: RawEnv): void {
   }
   if (parsed.AUTH_DEV_FIXED_OTP !== undefined) {
     violations.push('AUTH_DEV_FIXED_OTP is an OTP accepted for every phone; it must be unset.');
+  }
+  if (parsed.DEMO_OTP_ENABLED) {
+    violations.push('DEMO_OTP_ENABLED makes 000000 sign in to every number; it must be false.');
   }
   if (NON_DELIVERING_OTP_PROVIDERS.includes(parsed.OTP_DELIVERY_PROVIDER)) {
     violations.push(

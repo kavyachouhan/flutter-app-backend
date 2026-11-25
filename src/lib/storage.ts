@@ -116,8 +116,9 @@ const POLICIES: Readonly<Record<ObjectKind, KindPolicy>> = {
   // JSON as well as spreadsheets, because a GSTR-2B statement is downloaded
   // from the GST portal as JSON. It is parsed, never served back, so the
   // content type is only ever used to pick an extension and bound the size.
+  // .xls as well, because Vyapar and other billing apps still export it.
   import: {
-    types: { ...SPREADSHEET_TYPES, 'application/json': 'json' },
+    types: { ...SPREADSHEET_TYPES, 'application/vnd.ms-excel': 'xls', 'application/json': 'json' },
     maxBytes: 10 * MB,
     clientSignable: true,
   },
@@ -437,7 +438,9 @@ export function checkFileSignature(extension: string, head: Uint8Array): string 
         ? null
         : 'That is not a valid PNG picture.';
     case 'webp':
-      return ascii(head, 'RIFF') && ascii(head, 'WEBP', 8) ? null : 'That is not a valid WebP picture.';
+      return ascii(head, 'RIFF') && ascii(head, 'WEBP', 8)
+        ? null
+        : 'That is not a valid WebP picture.';
     case 'pdf': {
       const limit = Math.min(head.length, 1024);
       for (let i = 0; i + 5 <= limit; i += 1) if (ascii(head, '%PDF-', i)) return null;
@@ -503,7 +506,8 @@ export async function verifyUploadedObject(
       details: { objectKey },
     });
   }
-  if (!response.ok) throw new DependencyError('object storage', { details: { status: response.status } });
+  if (!response.ok)
+    throw new DependencyError('object storage', { details: { status: response.status } });
 
   // A ranged read answers `bytes 0-4095/TOTAL`; a short file answers whole.
   const range = response.headers.get('content-range');
@@ -537,6 +541,41 @@ export async function remove(objectKey: string): Promise<void> {
   } catch {
     log.warn({ objectKey }, 'Could not remove storage object; it is now orphaned');
   }
+}
+
+/**
+ * Deletes every stored file of a business — for the account purge only, run
+ * by an operator outside any request (so no tenant context is checked).
+ * Keys are `{tenantId}/{kind}/{file}`, so listing each kind's folder finds
+ * them all. Returns how many files were deleted.
+ */
+export async function removeAllForTenant(tenantId: string): Promise<number> {
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId)) throw new Error('removeAllForTenant needs a tenant id');
+  const bucket = env.SUPABASE_STORAGE_BUCKET;
+  let removed = 0;
+  for (const kind of OBJECT_KINDS) {
+    const prefix = `${tenantId}/${kind}`;
+    for (;;) {
+      // Always offset 0: each pass deletes what it listed, so the next page moves up.
+      const listed = await call(`/object/list/${bucket}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prefix, limit: 1000, offset: 0 }),
+      });
+      const names = ((await listed.json()) as { name?: string; id?: string | null }[])
+        // A null id is a "folder" placeholder, not a file.
+        .filter((o) => o.name && o.id !== null)
+        .map((o) => `${prefix}/${o.name}`);
+      if (names.length === 0) break;
+      await call(`/object/${bucket}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prefixes: names }),
+      });
+      removed += names.length;
+    }
+  }
+  return removed;
 }
 
 /** Each path segment is encoded; the slashes between them are structural. */

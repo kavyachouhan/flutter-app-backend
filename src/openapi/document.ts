@@ -14,6 +14,7 @@ import '../modules/health/health.openapi.js';
 import '../modules/auth/auth.openapi.js';
 import '../modules/tenants/tenants.openapi.js';
 import '../modules/members/members.openapi.js';
+import '../modules/account/account.openapi.js';
 import '../modules/devices/devices.openapi.js';
 import '../modules/outlets/outlets.openapi.js';
 import '../modules/catalogue/catalogue.openapi.js';
@@ -73,6 +74,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
       { name: 'Onboarding', description: 'Creating and choosing a business (identity token).' },
       { name: 'Tenant', description: 'The current business and its subscription.' },
       { name: 'Members', description: 'Staff and roles.' },
+      { name: 'Account', description: 'Deleting the business or your own sign-in.' },
       { name: 'Devices', description: 'Registered devices and their outlet/counter binding.' },
       { name: 'Outlets', description: 'Outlets (branches) and counters (tills).' },
       { name: 'Catalogue', description: 'Categories, items and barcodes.' },

@@ -23,6 +23,8 @@
     "migrate:status": "tsx --env-file=.env.development src/db/migrate.ts status",
     "db:bootstrap": "tsx --env-file=.env.development src/db/bootstrap.ts",
     "migrate:deploy": "node dist/db/migrate.js up",
+    "purge:accounts": "tsx --env-file=.env.development src/db/purge-deleted-accounts.ts",
+    "purge:accounts:deploy": "node dist/db/purge-deleted-accounts.js",
     "db:bootstrap:deploy": "node dist/db/bootstrap.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -48,6 +50,7 @@
     "rate-limiter-flexible": "^5.0.4",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.0.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.24.1"
   },
   "devDependencies": {

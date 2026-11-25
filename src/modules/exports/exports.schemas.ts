@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { LABEL_TEMPLATE_KEYS } from '../../domain/labels/templates.js';
 import { isoDate } from '../../lib/validators.js';
 
-export const EXPORT_KINDS = ['items', 'customers', 'stock', 'invoices'] as const;
+export const EXPORT_KINDS = ['items', 'customers', 'suppliers', 'stock', 'invoices'] as const;
 
 export const createExportBody = z
   .object({

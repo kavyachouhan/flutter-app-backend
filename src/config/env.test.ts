@@ -70,6 +70,7 @@ describe('production safety gate', () => {
     ['a wildcard CORS origin', { CORS_ALLOWED_ORIGINS: 'https://app.invalid,*' }, /CORS/],
     ['a non-TLS database', { DATABASE_SSL: 'false' }, /DATABASE_SSL/],
     ['pretty logs', { LOG_PRETTY: 'true' }, /LOG_PRETTY/],
+    ['the demo switch', { DEMO_OTP_ENABLED: 'true' }, /DEMO_OTP_ENABLED/],
   ])('refuses %s', (_label, overrides, message) => {
     expect(production(overrides)).toThrow(message);
   });

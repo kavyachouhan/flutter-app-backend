@@ -16,6 +16,7 @@ import {
   getOtpDeliveryProvider,
   type OtpDeliveryChannel,
 } from './delivery/index.js';
+import { demoOtpCode, demoOtpOn } from './demo-otp.js';
 import { maskPhone } from './phone.js';
 
 const log = createLogger('otp');
@@ -62,6 +63,13 @@ export async function issueOtp(phone: string): Promise<OtpIssued> {
     );
     if (acquired !== 'OK') {
       throw new RateLimitError(Math.max(await redis.ttl(cooldownKey(phone)), 1));
+    }
+
+    // Demo switch on: no SMS goes out and the code is 000000. The resend
+    // wait above still applies, so the app behaves exactly as with a real code.
+    if (demoOtpOn()) {
+      log.info({ provider: 'demo' }, 'Demo OTP: no SMS sent; the demo code signs in');
+      return;
     }
 
     const code = String(randomInt(10 ** env.OTP_LENGTH)).padStart(env.OTP_LENGTH, '0');
@@ -125,6 +133,13 @@ export async function issueOtp(phone: string): Promise<OtpIssued> {
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<void> {
+  if (demoOtpOn()) {
+    const expected = Buffer.from(demoOtpCode());
+    const given = Buffer.from(code);
+    if (given.length === expected.length && timingSafeEqual(given, expected)) return;
+    // With the switch on no real code was sent, so nothing else can match.
+    throw new AuthError('The code is incorrect.', ErrorCode.OTP_INVALID);
+  }
   if (
     env.AUTH_DEV_BYPASS &&
     env.AUTH_DEV_FIXED_OTP !== undefined &&

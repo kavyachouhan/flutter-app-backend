@@ -94,3 +94,155 @@ describe('parseItemRow', () => {
     expect(row.values['salePrice']).toBeNull();
   });
 });
+
+describe('item files exported by other billing apps', () => {
+  /** Vyapar's item export header row, exactly. */
+  const VYAPAR_ITEM_HEADERS = [
+    'Item Code',
+    'Item Name',
+    'HSN',
+    'Sale Price',
+    'Purchase Price',
+    'Discount Type',
+    'Sale Discount',
+    'Current Stock Quantity',
+    'Minimum Stock Quantity',
+    'Item Location',
+    'Tax Rate',
+    'Tax Inclusive',
+  ];
+
+  it('matches every column we have a field for', () => {
+    const match = matchHeaders(VYAPAR_ITEM_HEADERS);
+    expect(match.map).toEqual({
+      code: 0,
+      name: 1,
+      hsnCode: 2,
+      salePrice: 3,
+      purchasePrice: 4,
+      discountType: 5,
+      discountPercent: 6,
+      openingStock: 7,
+      reorderLevel: 8,
+      taxRatePercent: 10,
+      pricesIncludeTax: 11,
+    });
+    expect(match.unmatched).toEqual(['Item Location']);
+  });
+
+  const { map } = matchHeaders(VYAPAR_ITEM_HEADERS);
+  const row = (cells: (string | null)[]) => parseItemRow(cells, map);
+
+  it('reads a Vyapar row: GST@5%, Tax Inclusive N, stock below zero', () => {
+    const parsed = row([
+      'a101',
+      'Item 1',
+      '0902',
+      '20',
+      '10',
+      'Discount %',
+      '0',
+      '-10',
+      '0',
+      'Store 1',
+      'GST@5%',
+      'N',
+    ]);
+    expect(parsed.errors).toEqual({});
+    expect(parsed.values).toMatchObject({
+      code: 'a101',
+      salePrice: 2000,
+      purchasePrice: 1000,
+      taxRatePercent: 5,
+      pricesIncludeTax: false,
+      openingStock: -10000,
+      // A zero discount is no discount, so a re-import reports no change.
+      discountPercent: null,
+    });
+    expect('discountType' in parsed.values).toBe(false);
+  });
+
+  it('turns a rupee discount into a percentage of the sale price, and says so', () => {
+    const parsed = row([
+      'a',
+      'Item',
+      null,
+      '5',
+      null,
+      'Discount Amount',
+      '1',
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(parsed.values['discountPercent']).toBe(20);
+    expect(parsed.notes).toEqual(['Discount of ₹1 saved as 20% of the sale price']);
+  });
+
+  it('keeps a percentage discount as it is', () => {
+    const parsed = row([
+      'a',
+      'Item',
+      null,
+      '10',
+      null,
+      'Discount %',
+      '2',
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(parsed.values['discountPercent']).toBe(2);
+    expect(parsed.notes).toEqual([]);
+  });
+
+  it('refuses a rupee discount it cannot turn into a percentage', () => {
+    expect(
+      row(['a', 'Item', null, null, null, 'Discount Amount', '5', null, null, null, null, null])
+        .errors['discountPercent'],
+    ).toBeDefined();
+    expect(
+      row(['a', 'Item', null, '5', null, 'Discount Amount', '6', null, null, null, null, null])
+        .errors['discountPercent'],
+    ).toBeDefined();
+    expect(
+      row(['a', 'Item', null, '5', null, 'Discount %', '150', null, null, null, null, null]).errors[
+        'discountPercent'
+      ],
+    ).toBeDefined();
+  });
+});
+
+describe('rules the database enforces, caught while checking rows', () => {
+  const { map } = matchHeaders(['Name', 'HSN', 'Type', 'Track stock', 'Opening stock']);
+  const parse = (cells: (string | null)[]) => parseItemRow(cells, map);
+
+  it('REGRESSION: a service is saved without stock tracking — the database refuses a service that tracks it', () => {
+    const parsed = parse(['Home delivery', null, 'Service', null, '5']);
+    expect(parsed.errors).toEqual({});
+    expect(parsed.values['trackStock']).toBe(false);
+    expect(parsed.values['openingStock']).toBeNull();
+    expect(parsed.notes).toEqual(['A service has no stock, so its opening stock is not recorded']);
+  });
+
+  it('refuses a service that the file says tracks stock', () => {
+    expect(
+      parse(['Home delivery', null, 'Service', 'Yes', null]).errors['trackStock'],
+    ).toBeDefined();
+  });
+
+  it('puts back the leading zero Excel drops from an HSN code', () => {
+    expect(parse(['Tea', '902', null, null, null]).values['hsnCode']).toBe('0902');
+    expect(parse(['Tea', '30049099', null, null, null]).values['hsnCode']).toBe('30049099');
+  });
+
+  it("refuses an HSN that is not 4 to 8 digits, like Vyapar's sample H001", () => {
+    expect(parse(['Tea', 'H001', null, null, null]).errors['hsnCode']).toBeDefined();
+    expect(parse(['Tea', '12', null, null, null]).errors['hsnCode']).toBeDefined();
+    expect(parse(['Tea', '123456789', null, null, null]).errors['hsnCode']).toBeDefined();
+  });
+});

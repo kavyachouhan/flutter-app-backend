@@ -11,8 +11,11 @@
  */
 import { env } from '../../config/env.js';
 import { withReadTransaction, type Tx } from '../../db/tx.js';
+import type { ColumnDefinition } from '../../domain/import/columns.js';
 import { ITEM_COLUMNS } from '../../domain/import/item-columns.js';
+import { CUSTOMER_COLUMNS, SUPPLIER_COLUMNS } from '../../domain/import/party-columns.js';
 import { resolveLabels } from '../../domain/labels/resolve.js';
+import { stateNameFor } from '../../domain/print/states.js';
 import { LABEL_TEMPLATES, labelsPerPage } from '../../domain/labels/templates.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { upload } from '../../lib/storage.js';
@@ -48,25 +51,66 @@ const MAX_ROWS = env.IMPORT_MAX_ROWS;
  * that silently re-applies an opening balance on every re-import would be a
  * quiet way to corrupt stock.
  */
-const ROUND_TRIP_SKIP = new Set(['openingStock']);
-
-function itemSheetColumns(): SheetColumn[] {
-  return ITEM_COLUMNS.filter((column) => !ROUND_TRIP_SKIP.has(column.key)).map((column) => ({
-    header: column.header,
-    key: column.key,
-    format:
-      column.type === 'money'
-        ? ('money' as const)
-        : column.type === 'quantity'
-          ? ('quantity' as const)
-          : column.type === 'percent'
-            ? ('number' as const)
-            : ('text' as const),
-  }));
+function sheetColumnsFrom(
+  columns: readonly ColumnDefinition[],
+  headerFor: (column: ColumnDefinition) => string = (column) => column.header,
+): SheetColumn[] {
+  // Create-only columns (opening stock, opening date) are instructions
+  // rather than facts; a transient one (discount type) is never stored.
+  return columns
+    .filter(
+      (column) => !column.transient && !(column.createOnly && column.key !== 'openingBalance'),
+    )
+    .map((column) => ({
+      header: headerFor(column),
+      key: column.key,
+      format:
+        column.type === 'money' || column.type === 'signedMoney'
+          ? ('money' as const)
+          : column.type === 'quantity'
+            ? ('quantity' as const)
+            : column.type === 'percent' || column.type === 'decimal' || column.type === 'days'
+              ? ('number' as const)
+              : ('text' as const),
+      ...(column.key === 'name' ? { width: 28 } : {}),
+    }));
 }
+
+const itemSheetColumns = () => sheetColumnsFrom(ITEM_COLUMNS);
+
+/**
+ * A party's current balance is exported where the importer reads an opening
+ * balance, under a header that says what it is today. Importing the file into
+ * another business carries the balance over; re-importing it into this one
+ * leaves existing parties' balances alone, because an opening balance only
+ * applies to a party being created.
+ */
+const customerSheetColumns = () =>
+  sheetColumnsFrom(CUSTOMER_COLUMNS, (c) =>
+    c.key === 'openingBalance' ? 'Balance due' : c.header,
+  );
+const supplierSheetColumns = () =>
+  sheetColumnsFrom(SUPPLIER_COLUMNS, (c) =>
+    c.key === 'openingBalance' ? 'Balance payable' : c.header,
+  );
 
 export function itemExportHeaders(): string[] {
   return itemSheetColumns().map((column) => column.header);
+}
+
+export function customerExportHeaders(): string[] {
+  return customerSheetColumns().map((column) => column.header);
+}
+
+export function supplierExportHeaders(): string[] {
+  return supplierSheetColumns().map((column) => column.header);
+}
+
+/** A stored state code, written the way a person reads it: "29 - Karnataka". */
+function stateLabel(code: string | null): string | null {
+  if (!code) return null;
+  const name = stateNameFor(code);
+  return name ? `${code} - ${name}` : code;
 }
 
 async function itemsSheet(tx: Tx, includeInactive: boolean): Promise<SheetSpec> {
@@ -92,6 +136,8 @@ async function itemsSheet(tx: Tx, includeInactive: boolean): Promise<SheetSpec> 
       itemType: row.itemType === 'service' ? 'Service' : 'Goods',
       // Written the way the importer reads it back.
       trackStock: row.trackStock ? 'Yes' : 'No',
+      pricesIncludeTax: row.pricesIncludeTax ? 'Yes' : 'No',
+      discountPercent: row.discountPercent === null ? null : Number(row.discountPercent),
     })),
   };
 }
@@ -100,22 +146,25 @@ async function customersSheet(tx: Tx): Promise<SheetSpec> {
   const rows = await exportsRepository.customers(tx, MAX_ROWS);
   return {
     name: 'Customers',
-    columns: [
-      { header: 'Name', key: 'name', format: 'text', width: 28 },
-      { header: 'Phone', key: 'phone', format: 'text' },
-      { header: 'Email', key: 'email', format: 'text', width: 24 },
-      { header: 'GSTIN', key: 'gstin', format: 'text', width: 18 },
-      { header: 'State code', key: 'stateCode', format: 'text' },
-      { header: 'Address', key: 'addressLine1', format: 'text', width: 30 },
-      { header: 'City', key: 'city', format: 'text' },
-      { header: 'Pincode', key: 'pincode', format: 'text' },
-      { header: 'Credit limit', key: 'creditLimit', format: 'money' },
-      { header: 'Balance due', key: 'balance', format: 'money' },
-    ],
+    columns: customerSheetColumns(),
     rows: rows.map((row) => ({
       ...row,
+      stateCode: stateLabel(row.stateCode),
       creditLimit: paiseToNumber(row.creditLimit),
-      balance: paiseToNumber(row.balance),
+      openingBalance: paiseToNumber(row.balance),
+    })),
+  };
+}
+
+async function suppliersSheet(tx: Tx): Promise<SheetSpec> {
+  const rows = await exportsRepository.suppliers(tx, MAX_ROWS);
+  return {
+    name: 'Suppliers',
+    columns: supplierSheetColumns(),
+    rows: rows.map((row) => ({
+      ...row,
+      stateCode: stateLabel(row.stateCode),
+      openingBalance: paiseToNumber(row.balance),
     })),
   };
 }
@@ -235,6 +284,8 @@ function buildSheet(tx: Tx, body: CreateExportBody): Promise<SheetSpec> {
       return itemsSheet(tx, body.includeInactive);
     case 'customers':
       return customersSheet(tx);
+    case 'suppliers':
+      return suppliersSheet(tx);
     case 'stock':
       // The schema guarantees this is present for a stock export.
       return stockSheet(tx, body.outletId as string);

@@ -65,14 +65,24 @@ describe('createImportBody schema validation', () => {
     expect(csvParsed.contentType).toBe('text/csv');
   });
 
-  it('rejects unsupported content types (e.g. legacy xls or pdf)', () => {
-    expect(() =>
-      createImportBody.parse({
-        ...validPayload,
-        contentType: 'application/vnd.ms-excel',
-      }),
-    ).toThrow();
+  it('accepts the old .xls format, which Vyapar and other billing apps still export', () => {
+    const parsed = createImportBody.parse({
+      ...validPayload,
+      contentType: 'application/vnd.ms-excel',
+    });
+    expect(parsed.contentType).toBe('application/vnd.ms-excel');
+  });
 
+  it('accepts customer and supplier imports, and an outlet for opening stock', () => {
+    for (const kind of ['customers', 'suppliers'] as const) {
+      expect(createImportBody.parse({ ...validPayload, kind }).kind).toBe(kind);
+    }
+    const outletId = '018f3a1c-7d2e-7b3a-9c4d-5e6f7a8b9c0d';
+    expect(createImportBody.parse({ ...validPayload, outletId }).outletId).toBe(outletId);
+    expect(() => createImportBody.parse({ ...validPayload, kind: 'opening_stock' })).toThrow();
+  });
+
+  it('rejects content types that are not spreadsheets (e.g. pdf)', () => {
     expect(() =>
       createImportBody.parse({
         ...validPayload,
