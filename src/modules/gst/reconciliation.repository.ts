@@ -2,6 +2,9 @@ import type { Tx } from '../../db/tx.js';
 import type { BookInvoice, MatchType, PortalInvoice } from '../../domain/gst/reconcile.js';
 import type { Cursor } from '../../lib/pagination.js';
 
+/** 2B document types that are supplier invoices, matched against purchase bills. */
+export const MATCHABLE_2B_TYPES = ['b2b', 'b2b_amended', 'ecom', 'ecom_amended'] as const;
+
 export interface Gstr2bImportRow {
   id: string;
   gstin: string;
@@ -187,14 +190,25 @@ export const reconciliationRepository = {
     );
   },
 
-  /** The portal's rows, in the shape the pure matcher takes. */
+  /**
+   * The portal's invoice rows, in the shape the pure matcher takes.
+   *
+   * Only supplier invoices (B2B and e-commerce, with their amendments) are matched against
+   * purchase bills. Credit and debit notes, ISD documents and bills of entry are different
+   * documents: matching them to bills by number and amount paired a supplier's credit note
+   * with an unrelated bill. They stay in the import and still count in the 2B credit
+   * (`returnsRepository.gstr2bCredit`); matching them to purchase debit notes, ISD
+   * receipts and bills of entry comes with the ITC engine.
+   */
   portalInvoices(tx: Tx, importId: string): Promise<PortalInvoice[]> {
     return tx.many<PortalInvoice>(
       `SELECT id, supplier_gstin AS "supplierGstin", invoice_no AS "invoiceNo",
               invoice_date AS "invoiceDate", taxable_amount AS "taxableAmount",
               (cgst + sgst + igst + cess) AS "totalTax"
-       FROM gstr2b_invoices WHERE import_id = $1 ORDER BY row_no`,
-      [importId],
+       FROM gstr2b_invoices
+       WHERE import_id = $1 AND document_type IN ($2, $3, $4, $5)
+       ORDER BY row_no`,
+      [importId, ...MATCHABLE_2B_TYPES],
     );
   },
 
@@ -207,16 +221,24 @@ export const reconciliationRepository = {
    * and an unknown invoice in the next. One month either side catches the
    * ordinary late filing without pulling in a year of history.
    */
-  bookInvoices(tx: Tx, from: string, to: string): Promise<BookInvoice[]> {
+  /**
+   * Bills received by `gstin` only (a 2B statement is per registration; a multi-GSTIN
+   * tenant's other registrations' bills would otherwise show as "missing in 2B"). Bills with
+   * no resolved registration (legacy) are kept. Import bills (with a bill of entry) are left
+   * out: they appear in 2B's IMPG section, which is not matched against invoices.
+   */
+  bookInvoices(tx: Tx, gstin: string, from: string, to: string): Promise<BookInvoice[]> {
     return tx.many<BookInvoice>(
-      `SELECT id, supplier_gstin AS "supplierGstin", supplier_invoice_no AS "supplierInvoiceNo",
-              supplier_invoice_date AS "supplierInvoiceDate", taxable_amount AS "taxableAmount",
-              (total_cgst + total_sgst + total_igst + total_cess) AS "totalTax"
-       FROM purchase_bills
-       WHERE status <> 'void'
-         AND supplier_invoice_date >= $1::date AND supplier_invoice_date <= $2::date
-       ORDER BY supplier_invoice_date, id`,
-      [from, to],
+      `SELECT b.id, b.supplier_gstin AS "supplierGstin", b.supplier_invoice_no AS "supplierInvoiceNo",
+              b.supplier_invoice_date AS "supplierInvoiceDate", b.taxable_amount AS "taxableAmount",
+              (b.total_cgst + b.total_sgst + b.total_igst + b.total_cess) AS "totalTax"
+       FROM purchase_bills b
+       LEFT JOIN gst_registrations reg ON reg.id = b.registration_id
+       WHERE b.status <> 'void' AND b.boe_number IS NULL
+         AND (reg.gstin IS NULL OR reg.gstin = $1)
+         AND b.supplier_invoice_date >= $2::date AND b.supplier_invoice_date <= $3::date
+       ORDER BY b.supplier_invoice_date, b.id`,
+      [gstin, from, to],
     );
   },
 

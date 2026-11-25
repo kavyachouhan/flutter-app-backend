@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BLOCKED_CREDIT_CODES, ITC_USES } from '../../domain/gst/itc-engine.js';
 import { attachmentsField } from '../../lib/attachments.js';
 import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
@@ -80,6 +81,24 @@ export const createPurchaseBillBody = z.object({
    * from those rates.
    */
   isReverseCharge: z.boolean().default(false),
+  /**
+   * How the purchase is used, for the credit apportionment rules: `common` (partly exempt
+   * supplies; Rule 42/43 reverses the exempt share every month), `common_with_non_business`
+   * (also 5% for non-business use), `exempt_only` / `non_business` (no credit). Default:
+   * used for taxable business supplies.
+   */
+  itcUse: z.enum(ITC_USES).optional(),
+  /** The s.17(5) clause blocking the credit. Claimed in 4(A) and reversed in 4(B)(1). */
+  blockedCreditCode: z.enum(BLOCKED_CREDIT_CODES).optional(),
+  /** When goods / services were received (s.16(2)(b)); credit waits for it. Default: bill date. */
+  goodsReceivedDate: isoDate.optional(),
+  servicesReceivedDate: isoDate.optional(),
+  /** False while goods on one invoice are still arriving in lots: credit on the last lot. */
+  receiptComplete: z.boolean().optional(),
+  /** Import of goods: the bill of entry. Credit goes to 4(A)(1). */
+  boeNumber: nonEmpty.max(20).optional(),
+  boeDate: isoDate.optional(),
+  boePortCode: z.string().regex(/^[A-Z0-9]{6}$/, 'must be a six-character port code').optional(),
   lines: z.array(purchaseLine).min(1).max(500),
   billDiscount: discount.optional(),
   /** Capitalised into stock cost per `landedCostBasis`. */
@@ -202,3 +221,15 @@ export const listPurchaseOrdersQuery =pageQuery.extend({
 export type ListPurchaseOrdersQuery = z.infer<typeof listPurchaseOrdersQuery>;
 
 export const cancelPurchaseOrderBody = z.object({ reason: nonEmpty.max(200) });
+
+/** Corrects the credit facts of a bill until its credit is claimed in a filed GSTR-3B. */
+export const updatePurchaseItcBody = z
+  .object({
+    itcUse: z.enum(ITC_USES).optional(),
+    blockedCreditCode: z.enum(BLOCKED_CREDIT_CODES).nullable().optional(),
+    goodsReceivedDate: isoDate.nullable().optional(),
+    servicesReceivedDate: isoDate.nullable().optional(),
+    receiptComplete: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'nothing to change');
+export type UpdatePurchaseItcBody = z.infer<typeof updatePurchaseItcBody>;

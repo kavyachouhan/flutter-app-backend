@@ -1,0 +1,9 @@
+{
+  "issued": "2026-10-27",
+  "effectiveFrom": "2026-11-01",
+  "verificationStatus": "primary_verified",
+  "notification": "06/2026-CT(R)",
+  "sourceFile": "data/CBIC/notfctn_06_CTR_En.pdf",
+  "treatment": "deferred",
+  "reason": "Service rates (EV passenger transport and renting, delivery services, ITC provisos) amending Notif. 11/2017-CT(R). The text cites serial numbers, not SAC headings, so encoding needs the principal. Services with specific conditions are outside the initial retail scope."
+}

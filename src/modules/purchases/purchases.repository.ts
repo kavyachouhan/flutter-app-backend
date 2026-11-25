@@ -10,6 +10,9 @@ import type { Cursor } from '../../lib/pagination.js';
 import type { TermsSnapshot } from '../terms/terms.schemas.js';
 
 export interface PurchaseBillHeaderInsert {
+  /** D8: who supplied, and who received, as they were on this bill. */
+  sellerSnapshot: unknown;
+  buyerSnapshot: unknown;
   id: string;
   outletId: string;
   supplierId: string;
@@ -41,6 +44,17 @@ export interface PurchaseBillHeaderInsert {
   attachments: readonly unknown[];
   receivedAt: string;
   createdBy: string;
+  /** ITC facts (0039/0051). */
+  itc?: {
+    use: string;
+    blockedCreditCode: string | null;
+    goodsReceivedDate: string | null;
+    servicesReceivedDate: string | null;
+    receiptComplete: boolean;
+    boeNumber: string | null;
+    boeDate: string | null;
+    boePortCode: string | null;
+  };
 }
 
 export interface PurchaseBillLineInsert {
@@ -116,10 +130,15 @@ const HEADER_COLUMNS = `
   pb.supplier_invoice_no AS "supplierInvoiceNo", pb.supplier_invoice_date AS "supplierInvoiceDate",
   pb.due_date AS "dueDate", pb.supplier_gstin AS "supplierGstin",
   pb.supplier_state_code AS "supplierStateCode",
+  pb.seller_snapshot AS "sellerSnapshot", pb.buyer_snapshot AS "buyerSnapshot",
   pb.place_of_supply_state_code AS "placeOfSupplyStateCode", pb.tax_mode AS "taxMode",
   pb.supply_type AS "supplyType", pb.prices_include_tax AS "pricesIncludeTax",
   pb.round_off_enabled AS "roundOffEnabled", pb.itc_eligible AS "itcEligible",
   pb.is_reverse_charge AS "isReverseCharge", pb.itc_category AS "itcCategory",
+  pb.itc_use AS "itcUse", pb.blocked_credit_code AS "blockedCreditCode",
+  pb.goods_received_date::text AS "goodsReceivedDate", pb.services_received_date::text AS "servicesReceivedDate",
+  pb.receipt_complete AS "receiptComplete", pb.boe_number AS "boeNumber",
+  pb.boe_date::text AS "boeDate", pb.boe_port_code AS "boePortCode",
   pb.itc_ineligible_reason AS "itcIneligibleReason",
   pb.gross_amount AS "grossAmount", pb.line_discount_total AS "lineDiscountTotal",
   pb.bill_discount AS "billDiscount", pb.bill_discount_amount AS "billDiscountAmount",
@@ -224,7 +243,9 @@ export const purchasesRepository = {
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
          grand_total, tax_summary, hsn_summary, freight_amount, other_charges_amount,
          landed_cost_basis, notes, status, received_at, created_by, is_reverse_charge,
-         itc_category, itc_ineligible_reason, terms_id, terms_snapshot, attachments)
+         itc_category, itc_ineligible_reason, terms_id, terms_snapshot, attachments,
+         seller_snapshot, buyer_snapshot, itc_use, blocked_credit_code, goods_received_date,
+         services_received_date, receipt_complete, boe_number, boe_date, boe_port_code)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6,
          $7, $8, $9, $10, $11,
@@ -233,7 +254,8 @@ export const purchasesRepository = {
          $21, $22, $23, $24, $25,
          $26, $27, $28, $29, $30, $31, $32,
          $33, $34, $35, $36, $37,
-         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46, $47::jsonb)`,
+         $38, $39, 'issued', $40, $41, $42, $43, $44, $45, $46, $47::jsonb, $48, $49,
+         $50, $51, $52, $53, $54, $55, $56, $57)`,
       [
         h.id,
         h.outletId,
@@ -282,7 +304,47 @@ export const purchasesRepository = {
         h.termsId,
         jsonParam(h.termsSnapshot),
         JSON.stringify(h.attachments),
+        jsonParam(h.sellerSnapshot),
+        jsonParam(h.buyerSnapshot),
+        h.itc?.use ?? 'business_taxable',
+        h.itc?.blockedCreditCode ?? null,
+        h.itc?.goodsReceivedDate ?? null,
+        h.itc?.servicesReceivedDate ?? null,
+        h.itc?.receiptComplete ?? true,
+        h.itc?.boeNumber ?? null,
+        h.itc?.boeDate ?? null,
+        h.itc?.boePortCode ?? null,
       ],
+    );
+  },
+
+  /** Corrects the credit facts of a bill (allowed by purchase_bills_guard since 0051). */
+  async updateItcFacts(
+    tx: Tx,
+    id: string,
+    v: {
+      itcUse?: string | undefined;
+      blockedCreditCode?: string | null | undefined;
+      goodsReceivedDate?: string | null | undefined;
+      servicesReceivedDate?: string | null | undefined;
+      receiptComplete?: boolean | undefined;
+    },
+  ): Promise<void> {
+    const sets: string[] = [];
+    const params: unknown[] = [id];
+    const add = (column: string, value: unknown) => {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    };
+    if (v.itcUse !== undefined) add('itc_use', v.itcUse);
+    if (v.blockedCreditCode !== undefined) add('blocked_credit_code', v.blockedCreditCode);
+    if (v.goodsReceivedDate !== undefined) add('goods_received_date', v.goodsReceivedDate);
+    if (v.servicesReceivedDate !== undefined) add('services_received_date', v.servicesReceivedDate);
+    if (v.receiptComplete !== undefined) add('receipt_complete', v.receiptComplete);
+    if (sets.length === 0) return;
+    await tx.query(
+      `UPDATE purchase_bills SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`,
+      params,
     );
   },
 

@@ -35,6 +35,8 @@ export interface ReportCatalogueEntry {
   description: string;
   group: string;
   filters: readonly string[];
+  /** The app screen that runs it, when it is not the generic table. */
+  screen: string | null;
   /**
    * True when the plan does not include it. The client renders an upsell
    * instead of discovering a 402 after the user has picked a date range.
@@ -55,6 +57,7 @@ export function listReports(): Promise<ReportCatalogueEntry[]> {
       description: report.description,
       group: report.group,
       filters: report.filters,
+      screen: report.screen ?? null,
       locked: report.feature !== undefined && !hasFeature(subscription.features, report.feature),
       restricted: report.permission !== undefined && !hasPermission(auth.role, report.permission),
     }));
@@ -70,6 +73,12 @@ export function runReport(reportId: string, query: ReportParamsQuery): Promise<R
   if (report.permission && !hasPermission(auth.role, report.permission)) {
     throw new ForbiddenError(undefined, ErrorCode.INSUFFICIENT_ROLE, {
       details: { required: report.permission },
+    });
+  }
+  const run = report.run?.bind(report);
+  if (!run) {
+    throw new ValidationError('This report opens in its own screen and has no table to run.', {
+      details: { reportId, screen: report.screen },
     });
   }
   if (query.outletId) assertOutletAccess(query.outletId);
@@ -100,7 +109,7 @@ export function runReport(reportId: string, query: ReportParamsQuery): Promise<R
     );
 
     // One extra row tells the client the view was cut short, without a COUNT.
-    const rows = await report.run(tx, { ...params, limit: params.limit + 1 });
+    const rows = await run(tx, { ...params, limit: params.limit + 1 });
     const truncated = rows.length > params.limit;
     const visible = truncated ? rows.slice(0, params.limit) : rows;
 

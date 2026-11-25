@@ -9,6 +9,8 @@ import { clientId } from '../../lib/ids.js';
 export const DOCUMENT_TYPES = [
   'invoice',
   'credit_note',
+  'sales_debit_note',
+  'financial_credit_note',
   'debit_note',
   'payment_receipt',
   'purchase_order',

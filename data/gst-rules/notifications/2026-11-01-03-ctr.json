@@ -1,0 +1,26 @@
+{
+  "issued": "2026-10-27",
+  "effectiveFrom": "2026-11-01",
+  "verificationStatus": "primary_verified",
+  "notification": "03/2026-CT(R)",
+  "sourceFile": "data/CBIC/notfctn_03_CTR__En.pdf",
+  "treatment": "encoded",
+  "add": {
+    "taxRates": [
+      {
+        "id": "hsn-12119013-psyllium",
+        "scope": {
+          "kind": "hsn",
+          "codePrefixes": [
+            "12119013"
+          ]
+        },
+        "taxability": "exempt",
+        "ratePercent": null,
+        "condition": null,
+        "exemptionBasis": "S.No. 87A, Schedule to Notif. 10/2025-CT(R)",
+        "rcmCategoryCode": null
+      }
+    ]
+  }
+}

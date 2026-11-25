@@ -45,7 +45,7 @@ export const printDocumentSchema = registry.register(
   'PrintDocument',
   z
     .object({
-      kind: z.enum(['invoice', 'credit_note', 'payment_receipt', 'estimate', 'proforma_invoice', 'sales_order']),
+      kind: z.enum(['invoice', 'credit_note', 'sales_debit_note', 'financial_credit_note', 'payment_receipt', 'estimate', 'proforma_invoice', 'sales_order']),
       title: z.string().openapi({ description: '"TAX INVOICE", "BILL OF SUPPLY", "CREDIT NOTE".' }),
       business: z.object({
         name: z.string(),
@@ -69,6 +69,16 @@ export const printDocumentSchema = registry.register(
           stateName: z.string().optional(),
         })
         .optional(),
+      shipTo: z
+        .object({
+          name: z.string(),
+          gstin: z.string().optional(),
+          addressLines: z.array(z.string()),
+          stateName: z.string().optional(),
+        })
+        .optional()
+        .openapi({ description: 'The address of delivery, when it is not the customer address.' }),
+      stateTaxLabel: z.string().optional().openapi({ description: 'UTGST where it replaces SGST.' }),
       meta: z.array(printField),
       items: z.array(
         z.object({

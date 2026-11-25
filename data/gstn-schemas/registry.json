@@ -1,0 +1,132 @@
+{
+  "$comment": "Which payload mapper applies to which return period, and which official schema files validate it. To support a new portal format: drop the new schema files in this folder, add a version entry here (set the previous entry's effectiveTo), add one mapper file named after the id, and register it in src/domain/gst/returns/mappers/index.ts. No migration, no change to the calculations. effectiveFrom/effectiveTo are return periods as YYYY-MM (inclusive); null means unbounded. Nothing below states a date the portal has not published: unknown stays null.",
+  "forms": {
+    "gstr3b": {
+      "versions": [
+        {
+          "id": "gstr3b-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": {
+            "kind": "single",
+            "schema": "GSTR3B/GSTR3B - Save GSTR3B data request_schema.json"
+          },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "notes": "Official Save request schema. Payment of tax (tx_pmt) and liab_breakup are not produced: they come from GSTN ledgers."
+        }
+      ]
+    },
+    "gstr1": {
+      "versions": [
+        {
+          "id": "gstr1-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": {
+            "kind": "single",
+            "schema": "GSTR1/GSTR1 - Save GSTR1 data request_schema.json"
+          },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "unsupportedSections": [
+            "at",
+            "txpd",
+            "ecom",
+            "nila",
+            "ata",
+            "txpda",
+            "ecoma",
+            "supecoa",
+            "hsna"
+          ],
+          "notes": "Official Save request schema (additionalProperties is false throughout, so only schema-named keys are written). Written: b2b, b2cl, b2cs, cdnr, cdnur, exp, nil, hsn (b2b/b2c), doc_issue, and the amendments b2ba, b2cla, b2csa, cdnra, cdnura, expa (tables 9A/9C/10, from gst_amendments; validated against the schema, no portal sample). Table 14 (supeco) is written in the schema layout (clttx by operator, place of supply, recipient type and tax period; paytx operator-wise), not confirmed by a portal sample. Not computed yet: advances, table 15 (operators only), nil/HSN/advance and 14A amendments. The Submit schema (gstin, ret_period) is the filing call and is not used: filing needs a GSP and a signature."
+        }
+      ]
+    },
+    "gstr9": {
+      "versions": [
+        {
+          "id": "gstr9-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_checked_mapping_unverified",
+          "schemaSnapshot": "2026-11",
+          "validation": {
+            "kind": "single",
+            "schema": "GSTR9/GSTR9 - Save GSTR9 data request_schema.json"
+          },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "unsupportedSections": ["table8", "table10", "table14", "table15", "table16"],
+          "notes": "Official Save request schema, validated. Which key is which row is read from the form and the GSTR-9 Offline Tool v2.2, not confirmed by a sample file, so every export is a draft. Rows the engine does not compute are omitted (never zero) so the portal keeps what was entered. Table 8 is not written: the schema's descriptions of its keys are copied from other rows. 6A, 6A1, 6A2, 6J and 6O are computed by the portal; 6A1, 6A2 and 8H1 exist in the Offline Tool but not in this schema."
+        }
+      ]
+    },
+    "ledger_cash": {
+      "versions": [
+        {
+          "id": "ledger-cash-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Cash Ledger Details response_schema.json" },
+          "serverPopulatedFields": ["refNo", "igstbal", "cgstbal", "sgstbal", "cessbal"],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Cash Ledger Details response. The schema is inconsistent with itself: it requires refNo but names the property ref_no, and requires igstbal, cgstbal, sgstbal and cessbal inside op_bal and cl_bal, which define igst, cgst, sgst and cess instead. Those four balance keys and refNo are dropped from required (they are not used). Free-text patterns (desc) are reported as warnings, not refusals."
+        }
+      ]
+    },
+    "ledger_liability": {
+      "versions": [
+        {
+          "id": "ledger-liability-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Liability Ledger Details For Return Liability response_schema.json" },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Liability Ledger Details For Return Liability response."
+        }
+      ]
+    },
+    "ledger_itc_reversal": {
+      "versions": [
+        {
+          "id": "ledger-itc-reversal-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": { "kind": "single", "schema": "../gstn-ledger/Get Credit Reversal and Re-claimed Details response_schema.json" },
+          "serverPopulatedFields": [],
+          "samples": "unavailable",
+          "notes": "Inbound: the portal's Get Credit Reversal and Re-claimed Details response. itc4b2 is credit reversed, itc4d1 credit reclaimed."
+        }
+      ]
+    },
+    "gstr2b": {
+      "versions": [
+        {
+          "id": "gstr2b-v2026.11",
+          "effectiveFrom": null,
+          "effectiveTo": null,
+          "verification": "schema_verified",
+          "schemaSnapshot": "2026-11",
+          "validation": {
+            "kind": "single",
+            "schema": "GSTR2B/GSTR2B - Get All Details response_schema.json"
+          },
+          "notes": "Inbound format (portal 2B JSON). Used by the 2B importer, not by an export mapper."
+        }
+      ]
+    }
+  }
+}

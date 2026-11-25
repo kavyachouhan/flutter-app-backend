@@ -1,0 +1,3479 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "gstin": {
+            "type": "string",
+            "maxLength": 15,
+            "pattern": "^([0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[Zz1-9A-Ja-j]{1}[0-9a-zA-Z]{1})$",
+            "minLength": 15,
+            "description": "GSTIN of Tax Collector"
+        },
+        "fp": {
+            "description": "Financial Year",
+            "type": "string",
+            "pattern": "^(0320[0-9]{2})$",
+            "minLength": 1
+        },
+        "cutoffDt": {
+            "description": "CutOffDt Used During Weekly Refresh",
+            "type": "string"
+        },
+        "table4": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "b2c": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "b2b": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "ecom": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "exp": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "csamt"
+                            ]
+                        },
+                        "sez": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "csamt"
+                            ]
+                        },
+                        "deemed": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "at": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rchrg": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "cr_nt": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "dr_nt": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "amd_pos": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "amd_neg": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table5": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "zero_rtd": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "sez": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "ecom_14": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "rchrg": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "exmt": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "nil": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "non_gst": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "cr_nt": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "dr_nt": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "amd_pos": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "amd_neg": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Total Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table6": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "supp_non_rchrg": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "itc_typ": {
+                                        "type": "string",
+                                        "description": "Action to be taken",
+                                        "enum": [
+                                            "ip",
+                                            "cg",
+                                            "is"
+                                        ]
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "camt": {
+                                        "description": "Central tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "samt": {
+                                        "description": "State tax/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "required": [
+                                    "itc_typ",
+                                    "iamt",
+                                    "camt",
+                                    "samt",
+                                    "csamt"
+                                ]
+                            }
+                        },
+                        "supp_rchrg_unreg": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "itc_typ": {
+                                        "type": "string",
+                                        "description": "Action to be taken",
+                                        "enum": [
+                                            "ip",
+                                            "cg",
+                                            "is"
+                                        ]
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "camt": {
+                                        "description": "Central tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "samt": {
+                                        "description": "State tax/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "required": [
+                                    "itc_typ",
+                                    "iamt",
+                                    "camt",
+                                    "samt",
+                                    "csamt"
+                                ]
+                            }
+                        },
+                        "supp_rchrg_reg": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "itc_typ": {
+                                        "type": "string",
+                                        "description": "Action to be taken",
+                                        "enum": [
+                                            "ip",
+                                            "cg",
+                                            "is"
+                                        ]
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "camt": {
+                                        "description": "Central tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "samt": {
+                                        "description": "State tax/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "required": [
+                                    "itc_typ",
+                                    "iamt",
+                                    "camt",
+                                    "samt",
+                                    "csamt"
+                                ]
+                            }
+                        },
+                        "iog": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "itc_typ": {
+                                        "type": "string",
+                                        "description": "Action to be taken",
+                                        "enum": [
+                                            "ip",
+                                            "cg"
+                                        ]
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "required": [
+                                    "itc_typ",
+                                    "iamt",
+                                    "csamt"
+                                ]
+                            }
+                        },
+                        "ios": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "csamt"
+                            ]
+                        },
+                        "isd": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_clmd": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "tran1": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "camt",
+                                "samt"
+                            ]
+                        },
+                        "tran2": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "camt",
+                                "samt"
+                            ]
+                        },
+                        "other": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_otr": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table7": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "rule37": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rule39": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rule42": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rule43": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "sec17": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "revsl_tran1": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "camt",
+                                "samt"
+                            ]
+                        },
+                        "revsl_tran2": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "camt",
+                                "samt"
+                            ]
+                        },
+                        "other": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "desc": {
+                                        "type": "string",
+                                        "description": "others- reversal (Please specify)"
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": 0
+                                    },
+                                    "camt": {
+                                        "description": "Central tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": 0
+                                    },
+                                    "samt": {
+                                        "description": "State tax/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": 0
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": 0
+                                    }
+                                },
+                                "required": [
+                                    "desc",
+                                    "iamt",
+                                    "camt",
+                                    "samt",
+                                    "csamt"
+                                ]
+                            }
+                        },
+                        "rule37A": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rule38": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table8": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "itc_inwd_supp": {
+                            "description": "ITC on inward supplies (other than imports and inward supplies liable to reverse charge but includes services received from SEZs) received during 2017-18 but availed during April to September, 2018",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_nt_availd": {
+                            "description": "Difference [A-(B+C)]",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_nt_eleg": {
+                            "description": "ITC available but not availed (out of D)",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "iog_taxpaid": {
+                            "description": "ITC available but ineligible (out of D)",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "iog_nxt_yr": {
+                            "description": "ITC available but ineligible (out of D)",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State tax/UT Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "WEEKLY_R2A_REFRESH"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table9": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "iamt": {
+                            "description": "Integrated Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "txpyble",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "camt": {
+                            "description": "Central Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "txpyble",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "samt": {
+                            "description": "State/UT Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "txpyble",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "csamt": {
+                            "description": "Cess",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "txpyble",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "intr": {
+                            "description": "Interest",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Taxpayable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "fee": {
+                            "description": "Late fee",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Taxpayable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "pen": {
+                            "description": "Penalty",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Taxpayable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        },
+                        "other": {
+                            "description": "Other",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Taxpayable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"total_tax_paid": {
+                                    "description": "total_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+								"diff_tax_paid": {
+                                    "description": "diff_tax_paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpyble"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table10": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "dbn_amd": {
+                            "description": "Supplies / tax declared through Amendments (+) (net of debit notes)",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "cdn_amd": {
+                            "type": "object",
+                            "description": "Supplies / tax reduced through Amendments (-) (net of credit notes)",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_rvsl": {
+                            "description": "Reversal of ITC availed during previous financial year",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "itc_availd": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "description": "tax payer action",
+                            "type": "string",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table14": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "iamt": {
+                            "description": "Integrated Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Payable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99,
+                                    "optional": true
+                                },
+                                "txpaid": {
+                                    "description": "Paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpaid"
+                            ]
+                        },
+                        "camt": {
+                            "description": "Central Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Payable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99,
+                                    "optional": true
+                                },
+                                "txpaid": {
+                                    "description": "Paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpaid"
+                            ]
+                        },
+                        "samt": {
+                            "description": "State/UT Tax",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Payable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99,
+                                    "optional": true
+                                },
+                                "txpaid": {
+                                    "description": "Paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpaid"
+                            ]
+                        },
+                        "csamt": {
+                            "description": "Cess",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Payable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99,
+                                    "optional": true
+                                },
+                                "txpaid": {
+                                    "description": "Paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpaid"
+                            ]
+                        },
+                        "intr": {
+                            "description": "Interest",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txpyble": {
+                                    "description": "Payable",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "txpaid": {
+                                    "description": "Paid",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "txpaid",
+                                "txpyble"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table15": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "rfd_clmd": {
+                            "description": "Total Refund claimed",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rfd_sanc": {
+                            "description": "Total Refund sanctioned",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rfd_rejt": {
+                            "description": "Total Refund Rejected",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "rfd_pend": {
+                            "description": "Total Refund Pending",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "tax_dmnd": {
+                            "description": "Total demand of taxes",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "intr": {
+                                    "description": "Inerest",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "fee": {
+                                    "description": "Late Fee/Others",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "pen": {
+                                    "description": "Penalty",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt",
+                                "intr",
+                                "fee",
+                                "pen"
+                            ]
+                        },
+                        "tax_paid": {
+                            "description": "Total taxes paid in respect of E",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "intr": {
+                                    "description": "Inerest",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "fee": {
+                                    "description": "Late Fee/Others",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "pen": {
+                                    "description": "Penalty",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt",
+                                "intr",
+                                "fee",
+                                "pen"
+                            ]
+                        },
+                        "dmnd_pend": {
+                            "description": "Total demands pending out of E above",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "intr": {
+                                    "description": "Inerest",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "fee": {
+                                    "description": "Late Fee/Others",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                },
+                                "pen": {
+                                    "description": "Penalty",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": -9999999999999.99
+                                }
+                            },
+                            "required": [
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt",
+                                "intr",
+                                "fee",
+                                "pen"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table16": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "comp_supp": {
+                            "description": "Supplies received from Composition taxpayers",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Taxable Value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "txval"
+                            ]
+                        },
+                        "deemed_supp": {
+                            "description": "Deemed supply under Section 143",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        },
+                        "not_returned": {
+                            "description": "Goods sent on approval basis but not returned",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "txval": {
+                                    "description": "Taxable value",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "iamt": {
+                                    "description": "Integrated Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "camt": {
+                                    "description": "Central Tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "samt": {
+                                    "description": "State/UT tax",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                },
+                                "csamt": {
+                                    "description": "Cess",
+                                    "type": "number",
+                                    "multipleOf": 0.01,
+                                    "maximum": 9999999999999.99,
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "txval",
+                                "iamt",
+                                "camt",
+                                "samt",
+                                "csamt"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table17": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "items": {
+                            "description": "HSN Wise Summary of outward supplies",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "hsn_sc": {
+                                        "description": "HSN Code",
+                                        "type": "string",
+                                        "maxLength": 8,
+                                        "minLength": 1
+                                    },
+                                    "desc": {
+                                        "description": "Description",
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "minLength": 1
+                                    },
+                                    "isconcesstional": {
+                                        "enum": [
+                                            "Y",
+                                            "N"
+                                        ],
+                                        "description": "Flag for concessional",
+                                        "type": "string",
+                                        "maxLength": 1,
+                                        "minLength": 1
+                                    },
+                                    "uqc": {
+                                        "description": "UQC",
+                                        "type": "string"
+                                    },
+                                    "qty": {
+                                        "description": "Total Quantity",
+                                        "type": "number",
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "txval": {
+                                        "description": "Taxable Value",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "rt": {
+                                        "description": "Rate of Tax",
+                                        "type": "number"
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "camt": {
+                                        "description": "Central Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "samt": {
+                                        "description": "State/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "if": {
+                                    "properties": {
+                                        "hsn_sc": {
+                                            "pattern": "^([9][9])"
+                                        }
+                                    }
+                                },
+                                "then": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "rt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "txval": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "iamt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "camt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "samt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "csamt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "hsn_sc": {
+                                            "description": "HSN Code",
+                                            "type": "string",
+                                            "maxLength": 8,
+                                            "minLength": 1
+                                        },
+                                        "isconcesstional": {
+                                            "enum": [
+                                                "Y",
+                                                "N"
+                                            ],
+                                            "description": "Flag for concessional",
+                                            "type": "string",
+                                            "maxLength": 1,
+                                            "minLength": 1
+                                        }
+                                    },
+                                    "required": [
+                                        "hsn_sc",
+                                        "txval",
+                                        "rt",
+                                        "iamt",
+                                        "camt",
+                                        "samt",
+                                        "csamt"
+                                    ]
+                                },
+                                "else": {
+                                    "required": [
+                                        "hsn_sc",
+                                        "uqc",
+                                        "qty",
+                                        "txval",
+                                        "rt",
+                                        "iamt",
+                                        "camt",
+                                        "samt",
+                                        "csamt"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        },
+        "table18": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "A"
+                            ]
+                        },
+                        "items": {
+                            "description": "HSN Wise Summary of Inward supplies",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "hsn_sc": {
+                                        "description": "HSN Code",
+                                        "type": "string",
+                                        "maxLength": 8,
+                                        "minLength": 1
+                                    },
+                                    "desc": {
+                                        "description": "Description",
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "minLength": 1
+                                    },
+                                    "isconcesstional": {
+                                        "enum": [
+                                            "Y",
+                                            "N"
+                                        ],
+                                        "description": "Flag for concessional",
+                                        "type": "string",
+                                        "maxLength": 1,
+                                        "minLength": 1
+                                    },
+                                    "uqc": {
+                                        "description": "UQC",
+                                        "type": "string"
+                                    },
+                                    "qty": {
+                                        "description": "Total Quantity",
+                                        "type": "number",
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "txval": {
+                                        "description": "Taxable Value",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "rt": {
+                                        "description": "Rate of Tax",
+                                        "type": "number"
+                                    },
+                                    "iamt": {
+                                        "description": "Integrated Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "camt": {
+                                        "description": "Central Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "samt": {
+                                        "description": "State/UT Tax",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    },
+                                    "csamt": {
+                                        "description": "Cess",
+                                        "type": "number",
+                                        "multipleOf": 0.01,
+                                        "maximum": 9999999999999.99,
+                                        "minimum": -9999999999999.99
+                                    }
+                                },
+                                "if": {
+                                    "properties": {
+                                        "hsn_sc": {
+                                            "pattern": "^([9][9])"
+                                        }
+                                    }
+                                },
+                                "then": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "rt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "txval": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "iamt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "camt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "samt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "csamt": {
+                                            "description": "Rate of Tax",
+                                            "type": "number"
+                                        },
+                                        "hsn_sc": {
+                                            "description": "HSN Code",
+                                            "type": "string",
+                                            "maxLength": 8,
+                                            "minLength": 1
+                                        },
+                                        "isconcesstional": {
+                                            "enum": [
+                                                "Y",
+                                                "N"
+                                            ],
+                                            "description": "Flag for concessional",
+                                            "type": "string",
+                                            "maxLength": 1,
+                                            "minLength": 1
+                                        }
+                                    },
+                                    "required": [
+                                        "hsn_sc",
+                                        "txval",
+                                        "rt",
+                                        "iamt",
+                                        "camt",
+                                        "samt",
+                                        "csamt"
+                                    ]
+                                },
+                                "else": {
+                                    "required": [
+                                        "hsn_sc",
+                                        "uqc",
+                                        "qty",
+                                        "txval",
+                                        "rt",
+                                        "iamt",
+                                        "camt",
+                                        "samt",
+                                        "csamt"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "flag": {
+                            "type": "string",
+                            "description": "Action to be taken",
+                            "enum": [
+                                "D"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "flag"
+                    ]
+                }
+            ]
+        }
+    }
+}

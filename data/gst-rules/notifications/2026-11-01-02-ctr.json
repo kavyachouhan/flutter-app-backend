@@ -1,0 +1,49 @@
+{
+  "issued": "2026-10-27",
+  "effectiveFrom": "2026-11-01",
+  "verificationStatus": "primary_verified",
+  "notification": "02/2026-CT(R)",
+  "sourceFile": "data/CBIC/notfctn_02_CTR_En.pdf",
+  "treatment": "encoded",
+  "reason": "Amends 9/2025-CT(R). The rewording of S.No. 237 (fertilisers) changes no rate. Rates here are CGST + SGST, so Schedule I (2.5%) is 5% and Schedule II (9%) is 18%.",
+  "add": {
+    "taxRates": [
+      {
+        "id": "hsn-4012-retreaded-tractor",
+        "scope": {
+          "kind": "hsn",
+          "codePrefixes": [
+            "4012"
+          ]
+        },
+        "taxability": "taxable",
+        "ratePercent": 5,
+        "condition": {
+          "key": "manual_selection",
+          "value": null,
+          "description": "Retreaded tractor tyres (Schedule I S.No. 272A)"
+        },
+        "exemptionBasis": null,
+        "rcmCategoryCode": null
+      },
+      {
+        "id": "hsn-4012-other",
+        "scope": {
+          "kind": "hsn",
+          "codePrefixes": [
+            "4012"
+          ]
+        },
+        "taxability": "taxable",
+        "ratePercent": 18,
+        "condition": {
+          "key": "manual_selection",
+          "value": null,
+          "description": "Other retreaded or used tyres; solid or cushion tyres, treads, flaps (Schedule II S.No. 138)"
+        },
+        "exemptionBasis": null,
+        "rcmCategoryCode": null
+      }
+    ]
+  }
+}

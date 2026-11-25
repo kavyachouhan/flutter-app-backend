@@ -1,0 +1,189 @@
+{
+	"id": "Get-CDNUR-Schema",
+	"properties": {
+		"cdnur": {
+			"items": {
+				"properties": {
+					"chksum": {
+						"maxLength": 64,
+						"description": "Invoice checksum value",
+						"type": "string",
+						"pattern": "^[a-zA-Z0-9]+$",
+						"minLength": 1
+					},
+					"flag": {
+						"description": "Status of Invoice",
+						"type": "string"
+					},
+					"idt": {
+						"description": "Supplier Invoice Date",
+						"type": "string",
+						"pattern": "^((0[1-9]|[12][0-9]|3[01])[-](0[1-9]|1[012])[-]((19|20)\\d\\d))$"
+					},
+					"inum": {
+						"maxLength": 16,
+						"description": "Supplier Invoice Number",
+						"type": "string"
+					},
+					"p_gst": {
+						"maxLength": 1,
+						"description": "Pre GST Regime Dr./ Cr. Notes",
+						"type": "string",
+						"enum": [
+							"Y",
+							"N"
+						]
+					},
+					"pos": {
+						"description": "Maintained in GST System common database POS as provided in law / actual provision of service.",
+						"type": "string",
+						"pattern": "^(3[0-8]|[12][0-9]|0[1-9]|97)$",
+						"maxLength": 2,
+						"minLength": 2
+					},
+					"d_flag": {
+						"description": "delink flag",
+						"type": "string",
+						"enum": [
+							"Y"
+						]
+					},
+					"diff_percent": {
+						"description": "Differential percentage",
+						"type": "number",
+						"multipleOf": 0.01
+					},
+					"srctyp": {
+						"description": "Source Type of Invoice",
+						"type": "string"
+					},
+					"irn": {
+						"description": "Invoice Referrence Number",
+						"type": "string",
+						"maxLength": 64,
+						"minLength": 64,
+						"pattern": "^[a-zA-Z0-9]+$"
+					},
+					"irngendate": {
+						"description": "IRN Generated Date",
+						"type": "string",
+						"minLength": 1,
+						"pattern": "^(0[1-9]|1[0-9]|2[0-8]|29((?=-([0][13-9]|1[0-2])|(?=-(0[1-9]|1[0-2])-([0-9]{2}(0[48]|[13579][26]|[2468][048])|([02468][048]|[13579][26])00))))|30(?=-(0[13-9]|1[0-2]))|31(?=-(0[13578]|1[02])))-(0[1-9]|1[0-2])-[0-9]{4}$"
+					},
+					"itms": {
+						"items": {
+							"properties": {
+								"itm_det": {
+									"properties": {
+										"rt": {
+											"description": "rate as per invoice",
+											"type": "number",
+											"multipleOf": 0.01
+										},
+										"iamt": {
+											"description": "IGST Amount as per invoice",
+											"type": "number",
+											"multipleOf": 0.01
+										},
+										"csamt": {
+											"description": "Cess Amount as per invoice",
+											"multipleOf": 0.01,
+											"type": "number"
+										},
+										"txval": {
+											"description": "Taxable value of Goods or Service as per invoice",
+											"type": "number",
+											"multipleOf": 0.01,
+											"minLength": 1
+										}
+									},
+									"required": [
+										"rt",
+										"txval"
+									],
+									"type": "object"
+								},
+								"num": {
+									"description": "Serial no",
+									"type": "number",
+									"minLength": 1
+								}
+							},
+							"required": [
+								"itm_det",
+								"num"
+							],
+							"type": "object"
+						},
+						"type": "array"
+					},
+					"nt_dt": {
+						"description": "Credit Note/Debit Note/  Refund Voucher date",
+						"type": "string",
+						"pattern": "^((0[1-9]|[12][0-9]|3[01])[-](0[1-9]|1[012])[-]((19|20)\\d\\d))$"
+					},
+					"nt_num": {
+						"minLength": 1,
+						"maxLength": 16,
+						"description": "Credit note/debit note / Refund Voucher Number",
+						"type": "string"
+					},
+					"ntty": {
+						"description": "Credit/debit note type/ Refund Voucher",
+						"type": "string",
+						"enum": [
+							"C",
+							"R",
+							"D"
+						]
+					},
+					"typ": {
+						"description": "Supplier Invoice type EXPWP/ EXPWOP/ B2CL",
+						"type": "string",
+						"enum": [
+							"EXPWP",
+							"EXPWOP",
+							"B2CL"
+						]
+					},
+					"out_typ": {
+						"description": "outward supply type Eco or other than Eco",
+						"type": "string",
+						"enum": [
+							"E",
+							"O"
+						]
+					},
+					"tos": {
+						"description": "Type of Supply",
+						"type": "string",
+						"enum": [
+							"G",
+							"S"
+						]
+					},
+					"val": {
+						"description": "Total Note Value",
+						"type": "number"
+					}
+				},
+				"required": [
+					"itms",
+					"val",
+					"nt_num",
+					"chksum",
+					"nt_dt",
+					"ntty",
+					"typ",
+					"flag"
+				],
+				"type": "object"
+			},
+			"type": "array"
+		}
+	},
+	"required": [
+		"cdnur"
+	],
+	"type": "object"
+}

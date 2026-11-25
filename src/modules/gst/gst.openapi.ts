@@ -22,9 +22,92 @@ import {
   listMatchesQuery,
   listPeriodsQuery,
   MATCH_TYPES,
+  preparePeriodBody,
   RETURN_STATUSES,
   RETURN_TYPES,
 } from './gst.schemas.js';
+import { importLedgerBody, listLedgerImportsQuery } from './ledgers/ledger.schemas.js';
+import { hsnSalesQuery, sacQuery, transactionReportQuery } from './reports/gst-reports.schemas.js';
+
+const gstRegistration = z.object({
+  id: uuid,
+  gstin: z.string(),
+  stateCode: z.string(),
+  isPrincipal: z.boolean(),
+  status: z.string(),
+  effectiveFrom: z.string(),
+  effectiveTo: z.string().nullable(),
+  roundOffEnabled: z.boolean(),
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/registrations',
+  tags: ['GST'],
+  summary: "The business's GST registrations",
+  security: accessTokenSecurity,
+  responses: {
+    200: jsonResponse('Registrations.', dataEnvelope(z.array(gstRegistration))),
+    ...errorResponses(401, 403),
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: '/v1/gst/registrations/{id}',
+  tags: ['GST'],
+  summary: "Change a registration's settings",
+  description: 'Rounding the bill to the rupee is set per registration and is on by default.',
+  security: accessTokenSecurity,
+  request: {
+    params: z.object({ id: uuid }),
+    body: {
+      content: { 'application/json': { schema: z.object({ roundOffEnabled: z.boolean() }) } },
+    },
+  },
+  responses: {
+    200: jsonResponse('The registration.', dataEnvelope(gstRegistration)),
+    ...errorResponses(400, 401, 403, 404),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/rule-sets',
+  tags: ['GST'],
+  summary: 'Published GST rule sets',
+  description:
+    'Dated, complete snapshots of the GST rules, including withdrawn ones so a device can drop them. Pass `since` (the latest `changedAt` held) to fetch only what changed. A device selects by date: latest effectiveFrom on or before it, then highest revision.',
+  security: accessTokenSecurity,
+  request: { query: z.object({ since: z.string().datetime({ offset: true }).optional() }) },
+  responses: {
+    200: jsonResponse('Rule set versions.', dataEnvelope(z.array(z.record(z.unknown())))),
+    ...errorResponses(401),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/hsn-master',
+  tags: ['GST'],
+  summary: 'The HSN/SAC master',
+  description:
+    'Codes and descriptions only: rates come from the rule set. `codes` is empty when `version` is what the device already holds. Each code is [code, kind, description, parentCode].',
+  security: accessTokenSecurity,
+  request: { query: z.object({ version: z.string().max(64).optional() }) },
+  responses: {
+    200: jsonResponse(
+      'The master, or just its version.',
+      dataEnvelope(
+        z.object({
+          version: z.string().nullable(),
+          codes: z.array(z.array(z.string().nullable())),
+        }),
+      ),
+    ),
+    ...errorResponses(401),
+  },
+});
 
 const returnPeriod = registry.register(
   'GstReturnPeriod',
@@ -103,7 +186,8 @@ const importProgress = registry.register(
     exactCount: z.number().int(),
     probableCount: z.number().int(),
     missingInBooks: z.number().int().openapi({
-      description: 'Filed by a supplier, absent from the shop’s books — usually a bill nobody entered.',
+      description:
+        'Filed by a supplier, absent from the shop’s books — usually a bill nobody entered.',
     }),
     missingIn2b: z.number().int().openapi({
       description:
@@ -143,6 +227,126 @@ const match = registry.register(
 
 registry.registerPath({
   method: 'get',
+  path: '/v1/gst/reports/transactions',
+  tags: ['GST'],
+  summary: 'GSTR transaction report (Excel)',
+  description: [
+    'GSTR-1 sales, GSTR-1 credit/debit notes, and the purchase register in the layout of the',
+    'official GSTR-2 offline template, for one month and registration.',
+    '',
+    'Worked out live from current documents with the same engines as the prepared returns; it is',
+    'not snapshotted. GSTR-2 has been suspended since 2017, so the purchase files are registers',
+    'for reconciliation, not filings, and there is no portal JSON for them.',
+  ].join('\n'),
+  security: accessTokenSecurity,
+  request: { query: transactionReportQuery },
+  responses: {
+    200: jsonResponse(
+      'A signed download link.',
+      dataEnvelope(
+        z.object({
+          filename: z.string(),
+          downloadUrl: z.string(),
+          expiresAt: timestamp,
+          rows: z.number().int(),
+          issues: z.array(z.record(z.unknown())),
+        }),
+      ),
+    ),
+    ...errorResponses(400, 401, 403, 422),
+  },
+});
+
+const tableReportResponses = {
+  200: jsonResponse(
+    'With format=json: the tables, in the shape a prepared return is read in. With xlsx or ca: a signed download link.',
+    dataEnvelope(z.record(z.unknown())),
+  ),
+  ...errorResponses(400, 401, 403, 422),
+};
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/reports/hsn-sales',
+  tags: ['GST'],
+  summary: 'Sales summary by HSN',
+  description:
+    'Issued invoices and notes of one registration between two dates, by HSN code, unit and rate, net of credit notes, split into registered-buyer and other as in GSTR-1 Table 12. Uses the same accumulation as Table 12, so the figures agree.',
+  security: accessTokenSecurity,
+  request: { query: hsnSalesQuery },
+  responses: tableReportResponses,
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/reports/sac',
+  tags: ['GST'],
+  summary: 'SAC (services) report',
+  description:
+    'Service lines (chapter 99 or listed as services in the HSN/SAC master) by SAC, transaction type and rate, for sales, sale returns, purchases and purchase returns. There is no separate SAC return: services are reported in the HSN tables of GSTR-1 and GSTR-9, so this is an analysis view.',
+  security: accessTokenSecurity,
+  request: { query: sacQuery },
+  responses: tableReportResponses,
+});
+
+const ledgerImport = registry.register(
+  'GstLedgerImport',
+  z.object({
+    id: uuid,
+    gstin: z.string(),
+    kind: z.enum(['cash', 'liability', 'itc_reversal']),
+    periodFrom: calendarDate,
+    periodTo: calendarDate,
+    parserId: z.string(),
+    entryCount: z.number().int(),
+    newEntryCount: z.number().int().openapi({
+      description: 'Entries not already held from an earlier, overlapping file.',
+    }),
+    issues: z.array(z.record(z.unknown())),
+    createdAt: timestamp,
+  }),
+);
+
+registry.registerPath({
+  method: 'post',
+  path: '/v1/gst/ledger-imports',
+  tags: ['GST'],
+  summary: 'Import a GSTN ledger file',
+  description: [
+    'Takes a ledger exactly as the GST portal produced it (cash ledger, return-liability ledger, or',
+    'credit reversal and re-claim ledger) and keeps its entries.',
+    '',
+    'The file is checked against the official schema and refused when it is not that ledger, is for',
+    'another GSTIN, or has a window that cannot be read. The same document is accepted once; an entry',
+    'that arrives again in an overlapping file is kept once.',
+    '',
+    'Credit reclaimed (6H) and reversed come from the credit reversal ledger. Tax paid through cash or',
+    'credit is read by a rule set that is empty until it has been checked against real ledger files,',
+    'so GSTR-9 shows tax paid as unknown rather than guessing.',
+  ].join('\n'),
+  security: accessTokenSecurity,
+  request: { body: { content: { 'application/json': { schema: importLedgerBody } } } },
+  responses: {
+    201: jsonResponse('Imported (or already imported).', dataEnvelope(ledgerImport)),
+    ...errorResponses(400, 401, 403, 422),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: '/v1/gst/ledger-imports',
+  tags: ['GST'],
+  summary: 'Imported ledger files',
+  security: accessTokenSecurity,
+  request: { query: listLedgerImportsQuery },
+  responses: {
+    200: jsonResponse('Newest first.', dataEnvelope(z.array(ledgerImport))),
+    ...errorResponses(401, 403),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
   path: '/v1/gst/periods',
   tags: ['GST'],
   summary: 'Return periods',
@@ -166,9 +370,9 @@ registry.registerPath({
     'registration per state and files separately for each. Omit `gstin` and the business’s own',
     'is used; a business with more than one must name which.',
     '',
-    'A composition dealer files CMP-08 and a regular dealer GSTR-1 and GSTR-3B. Asking for the',
-    'wrong one is refused rather than accepted, because filing a return you do not owe tends to',
-    'come with the one you do left unfiled.',
+    'GSTR-1, GSTR-3B and GSTR-9 are for regular dealers. A composition dealer is refused: its',
+    'returns (CMP-08, GSTR-4) are not supported in this version, and filing a return you do not',
+    'owe tends to come with the one you do left unfiled.',
   ].join('\n'),
   security: accessTokenSecurity,
   request: { body: { content: { 'application/json': { schema: createPeriodBody } } } },
@@ -206,9 +410,16 @@ registry.registerPath({
     'the B2CS rate-wise aggregate, the nil/exempt/non-GST totals, the HSN summary and the',
     'documents-issued table. GSTR-3B carries the 3.1 sections, the self-assessed reverse-charge',
     'liability, and input tax credit split the four ways table 4 requires.',
+    '',
+    "GSTR-9 is summed from the financial year's period returns (filed, else prepared, else worked",
+    'out from the books and flagged) and reconciled against the books. The optional body field',
+    '`considerNonTaxAsExempt` reports non-GST outward supplies as exempted (5D) instead of 5F.',
   ].join('\n'),
   security: accessTokenSecurity,
-  request: { params: z.object({ id: uuid }) },
+  request: {
+    params: z.object({ id: uuid }),
+    body: { required: false, content: { 'application/json': { schema: preparePeriodBody } } },
+  },
   responses: {
     200: jsonResponse('Prepared.', dataEnvelope(returnPeriod)),
     ...errorResponses(409),
@@ -245,22 +456,27 @@ registry.registerPath({
   tags: ['GST'],
   summary: 'Download a prepared return',
   description: [
-    'A workbook with one sheet per table (B2B, B2CL, B2CS, exports, SEZ, CDNR, CDNUR,',
-    'nil/exempt/non-GST, HSN, documents issued), or the same figures as JSON.',
+    'format=xlsx: a workbook with one sheet per table (GSTR-1: b2b, b2cl, b2cs, cdnr, cdnur, exp,',
+    'nil/exempt/non-GST, HSN b2b/b2c, documents issued; GSTR-3B: 3.1, 3.2, 4, 5), rendered from the',
+    'same sheets the app shows. format=ca adds a summary, the issues list and (GSTR-3B) the ITC register.',
     '',
-    'Reads the snapshotted workings, never recomputing — which is the point of snapshotting them:',
-    'the file an accountant was given last week and the figures on screen today have to be the',
-    'same thing, or nobody can tell which was filed.',
+    'format=json: portal upload JSON from a versioned mapper, validated against the official schema.',
+    'GSTR-3B uses the official Save schema (portal ready). GSTR-1 follows the official Get response',
+    'schemas only (no official upload schema was available), so it is always labelled draft, and the',
+    'sections with no official schema (exports, advances, nil/exempt, HSN, documents issued,',
+    'amendments) are refused unless acceptUnsupported=true, which produces a clearly named partial draft.',
+    'The response says which mapper and schema fingerprint produced the file and lists every issue.',
     '',
-    'The JSON carries the workings as stored under an identifying header. It is deliberately not',
-    'reshaped into the portal’s abbreviated upload keys: that mapping belongs with a filing',
-    'integration that can be tested against the real API, and inventing it here would produce a',
-    'file that looks official and may not upload.',
+    'Reads the snapshotted workings, never recomputing, so the file an accountant was given last week',
+    'and the figures on screen today are the same thing.',
   ].join('\n'),
   security: accessTokenSecurity,
   request: {
     params: z.object({ id: uuid }),
-    query: z.object({ format: z.enum(['xlsx', 'json']).optional() }),
+    query: z.object({
+      format: z.enum(['xlsx', 'json', 'ca']).optional(),
+      acceptUnsupported: z.enum(['true', 'false']).optional(),
+    }),
   },
   responses: {
     200: jsonResponse(
@@ -270,6 +486,19 @@ registry.registerPath({
           objectKey: z.string(),
           filename: z.string(),
           contentType: z.string(),
+          payloadStatus: z.enum(['portal_ready', 'draft', 'draft_partial']).optional(),
+          mapperId: z.string().optional(),
+          schemaSha256: z.string().optional(),
+          issues: z
+            .array(
+              z.object({
+                severity: z.string(),
+                code: z.string(),
+                message: z.string(),
+                path: z.string().optional(),
+              }),
+            )
+            .optional(),
           downloadUrl: z.string(),
           expiresAt: timestamp,
         }),

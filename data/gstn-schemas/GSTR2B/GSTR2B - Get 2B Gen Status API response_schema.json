@@ -1,0 +1,21 @@
+{
+    "id": "GET-2B-GEN-STATUS",
+    "properties": {
+        "status_cd": {
+            "description": "Status of the request",
+            "type": "string"
+        },
+        "err_cd": {
+            "description": "Error code",
+            "type": "string"
+        },
+        "err_msg": {
+            "description": "Error message",
+            "type": "string"
+        }
+    },
+    "required": [
+        "status_cd"
+    ],
+    "type": "object"
+}

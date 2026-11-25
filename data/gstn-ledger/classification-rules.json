@@ -1,0 +1,5 @@
+{
+  "$comment": "How a cash or liability ledger entry is read for GSTR-9 Table 9 (tax paid in cash, tax paid through credit). EMPTY ON PURPOSE: the ledger schemas that were supplied do not say which description or discharge-type values mean what, and a wrong reading would put wrong figures in a return. While this list holds no paid_cash or paid_itc rule, Table 9 'paid' is shown as unknown. To add a rule, check it against a real ledger file or the portal screen, then add an object with: id, kind (cash or liability), at least one of direction (credit or debit), descriptionPattern (a regular expression, case-insensitive), dischargeType; effect (paid_cash, paid_itc or ignore); and verifiedAgainst (what it was checked against: required). The first matching rule wins. See docs/gst/GST_PENDING.md.",
+  "version": "2026-11-none",
+  "rules": []
+}

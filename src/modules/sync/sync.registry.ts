@@ -71,6 +71,9 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   table('tenants', ['id'], true, [], { tenantColumn: 'id' }),
   table('outlets', ['id'], true),
   table('counters', ['id'], true),
+  table('gst_registrations', ['id'], true),
+  table('gst_registration_profiles', ['id'], false),
+  table('entity_turnover_by_fy', ['id'], false),
   table('memberships', ['id'], true, [], {
     join: {
       sql: 'JOIN users u ON u.id = t.user_id',
@@ -82,6 +85,7 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
   table('items', ['id'], true, ['item.create', 'item.update', 'item.delete']),
   table('item_barcodes', ['id'], true, ['item.create', 'item.update']),
   table('customers', ['id'], true, ['customer.create', 'customer.update', 'customer.delete']),
+  table('customer_addresses', ['id'], true, ['customer_address.upsert', 'customer_address.delete']),
   table('terms_conditions', ['id'], true, ['terms.create', 'terms.update', 'terms.delete']),
   table('customer_balances', ['customer_id'], false),
   table('document_series', ['id'], true),
@@ -92,6 +96,9 @@ export const SYNC_TABLES: readonly SyncedTable[] = [
     where: RECENT_LINES,
     omit: ['cogs_amount'],
   }),
+  table('sales_debit_notes', ['id'], false, ['sales_debit_note.create', 'sales_debit_note.void']),
+  table('sales_debit_note_lines', ['id'], false, ['sales_debit_note.create']),
+  table('financial_credit_notes', ['id'], false, ['financial_credit_note.create', 'financial_credit_note.void']),
   table('credit_notes', ['id'], false, [
     'credit_note.create',
     'credit_note.void',

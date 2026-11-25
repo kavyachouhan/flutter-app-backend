@@ -3,7 +3,7 @@ import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { gstin, isoDate, nonEmpty } from '../../lib/validators.js';
 
-export const RETURN_TYPES = ['gstr1', 'gstr3b', 'cmp08'] as const;
+export const RETURN_TYPES = ['gstr1', 'gstr3b', 'gstr9', 'gstr1a', 'cmp08', 'gstr4'] as const;
 export const RETURN_STATUSES = ['open', 'prepared', 'filed'] as const;
 export const ITC_CATEGORIES = ['inputs', 'input_services', 'capital_goods', 'ineligible'] as const;
 export const ITC_STATES = ['available', 'claimed', 'reversed', 'ineligible'] as const;
@@ -45,6 +45,15 @@ export type CreatePeriodBody = z.infer<typeof createPeriodBody>;
  * anything: the figures are the shop's declaration to the department, so
  * somebody has to say they have been filed, and that someone is recorded.
  */
+/**
+ * Options for preparing a return. Only GSTR-9 has any: whether non-GST outward supplies are
+ * reported as exempted (Table 5D) instead of non-GST (5F).
+ */
+export const preparePeriodBody = z
+  .object({ considerNonTaxAsExempt: z.boolean().optional() })
+  .default({});
+export type PreparePeriodBody = z.infer<typeof preparePeriodBody>;
+
 export const filePeriodBody = z.object({
   /** The portal's acknowledgement number, which is the only proof of filing. */
   arn: nonEmpty.max(64).optional(),

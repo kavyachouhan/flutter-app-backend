@@ -306,23 +306,114 @@ export function handWrittenTaxCases(): TaxContractCase[] {
       }),
     },
     {
-      name: 'reverse charge carries no tax but reports the value',
-      input: invoice({ isReverseCharge: true, lines: [line({ taxRatePercent: 18 })] }),
+      name: 'reverse charge computes the tax but leaves it out of the total',
+      input: invoice({ taxPayableBy: 'recipient', lines: [line({ taxRatePercent: 18 })] }),
     },
     {
-      name: 'reverse charge inter-state carries no IGST',
+      name: 'reverse charge inter-state computes IGST and leaves it out of the total',
       input: invoice({
-        isReverseCharge: true,
+        taxPayableBy: 'recipient',
         placeOfSupplyStateCode: '29',
         lines: [line({ taxRatePercent: 18 })],
       }),
     },
     {
-      name: 'reverse charge on an inclusive price takes the price as-is',
+      name: 'reverse charge on an inclusive price takes the price as taxable value',
       input: invoice({
-        isReverseCharge: true,
+        taxPayableBy: 'recipient',
         pricesIncludeTax: true,
-        lines: [line({ unitPrice: 11800 })],
+        lines: [line({ unitPrice: 11800, taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'reverse charge on a taxable charge computes its tax outside the total',
+      input: invoice({
+        taxPayableBy: 'recipient',
+        additionalCharges: [{ id: 'c1', label: 'Freight', amount: 10000, taxable: true, taxRatePercent: 18 }],
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'an unregistered shop has no reverse-charge tax to compute',
+      input: invoice({ mode: 'non_gst', taxPayableBy: 'recipient', lines: [line({ taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'a zero-rated export has no reverse-charge tax to compute',
+      input: invoice({
+        supplyType: 'export_without_tax',
+        placeOfSupplyStateCode: '96',
+        taxPayableBy: 'recipient',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'inclusive ₹100 at 18% totals exactly ₹100',
+      input: invoice({ pricesIncludeTax: true, lines: [line({ unitPrice: 10000, taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'inclusive ₹100 at 18% inter-state costs the same',
+      input: invoice({
+        pricesIncludeTax: true,
+        placeOfSupplyStateCode: '29',
+        lines: [line({ unitPrice: 10000, taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'inclusive fractional rate 0.25% totals its price',
+      input: invoice({ pricesIncludeTax: true, lines: [line({ unitPrice: 123457, taxRatePercent: 0.25 })] }),
+    },
+    {
+      name: 'inclusive with cess totals its price',
+      input: invoice({
+        pricesIncludeTax: true,
+        lines: [line({ unitPrice: 99999, taxRatePercent: 28, cessRatePercent: 12 })],
+      }),
+    },
+    {
+      name: 'a single paisa at 18% inclusive stays non-negative',
+      input: invoice({ pricesIncludeTax: true, lines: [line({ unitPrice: 1, taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'exclusive tax with an odd total still splits into equal halves',
+      input: invoice({ lines: [line({ unitPrice: 8473, taxRatePercent: 18 })] }),
+    },
+    {
+      name: 'a supply to an SEZ in the supplier state is allowed, under IGST',
+      input: invoice({
+        supplyType: 'sez_with_tax',
+        placeOfSupplyStateCode: '27',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'a zero-rated supply to an SEZ in the supplier state is allowed',
+      input: invoice({
+        supplyType: 'sez_without_tax',
+        placeOfSupplyStateCode: '27',
+        lines: [line({ taxRatePercent: 18 })],
+      }),
+    },
+    {
+      name: 'declared inter-state with a same-state place of supply is refused',
+      input: invoice({ supplyType: 'inter_state', placeOfSupplyStateCode: '27', lines: [line()] }),
+    },
+    {
+      name: 'declared inter-state with no place of supply is refused',
+      input: invoice({ supplyType: 'inter_state', lines: [line()] }),
+    },
+    {
+      name: 'declared intra-state with another state as place of supply is refused',
+      input: invoice({ supplyType: 'intra_state', placeOfSupplyStateCode: '29', lines: [line()] }),
+    },
+    {
+      name: 'an export with the supplier state as place of supply is refused',
+      input: invoice({ supplyType: 'export_with_tax', placeOfSupplyStateCode: '27', lines: [line()] }),
+    },
+    {
+      name: 'a fractional non-taxable charge is refused, not truncated',
+      input: invoice({
+        additionalCharges: [{ id: 'c1', label: 'Packing', amount: 100.5, taxable: false }],
+        lines: [line()],
       }),
     },
     {

@@ -1,0 +1,16 @@
+Release 1.0
+
+- Preparation GST ITC-01 return data and Generation of JSON file for upload of data on GST Portal
+- Correction of downloaded GST ITC-01 error file and regeneration of JSON file in offline tool
+
+Release 1.1
+
+- Version 1.1 includes minor bug fixes related to Type Mismatch while entering Invoice Number without Invoice Date
+
+Release 1.2
+
+- Version 1.2 includes minor bug fixes related to .json structure validation.
+
+Release 1.3
+
+- Version 1.3 includes minor bug fixes related to .json structure validation.

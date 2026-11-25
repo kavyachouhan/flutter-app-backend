@@ -28,6 +28,7 @@ import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { apportionLandedCost } from '../../domain/costing/landed-cost.js';
 import { applyReceipt, reverseReceipt } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import type { TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
@@ -36,12 +37,14 @@ import {
   InternalError,
   NotFoundError,
   UnprocessableError,
+  ValidationError,
 } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { accessibleOutletIds, assertOutletAccess } from '../../middleware/authorize.js';
 import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
+import { gstr3bFiledForItc } from '../gst/filing-state.js';
 import { itcRepository } from '../gst/itc.repository.js';
 import { invoicesRepository } from '../invoices/invoices.repository.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
@@ -51,13 +54,14 @@ import {
   type NewSupplierLedgerEntry,
 } from '../suppliers/suppliers.repository.js';
 import { resolveTermsForDocument } from '../terms/terms.service.js';
+import { sellerSnapshot } from '../invoices/invoice-supply.js';
 import { tenantsRepository, type TenantSettings } from '../tenants/tenants.repository.js';
 import { dueDateFor } from '../../domain/purchases/due-date.js';
 import { numberForDocument } from './numbering.js';
 import { ordersRepository } from './orders.repository.js';
 import { assertReceiptFits } from './orders.service.js';
 import { purchasesRepository, type PurchaseBillLineInsert } from './purchases.repository.js';
-import type {
+import type { UpdatePurchaseItcBody,
   CreatePurchaseBillBody,
   CreateSupplierPaymentBody,
   ListPurchaseBillsQuery,
@@ -151,6 +155,11 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const unknown = itemIds.filter((id) => !items.has(id));
     if (unknown.length > 0) throw new NotFoundError('Item', { details: { itemIds: unknown } });
 
+    // Guessing "our own state" here would put tax under the wrong head without anyone seeing.
+    if (taxMode === 'gst' && !supplier.stateCode && body.lines.some((l) => l.taxRatePercent > 0)) {
+      throw new ValidationError('Add this supplier\'s state: it decides IGST or CGST and SGST on the bill.');
+    }
+
     const totals = computeInvoice(
       {
         mode: taxMode,
@@ -160,7 +169,7 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
         supplierStateCode: supplier.stateCode ?? outlet.stateCode ?? settings.stateCode,
         placeOfSupplyStateCode:
           body.placeOfSupplyStateCode ?? outlet.stateCode ?? settings.stateCode,
-        isReverseCharge: body.isReverseCharge,
+        taxPayableBy: taxPayableByFor(body.isReverseCharge),
         pricesIncludeTax: body.pricesIncludeTax,
         roundOff: body.roundOff,
         billDiscount: body.billDiscount,
@@ -195,7 +204,27 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
     const terms = await resolveTermsForDocument(tx, body.termsId, 'purchase');
     assertAttachments(body.attachments);
 
+    const tenant = await tenantsRepository.findCurrent(tx);
+    if (!tenant) throw new NotFoundError('Tenant');
     await purchasesRepository.insertBill(tx, {
+      sellerSnapshot: {
+        name: supplier.name,
+        legalName: null,
+        gstin: supplier.gstin,
+        uin: supplier.uin,
+        gstTreatment: supplier.gstTreatment,
+        address: {
+          line1: supplier.addressLine1,
+          line2: supplier.addressLine2,
+          city: supplier.city,
+          postalCode: supplier.pincode,
+          stateCode: supplier.stateCode,
+          countryCode: supplier.countryCode,
+        },
+        phone: supplier.phone,
+        email: supplier.email,
+      },
+      buyerSnapshot: sellerSnapshot(tenant, outlet, taxMode),
       id: body.id,
       outletId: body.outletId,
       supplierId: supplier.id,
@@ -227,6 +256,16 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       createdBy: auth.userId,
       itcCategory,
       itcIneligibleReason,
+      itc: {
+        use: body.itcUse ?? 'business_taxable',
+        blockedCreditCode: itcEligible ? (body.blockedCreditCode ?? null) : null,
+        goodsReceivedDate: body.goodsReceivedDate ?? null,
+        servicesReceivedDate: body.servicesReceivedDate ?? null,
+        receiptComplete: body.receiptComplete ?? true,
+        boeNumber: body.boeNumber ?? null,
+        boeDate: body.boeDate ?? null,
+        boePortCode: body.boePortCode ?? null,
+      },
     });
 
     const lineRows: PurchaseBillLineInsert[] = body.lines.map((line, index) => {
@@ -480,6 +519,13 @@ export async function voidPurchaseBill(id: string, reason: string) {
     if (!header) throw new NotFoundError('Purchase bill');
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { bill: await loadBill(tx, id), voided: false };
+
+    if (await gstr3bFiledForItc(tx, 'purchase_bill', id)) {
+      throw new UnprocessableError(
+        'The input tax credit on this bill is in a filed GSTR-3B, so the bill can no longer be cancelled. Raise a debit note or correct it in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
 
     if (header.amountPaid > 0) {
       throw new UnprocessableError(
@@ -735,5 +781,40 @@ export function voidSupplierPayment(id: string, reason: string) {
     });
 
     return purchasesRepository.findPayment(tx, id);
+  });
+}
+
+/**
+ * Corrects a bill's credit facts. Refused once the bill's credit has been through a filed GSTR-3B
+ * (a movement recorded, or the period filed before the ITC engine): the filed return is the record.
+ */
+export function updatePurchaseItc(id: string, body: UpdatePurchaseItcBody) {
+  return withTransaction(async (tx) => {
+    const header = await purchasesRepository.findBill(tx, id, true);
+    if (!header) throw new NotFoundError('Purchase bill');
+    assertOutletAccess(header.outletId);
+    if (header.status === 'void') {
+      throw new UnprocessableError('This bill is void.', ErrorCode.UNPROCESSABLE);
+    }
+    const claimed = await tx.one<{ found: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM itc_movements m JOIN itc_register r ON r.id = m.register_id
+          WHERE r.source_type = 'purchase_bill' AND r.source_id = $1) AS found`,
+      [id],
+    );
+    if (claimed?.found || (await gstr3bFiledForItc(tx, 'purchase_bill', id))) {
+      throw new UnprocessableError(
+        'The credit on this bill is already in a filed GSTR-3B. Correct it with a debit note or in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
+    await purchasesRepository.updateItcFacts(tx, id, body);
+    await recordAudit(tx, {
+      action: 'purchase_bill.itc_updated',
+      entityType: 'purchase_bill',
+      entityId: id,
+      metadata: { ...body },
+    });
+    return loadBill(tx, id);
   });
 }

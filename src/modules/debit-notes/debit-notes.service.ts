@@ -16,6 +16,7 @@ import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import { reverseReceipt } from '../../domain/costing/moving-average.js';
 import { computeInvoice } from '../../domain/tax/engine.js';
+import { taxPayableByFor } from '../../domain/tax/types.js';
 import type { SupplyType, TaxMode } from '../../domain/tax/types.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, InternalError, NotFoundError, UnprocessableError } from '../../lib/errors.js';
@@ -26,6 +27,7 @@ import { businessEvents } from '../../observability/metrics.js';
 import { recordAudit } from '../audit/audit.js';
 import { assertFeature } from '../entitlements/entitlements.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
+import { gstr3bFiledForItc } from '../gst/filing-state.js';
 import { itcRepository } from '../gst/itc.repository.js';
 import { numberForDocument } from '../purchases/numbering.js';
 import { purchasesRepository } from '../purchases/purchases.repository.js';
@@ -55,6 +57,9 @@ interface BillForReturn {
   readonly itcCategory: string | null;
   readonly supplyType: SupplyType;
   readonly isReverseCharge: boolean;
+  readonly supplierStateCode: string | null;
+  readonly sellerSnapshot: unknown;
+  readonly buyerSnapshot: unknown;
   readonly placeOfSupplyStateCode: string | null;
   readonly pricesIncludeTax: boolean;
   readonly roundOffEnabled: boolean;
@@ -142,13 +147,14 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
     const totals = computeInvoice(
       {
         mode: bill.taxMode,
-        supplierStateCode: supplier.stateCode ?? settings.stateCode,
+        // The return reverses the bill as it was: a supplier edited since changes nothing here.
+        supplierStateCode: bill.supplierStateCode ?? bill.placeOfSupplyStateCode ?? settings.stateCode,
         placeOfSupplyStateCode: bill.placeOfSupplyStateCode ?? settings.stateCode,
         // Both carried over from the bill: a return of a reverse-charge
         // purchase reverses the same self-assessed liability, so the two have
         // to be reported on the same footing.
         supplyType: bill.supplyType,
-        isReverseCharge: bill.isReverseCharge,
+        taxPayableBy: taxPayableByFor(bill.isReverseCharge),
         pricesIncludeTax: bill.pricesIncludeTax,
         roundOff: bill.roundOffEnabled,
         lines: body.lines.map((line) => {
@@ -183,6 +189,8 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       id: body.id,
       outletId: bill.outletId,
       supplierId: bill.supplierId,
+      sellerSnapshot: bill.sellerSnapshot ?? null,
+      buyerSnapshot: bill.buyerSnapshot ?? null,
       purchaseBillId: body.purchaseBillId,
       originalDocumentNumber: bill.documentNumber,
       seriesId: number.seriesId,
@@ -191,7 +199,7 @@ export async function createDebitNote(body: CreateDebitNoteBody) {
       documentDate: body.documentDate,
       fyStartYear: number.fyStartYear,
       supplierGstin: supplier.gstin,
-      supplierStateCode: supplier.stateCode,
+      supplierStateCode: bill.supplierStateCode,
       placeOfSupplyStateCode: bill.placeOfSupplyStateCode,
       pricesIncludeTax: bill.pricesIncludeTax,
       roundOffEnabled: bill.roundOffEnabled,
@@ -370,6 +378,13 @@ export async function voidDebitNote(id: string, reason: string) {
     if (!header) throw new NotFoundError('Debit note');
     assertOutletAccess(header.outletId);
     if (header.status === 'void') return { note: await loadNote(tx, id), voided: false };
+
+    if (await gstr3bFiledForItc(tx, 'debit_note', id)) {
+      throw new UnprocessableError(
+        'This debit note is in a filed GSTR-3B, so it can no longer be cancelled. Correct it in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
 
     await debitNotesRepository.markVoid(tx, id, reason, auth.userId);
 

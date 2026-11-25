@@ -21,7 +21,7 @@ export async function purchaseRegister(tx: Tx, params: ReportParams): Promise<Re
            b.supplier_invoice_no AS "supplierNumber", s.name AS "supplierName",
            b.supplier_gstin AS "supplierGstin",
            b.taxable_amount AS "taxableAmount",
-           (b.total_cgst + b.total_sgst + b.total_igst + b.total_cess)::bigint AS "taxAmount",
+           (CASE WHEN b.is_reverse_charge THEN 0 ELSE b.total_cgst + b.total_sgst + b.total_igst + b.total_cess END)::bigint AS "taxAmount",
            b.grand_total AS "grandTotal",
            b.itc_eligible::text AS "itcEligible",
            COALESCE(b.itc_category, '-') AS "itcCategory",
@@ -45,7 +45,7 @@ export async function supplierWisePurchases(tx: Tx, params: ReportParams): Promi
     WITH bills AS (
       SELECT b.supplier_id, count(*)::int AS "billCount",
              SUM(b.taxable_amount)::bigint AS "taxableAmount",
-             SUM(b.total_cgst + b.total_sgst + b.total_igst + b.total_cess)::bigint AS "taxAmount",
+             SUM(CASE WHEN b.is_reverse_charge THEN 0 ELSE b.total_cgst + b.total_sgst + b.total_igst + b.total_cess END)::bigint AS "taxAmount",
              SUM(b.grand_total)::bigint AS "grandTotal"
       FROM purchase_bills b
       WHERE b.status <> 'void' AND ${outletScope(p, 'b', params)}

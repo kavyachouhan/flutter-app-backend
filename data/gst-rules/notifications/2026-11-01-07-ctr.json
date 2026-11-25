@@ -1,0 +1,9 @@
+{
+  "issued": "2026-10-27",
+  "effectiveFrom": "2026-11-01",
+  "verificationStatus": "primary_verified",
+  "notification": "07/2026-CT(R)",
+  "sourceFile": "data/CBIC/notfctn_07_CTR_En.pdf",
+  "treatment": "deferred",
+  "reason": "Conditional service exemptions amending Notif. 12/2017-CT(R). A heading-wide entry would wrongly exempt the rest of the heading; needs the principal table for those headings."
+}

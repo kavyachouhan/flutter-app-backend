@@ -1,0 +1,32 @@
+{
+        
+            "type": "object",
+            "title": "GSTR2B Generate 2B On Demand Schema",
+            "additionalProperties": false,
+            "properties": {
+                "rtin": {
+                    "description": "Receipient GSTIN",
+                    "$ref": "#/definitions/gstin"
+                },
+                 "itcprd": {
+                    "description": "ITC period",
+                    "$ref": "#/definitions/itcprd"
+                }
+             },
+            "required": [
+                "rtin",
+                "itcprd"
+            ],
+    "definitions": {
+        "gstin": {
+            "type": "string",
+            "maxLength": 15,
+            "minLength": 15,
+            "pattern": "[0-9]{2}[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}[1-9A-Za-z]{1}[Zz1-9A-Ja-j]{1}[0-9a-zA-Z]{1}"
+        },
+        "itcprd": {
+            "type": "string",
+            "pattern": "^((0[1-9]|1[012])((19|20)\\d\\d))$"
+        }
+	}
+}

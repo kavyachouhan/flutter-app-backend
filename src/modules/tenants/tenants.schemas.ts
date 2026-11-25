@@ -20,8 +20,8 @@ const profileFields = {
     .optional(),
   /**
    * The rate actually used. Defaulted from the category but stored
-   * separately, because the notified rates change and a CMP-08 already filed
-   * must keep reporting the rate it was filed at.
+   * separately, because the notified rates change and a shop's own figure
+   * must not move when the default does.
    */
   compositionRatePercent: z.number().min(0).max(100).nullable().optional(),
   /** Decides which periods exist to file at all. */

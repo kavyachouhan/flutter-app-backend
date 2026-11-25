@@ -30,5 +30,14 @@ export type CreateReceiptBody = z.infer<typeof createReceiptBody>;
 
 export const voidPaymentBody = z.object({ reason: nonEmpty });
 
+/** Settles invoices from what is still unallocated on a receipt (an advance on the khata). */
+export const allocateReceiptBody = z.object({
+  allocations: z
+    .array(z.object({ invoiceId: z.string().uuid(), amount: positivePaise }))
+    .min(1)
+    .max(200),
+});
+export type AllocateReceiptBody = z.infer<typeof allocateReceiptBody>;
+
 export const listPaymentsQuery = pageQuery.extend({ customerId: z.string().uuid().optional() });
 export type ListPaymentsQuery = z.infer<typeof listPaymentsQuery>;

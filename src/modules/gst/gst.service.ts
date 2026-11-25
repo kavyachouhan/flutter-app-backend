@@ -1,5 +1,5 @@
 /**
- * GSTR-1 and 3B workings, the ITC register, and CMP-08.
+ * GSTR-1, GSTR-3B and GSTR-9 workings, and the ITC register.
  *
  * Three rules shape this module, and all three are about not telling the
  * department something untrue.
@@ -20,33 +20,47 @@
  */
 import { env } from '../../config/env.js';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
-import {
-  classifyOutward,
-  periodOf,
-  sectionForOutward,
-  type Gstr1Table,
-  type SupplyCategory,
-  type SupplyType,
-} from '../../domain/gst/classify.js';
-import { compositionLiability, compositionQuarter } from '../../domain/gst/composition.js';
+import { periodOf } from '../../domain/gst/classify.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ConflictError, ErrorCode, NotFoundError, UnprocessableError } from '../../lib/errors.js';
 import { buildPage, parsePage } from '../../lib/pagination.js';
 import { recordAudit } from '../audit/audit.js';
 import { businessEvents } from '../../observability/metrics.js';
 import { assertFeature } from '../entitlements/entitlements.js';
-import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
-import { gstRepository, type GstReturnPeriodRow, type OutwardDocumentRow } from './gst.repository.js';
+import { gstRepository, type GstReturnPeriodRow } from './gst.repository.js';
+import { fyEndMonth, periodWindow } from './period-window.js';
+import { computeGstr9 } from './returns/gstr9.service.js';
+import {
+  computeGstr1,
+  computeGstr3b,
+  toStoredWorkings,
+  type ItcProposal,
+} from './returns/returns.service.js';
+import { itcEngineRepository } from './itc/itc-engine.repository.js';
+import { computeGstr1a } from './returns/gstr1a.service.js';
+import {
+  computeCmp08,
+  computeGstr4,
+  type CompositionWorkings,
+} from './returns/composition.service.js';
+import type { Gstr1Return } from '../../domain/gst/returns/model.js';
 import { itcRepository } from './itc.repository.js';
+import {
+  annualReturnObligation,
+  isTimeBarred,
+  standardDueDate,
+  timeBarredFrom,
+} from '../../domain/gst/filing-obligations.js';
+import { resolvedTurnover } from '../../domain/gst/entity.js';
+import type { WorkingIssue } from '../../domain/gst/returns/sheets.js';
 import type {
   CreatePeriodBody,
+  PreparePeriodBody,
   FilePeriodBody,
   ItcRegisterQuery,
   ListPeriodsQuery,
 } from './gst.schemas.js';
-
-
 
 async function requirePeriod(tx: Tx, id: string, forUpdate = false): Promise<GstReturnPeriodRow> {
   const period = await gstRepository.findPeriod(tx, id, forUpdate);
@@ -54,85 +68,10 @@ async function requirePeriod(tx: Tx, id: string, forUpdate = false): Promise<Gst
   return period;
 }
 
-/**
- * Every GSTIN this business files under: the tenant's, plus any outlet that
- * overrides it.
- *
- * Exported because the reports need the same list — filing is per
- * registration, and there is no other helper that resolves it.
- */
-export async function filingGstins(tx: Tx): Promise<string[]> {
-  const settings = await tenantsRepository.getSettings(tx);
-  const outlets = await outletsRepository.listOutlets(tx, null);
-  const gstins = new Set<string>();
-  if (settings.gstin) gstins.add(settings.gstin);
-  for (const outlet of outlets) if (outlet.gstin) gstins.add(outlet.gstin);
-  return [...gstins];
-}
+export { periodWindow } from './period-window.js';
 
-async function resolveGstin(tx: Tx, requested: string | undefined): Promise<string> {
-  const available = await filingGstins(tx);
-  if (requested) {
-    if (!available.includes(requested)) {
-      throw new UnprocessableError(
-        'That GSTIN does not belong to this business.',
-        ErrorCode.UNPROCESSABLE,
-        { details: { gstin: requested, available } },
-      );
-    }
-    return requested;
-  }
-  const only = available[0];
-  if (!only) {
-    throw new UnprocessableError(
-      'This business is not GST registered, so it has no returns to file.',
-      ErrorCode.UNPROCESSABLE,
-    );
-  }
-  if (available.length > 1) {
-    throw new UnprocessableError(
-      'This business files under more than one GSTIN; name the one you mean.',
-      ErrorCode.UNPROCESSABLE,
-      { details: { available } },
-    );
-  }
-  return only;
-}
-
-/** Last day of a month, without constructing a date in the wrong timezone. */
-function lastDayOf(year: number, month: number): string {
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  const firstOfNext = new Date(Date.UTC(nextYear, nextMonth - 1, 1));
-  const last = new Date(firstOfNext.getTime() - 86_400_000);
-  return last.toISOString().slice(0, 10);
-}
-
-/**
- * The window a period covers.
- *
- * CMP-08 is quarterly on the financial year; GSTR-1 and 3B are monthly unless
- * the shop is on QRMP, in which case GSTR-1 is quarterly too. Getting this
- * wrong files a correct set of figures against the wrong months, which is
- * harder to spot than a wrong figure.
- */
-async function periodWindow(
-  tx: Tx,
-  returnType: string,
-  year: number,
-  month: number,
-): Promise<{ from: string; to: string }> {
-  const settings = await tenantsRepository.getSettings(tx);
-  const quarterly = returnType === 'cmp08' || settings.filingFrequency === 'qrmp';
-  if (!quarterly) {
-    return { from: `${year}-${String(month).padStart(2, '0')}-01`, to: lastDayOf(year, month) };
-  }
-  const quarter = compositionQuarter(year, month, settings.fyStartMonth);
-  return {
-    from: `${quarter.fromYear}-${String(quarter.fromMonth).padStart(2, '0')}-01`,
-    to: lastDayOf(quarter.toYear, quarter.toMonth),
-  };
-}
+export { filingGstins, resolveGstin } from './gstin-scope.js';
+import { resolveGstin } from './gstin-scope.js';
 
 export async function listPeriods(query: ListPeriodsQuery) {
   const page = parsePage(query);
@@ -164,32 +103,67 @@ export function createPeriod(body: CreatePeriodBody) {
     const gstin = await resolveGstin(tx, body.gstin);
     const settings = await tenantsRepository.getSettings(tx);
 
-    // A composition dealer files CMP-08, not GSTR-1 and 3B, and a regular
-    // dealer the reverse. Offering the wrong one is how a shop files a return
-    // it does not owe and leaves the one it does unfiled.
-    if (settings.isComposition && body.returnType !== 'cmp08') {
+    // A composition dealer files CMP-08 (quarterly) and GSTR-4 (annual); a regular dealer files
+    // GSTR-1, 1A, 3B and 9. Offering the other kind would have the shop file a return it does not owe.
+    const compositionReturn = body.returnType === 'cmp08' || body.returnType === 'gstr4';
+    if (settings.isComposition && !compositionReturn) {
       throw new UnprocessableError(
-        'A composition dealer files CMP-08, not GSTR-1 or GSTR-3B.',
+        'A composition dealer files CMP-08 every quarter and GSTR-4 for the year, not GSTR-1, GSTR-3B or GSTR-9.',
         ErrorCode.UNPROCESSABLE,
       );
     }
-    if (!settings.isComposition && body.returnType === 'cmp08') {
+    if (!settings.isComposition && compositionReturn) {
       throw new UnprocessableError(
-        'CMP-08 applies only under the composition scheme.',
+        'CMP-08 and GSTR-4 are for composition dealers only.',
         ErrorCode.UNPROCESSABLE,
       );
     }
 
+    // A GSTR-9 period is a financial year: the year is the one it starts in and the month is the
+    // year's last, whatever the client sent, so there is one period per year and registration.
+    // CMP-08: the quarter's last month (statutory April year). GSTR-4: March of the year.
+    const periodMonth =
+      body.returnType === 'gstr9'
+        ? fyEndMonth(settings.fyStartMonth)
+        : body.returnType === 'gstr4'
+          ? 3
+          : body.returnType === 'cmp08'
+            ? [3, 6, 9, 12][Math.floor((((body.periodMonth - 4 + 12) % 12) / 3 + 1) % 4)]!
+            : body.periodMonth;
     const scope = {
       gstin,
       returnType: body.returnType,
       periodYear: body.periodYear,
-      periodMonth: body.periodMonth,
+      periodMonth,
     };
     const duplicate = await gstRepository.findPeriodByScope(tx, scope);
     if (duplicate) return duplicate;
 
-    const window = await periodWindow(tx, body.returnType, body.periodYear, body.periodMonth);
+    // GSTR-1A exists only between the filed GSTR-1 and the GSTR-3B of the same period.
+    if (body.returnType === 'gstr1a') {
+      const state = await tx.one<{ gstr1: boolean; gstr3b: boolean }>(
+        `SELECT
+           EXISTS (SELECT 1 FROM gst_return_periods WHERE gstin = $1 AND return_type = 'gstr1'
+                    AND status = 'filed' AND period_year = $2 AND period_month = $3) AS gstr1,
+           EXISTS (SELECT 1 FROM gst_return_periods WHERE gstin = $1 AND return_type = 'gstr3b'
+                    AND status = 'filed' AND period_year = $2 AND period_month = $3) AS gstr3b`,
+        [gstin, body.periodYear, periodMonth],
+      );
+      if (!state?.gstr1) {
+        throw new UnprocessableError(
+          'GSTR-1A opens only after the GSTR-1 for the period is filed.',
+          ErrorCode.UNPROCESSABLE,
+        );
+      }
+      if (state.gstr3b) {
+        throw new UnprocessableError(
+          'GSTR-1A closes when the GSTR-3B for the period is filed; amend in a later GSTR-1 instead.',
+          ErrorCode.UNPROCESSABLE,
+        );
+      }
+    }
+
+    const window = await periodWindow(tx, body.returnType, body.periodYear, periodMonth);
     await gstRepository.insertPeriod(tx, {
       id: body.id,
       ...scope,
@@ -209,7 +183,7 @@ export function createPeriod(body: CreatePeriodBody) {
  * changing it silently would be the one genuinely dangerous thing this module
  * could do.
  */
-export function preparePeriod(id: string) {
+export function preparePeriod(id: string, options: PreparePeriodBody = {}) {
   const auth = requireAuthContext();
 
   return withTransaction(async (tx) => {
@@ -233,7 +207,14 @@ export function preparePeriod(id: string) {
         ? await buildGstr1(tx, period)
         : period.returnType === 'gstr3b'
           ? await buildGstr3b(tx, period)
-          : await buildCmp08(tx, period);
+          : period.returnType === 'gstr1a'
+            ? await buildGstr1aPeriod(tx, period)
+            : period.returnType === 'cmp08'
+              ? stored(period, await computeCmp08(tx, period.gstin, period.periodFrom, period.periodTo))
+              : period.returnType === 'gstr4'
+                ? stored(period, await computeGstr4(tx, period.gstin, period.periodYear))
+                : await buildGstr9Period(tx, period, options);
+    await addObligationIssues(tx, period, workings);
 
     await gstRepository.savePrepared(tx, id, workings.workings, workings.totals, auth.userId);
     await recordAudit(tx, {
@@ -270,6 +251,37 @@ export function filePeriod(id: string, body: FilePeriodBody) {
     if (period.status === 'filed') return period;
 
     await gstRepository.markFiled(tx, id, auth.userId, body.arn ?? null, body.notes ?? null);
+    // GSTR-1 and GSTR-3B lock the period on the registration (GSTR-9 has no lock level):
+    // documents dated in it can then only be corrected by notes or amendments.
+    let locked = false;
+    let movements = 0;
+    if (period.returnType === 'gstr3b') {
+      // The credit this return claimed, reversed and reclaimed becomes part of each document's
+      // history, which the next return's ITC engine reads.
+      const proposal = (period.workings as { itc?: ItcProposal } | null)?.itc;
+      if (proposal?.engine === 'v1') {
+        await itcEngineRepository.insertMovements(
+          tx,
+          {
+            gstin: period.gstin,
+            returnPeriodId: period.id,
+            period: `${period.periodYear}-${String(period.periodMonth).padStart(2, '0')}`,
+            createdBy: auth.userId,
+          },
+          proposal.movements,
+        );
+        movements = proposal.movements.length;
+      }
+    }
+    if (period.returnType === 'gstr1' || period.returnType === 'gstr3b') {
+      locked = await gstRepository.recordPeriodLock(
+        tx,
+        period.gstin,
+        period.returnType === 'gstr1' ? 'gstr1_filed' : 'gstr3b_filed',
+        period.periodTo,
+        auth.userId,
+      );
+    }
     await recordAudit(tx, {
       action: 'gst_return.filed',
       entityType: 'gst_return_period',
@@ -280,6 +292,8 @@ export function filePeriod(id: string, body: FilePeriodBody) {
         period: `${period.periodYear}-${String(period.periodMonth).padStart(2, '0')}`,
         arn: body.arn ?? null,
         totalTax: period.totalTax,
+        periodLocked: locked,
+        itcMovements: movements,
       },
     });
     businessEvents.inc({ event: 'gst_return.filed' });
@@ -287,276 +301,166 @@ export function filePeriod(id: string, body: FilePeriodBody) {
   });
 }
 
-// --- Workings --------------------------------------------------------------
+// --- Workings ---------------------------------------------------------------
+
+/**
+ * Warnings about the obligation itself, added to every prepared return (see
+ * `domain/gst/filing-obligations.ts`): the three-year bar on filing (s.37(5), 39(11), 44(2))
+ * and, for GSTR-9, whether the annual return is optional at this turnover. Warnings only;
+ * nothing is blocked.
+ */
+async function addObligationIssues(
+  tx: Tx,
+  period: GstReturnPeriodRow,
+  workings: Workings,
+): Promise<void> {
+  const extra: WorkingIssue[] = [];
+  const freq = await gstRepository.filingFrequencyOn(tx, period.gstin, period.periodTo);
+  const due = standardDueDate(period.returnType, period.periodYear, period.periodMonth, freq);
+  const today = new Date().toISOString().slice(0, 10);
+  if (isTimeBarred(due, today)) {
+    extra.push({
+      severity: 'warning',
+      code: 'return_time_barred',
+      message: `This return was due on ${due} and cannot be filed after ${timeBarredFrom(due)} (three years from the due date: s.37(5), 39(11) and 44(2), in force from 01.10.2023). The portal will not accept it.`,
+    });
+  }
+  if (period.returnType === 'gstr9') {
+    const turnover = await gstRepository.turnoverRecords(tx);
+    const obligation = annualReturnObligation(
+      period.periodYear,
+      resolvedTurnover({ exemptionCategory: 'none', turnover }, period.periodYear),
+    );
+    if (obligation.status !== 'required') {
+      extra.push({
+        severity: 'info',
+        code: obligation.status === 'optional' ? 'gstr9_optional' : 'gstr9_obligation_unknown',
+        message:
+          obligation.status === 'optional'
+            ? `GSTR-9 is optional for this year. ${obligation.basis}`
+            : `GSTR-9 may be optional for this year. ${obligation.basis}`,
+      });
+    }
+  }
+  if (extra.length === 0) return;
+  const stored = workings.workings as { issues?: WorkingIssue[] };
+  stored.issues = [...(stored.issues ?? []), ...extra];
+}
 
 interface Workings {
   workings: Record<string, unknown>;
   totals: { totalTaxable: number; totalTax: number };
 }
 
-const taxOf = (document: OutwardDocumentRow): number =>
-  document.totalCgst + document.totalSgst + document.totalIgst + document.totalCess;
+const boundsOf = (period: GstReturnPeriodRow) => ({
+  gstin: period.gstin,
+  period: { year: period.periodYear, month: period.periodMonth },
+  from: period.periodFrom,
+  to: period.periodTo,
+});
 
 /**
- * GSTR-1: the outward supply tables.
- *
- * B2B, B2CL, exports, SEZ and the credit/debit-note tables are reported
- * document by document, because the buyer's credit depends on the individual
- * invoice. B2CS is a rate-wise aggregate per place of supply — the portal does
- * not want a row per corner-shop sale, and a shop doing two hundred bills a
- * day would produce a file nobody could upload.
+ * GSTR-1. The figures come from the line-level engine in `domain/gst/returns`; this function only
+ * stores them. The stored workings carry the sheets the app shows and the exports are rendered
+ * from, plus the neutral model the portal JSON mapper reads, so every output agrees.
  */
 async function buildGstr1(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const documents = await gstRepository.outwardDocuments(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const itemised: Record<string, unknown[]> = { b2b: [], b2cl: [], export: [], sez: [], cdnr: [], cdnur: [] };
-  // Keyed by place of supply and rate, which is what table 7 reports on.
-  const b2cs = new Map<string, { placeOfSupply: string; taxRatePercent: number; taxableAmount: number; tax: number }>();
-
-  let totalTaxable = 0;
-  let totalTax = 0;
-
-  for (const document of documents) {
-    const table: Gstr1Table = classifyOutward({
-      customerGstin: document.customerGstin,
-      supplyType: document.supplyType as SupplyType,
-      grandTotal: document.grandTotal,
-      isCreditOrDebitNote: document.kind === 'credit_note',
-      lineCategories: document.lineCategories as SupplyCategory[],
-    });
-
-    // A credit note reduces the period's supply, so it counts negatively
-    // towards the headline figures even though it is listed positively in its
-    // own table — which is how the portal expects both.
-    const sign = document.kind === 'credit_note' ? -1 : 1;
-    totalTaxable += sign * document.taxableAmount;
-    totalTax += sign * taxOf(document);
-
-    if (table === 'nil_exempt_non_gst') continue;
-
-    if (table === 'b2cs') {
-      for (const rate of document.taxSummary ?? []) {
-        const placeOfSupply = document.placeOfSupplyStateCode ?? 'unknown';
-        const key = `${placeOfSupply}|${rate.taxRatePercent}`;
-        const current = b2cs.get(key) ?? {
-          placeOfSupply,
-          taxRatePercent: rate.taxRatePercent,
-          taxableAmount: 0,
-          tax: 0,
-        };
-        current.taxableAmount += sign * rate.taxableAmount;
-        b2cs.set(key, current);
-      }
-      continue;
-    }
-
-    (itemised[table] ??= []).push({
-      documentNumber: document.documentNumber,
-      documentDate: document.documentDate,
-      customerGstin: document.customerGstin,
-      customerName: document.customerName,
-      placeOfSupply: document.placeOfSupplyStateCode,
-      supplyType: document.supplyType,
-      isReverseCharge: document.isReverseCharge,
-      taxableAmount: document.taxableAmount,
-      cgst: document.totalCgst,
-      sgst: document.totalSgst,
-      igst: document.totalIgst,
-      cess: document.totalCess,
-      invoiceValue: document.grandTotal,
-      ...(document.originalDocumentNumber
-        ? { originalDocumentNumber: document.originalDocumentNumber }
-        : {}),
-    });
-  }
-
-  const categories = await gstRepository.categoryTotals(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const hsn = await gstRepository.hsnSummary(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const documentsIssued = await gstRepository.documentsIssued(
-    tx,
-    period.periodFrom,
-    period.periodTo,
-  );
-
+  const w = await computeGstr1(tx, boundsOf(period));
   return {
-    workings: {
-      // Table numbers are carried in the keys so a client, an accountant and
-      // the portal's own JSON all agree on what each block is.
-      b2b: itemised['b2b'],
-      b2cl: itemised['b2cl'],
-      b2cs: [...b2cs.values()],
-      exports: itemised['export'],
-      sez: itemised['sez'],
-      cdnr: itemised['cdnr'],
-      cdnur: itemised['cdnur'],
-      nilExemptNonGst: categories.filter((row) => row.supplyCategory !== 'taxable'),
-      hsnSummary: hsn,
-      documentsIssued,
-    },
-    totals: { totalTaxable, totalTax },
+    workings: toStoredWorkings(w),
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }
 
 /**
- * GSTR-3B: the summary return.
- *
- * Section 3.1 is outward supply split by classification; table 4 is input tax
- * credit split the four ways the form requires. Reverse-charge inward supplies
- * appear in both — a liability under 3.1(d) and a credit under 4(A)(3) — and
- * netting them would understate both sides.
+ * GSTR-9, the annual return: summed from the year's period returns (see `gstr9.service`). The
+ * option chosen when preparing is stored with the workings, so a re-prepare keeps it unless the
+ * caller says otherwise.
  */
-async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const categories = await gstRepository.categoryTotals(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const documents = await gstRepository.outwardDocuments(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const sections: Record<string, { taxableAmount: number; cgst: number; sgst: number; igst: number; cess: number }> = {};
-  const add = (
-    section: string,
-    values: { taxableAmount: number; cgst: number; sgst: number; igst: number; cess: number },
-  ) => {
-    const current = (sections[section] ??= {
-      taxableAmount: 0,
-      cgst: 0,
-      sgst: 0,
-      igst: 0,
-      cess: 0,
-    });
-    current.taxableAmount += values.taxableAmount;
-    current.cgst += values.cgst;
-    current.sgst += values.sgst;
-    current.igst += values.igst;
-    current.cess += values.cess;
-  };
-
-  // Taxable value by section comes from the line classifications; the tax on
-  // it comes from the documents, because tax is a document-level total once
-  // charges and round-off are in it.
-  for (const row of categories) {
-    add(
-      sectionForOutward(row.supplyType as SupplyType, row.supplyCategory as SupplyCategory),
-      { taxableAmount: row.taxableAmount, cgst: 0, sgst: 0, igst: 0, cess: 0 },
-    );
-  }
-  for (const document of documents) {
-    const sign = document.kind === 'credit_note' ? -1 : 1;
-    const zeroRated =
-      document.supplyType.startsWith('export') || document.supplyType.startsWith('sez');
-    add(zeroRated ? '3.1b' : '3.1a', {
-      taxableAmount: 0,
-      cgst: sign * document.totalCgst,
-      sgst: sign * document.totalSgst,
-      igst: sign * document.totalIgst,
-      cess: sign * document.totalCess,
-    });
-  }
-
-  const reverseCharge = (
-    await gstRepository.reverseChargeInward(tx, period.periodFrom, period.periodTo)
-  )[0];
-
-  const itc = await itcRepository.totalsForPeriod(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-
-  const totalTaxable =
-    Object.values(sections).reduce((sum, section) => sum + section.taxableAmount, 0) +
-    (reverseCharge?.taxableAmount ?? 0);
-  const totalTax =
-    Object.values(sections).reduce(
-      (sum, section) => sum + section.cgst + section.sgst + section.igst + section.cess,
-      0,
-    ) + (reverseCharge?.tax ?? 0);
-
+async function buildGstr9Period(
+  tx: Tx,
+  period: GstReturnPeriodRow,
+  options: PreparePeriodBody,
+): Promise<Workings> {
+  const previous = (period.workings as { options?: { considerNonTaxAsExempt?: boolean } } | null)
+    ?.options?.considerNonTaxAsExempt;
+  const considerNonTaxAsExempt = options.considerNonTaxAsExempt ?? previous ?? false;
+  const w = await computeGstr9(tx, period, { considerNonTaxAsExempt });
   return {
-    workings: {
-      outwardSupplies: sections,
-      // 3.1(d) is an *inward* supply the shop self-assesses tax on, so it is
-      // not one of the outward sections. Its tax is a single self-assessed
-      // figure rather than a CGST/SGST/IGST split: the head depends on where
-      // the supplier was, and an unregistered supplier has no return to
-      // reconcile the split against. Reporting it as one number is what the
-      // form asks for and is the only figure that can be defended.
-      inwardReverseCharge: {
-        taxableAmount: reverseCharge?.taxableAmount ?? 0,
-        selfAssessedTax: reverseCharge?.tax ?? 0,
-      },
-      inputTaxCredit: {
-        // 4(A): credit available, by category.
-        available: itc.filter((row) => row.itcCategory !== 'ineligible' && !row.isReverseCharge),
-        reverseCharge: itc.filter((row) => row.isReverseCharge),
-        // 4(D): credit that is not available at all, which still has to be
-        // declared rather than quietly dropped.
-        ineligible: itc.filter((row) => row.itcCategory === 'ineligible'),
-      },
-    },
-    totals: { totalTaxable, totalTax },
+    workings: { ...toStoredWorkings(w), options: { considerNonTaxAsExempt } },
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }
 
-/** CMP-08: flat tax on turnover, plus any reverse-charge tax owed on top. */
-async function buildCmp08(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
-  const settings = await tenantsRepository.getSettings(tx);
-  if (settings.compositionRatePercent === null) {
-    throw new UnprocessableError(
-      'Set the composition category and rate in settings before preparing CMP-08.',
-      ErrorCode.UNPROCESSABLE,
-    );
+/**
+ * GSTR-3B, built from the same outward figures as GSTR-1 plus the purchase side. When a GSTR-1 for
+ * the same registration and month has already been prepared, the two are compared and a difference
+ * is reported: it means bills changed after one of them was prepared.
+ */
+async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
+  const w = await computeGstr3b(tx, boundsOf(period));
+  const stored = await tx.one<{ totalTaxable: number | null; totalTax: number | null; status: string }>(
+    `SELECT total_taxable AS "totalTaxable", total_tax AS "totalTax", status FROM gst_return_periods
+     WHERE gstin = $1 AND return_type = 'gstr1' AND period_year = $2 AND period_month = $3
+       AND status IN ('prepared', 'filed')`,
+    [period.gstin, period.periodYear, period.periodMonth],
+  );
+  const issues = [...w.issues];
+  if (stored && stored.totalTaxable !== null) {
+    const fresh = await computeGstr1(tx, boundsOf(period));
+    if (
+      Number(stored.totalTaxable) !== fresh.totals.taxable ||
+      Number(stored.totalTax) !== fresh.totals.tax
+    ) {
+      issues.push(
+        stored.status === 'filed'
+          ? {
+              severity: 'warning',
+              code: 'gstr1_changed_since_filed',
+              message: `Bills of this period changed after GSTR-1 was filed (filed taxable ${stored.totalTaxable}, today ${fresh.totals.taxable} paise). Report the difference in GSTR-1A before filing this GSTR-3B, or in a later GSTR-1.`,
+            }
+          : {
+        severity: 'error',
+        code: 'gstr1_changed_since_prepared',
+        message: `The prepared GSTR-1 shows taxable ${stored.totalTaxable} and tax ${stored.totalTax} (paise), but today's bills give ${fresh.totals.taxable} and ${fresh.totals.tax}. Prepare GSTR-1 again so both returns agree.`,
+            },
+      );
+    }
+  } else {
+    issues.push({
+      severity: 'info',
+      code: 'gstr1_not_prepared',
+      message: 'GSTR-1 for this month has not been prepared, so the two returns were not compared.',
+    });
   }
-
-  const turnover = await gstRepository.compositionTurnover(
-    tx,
-    period.gstin,
-    period.periodFrom,
-    period.periodTo,
-  );
-  const reverseCharge = (
-    await gstRepository.reverseChargeInward(tx, period.periodFrom, period.periodTo)
-  )[0];
-
-  const liability = compositionLiability(
-    {
-      outwardSupplies: turnover?.outwardSupplies ?? 0,
-      reverseChargeInward: reverseCharge?.taxableAmount ?? 0,
-      reverseChargeTax: reverseCharge?.tax ?? 0,
-    },
-    Number(settings.compositionRatePercent),
-  );
-
   return {
-    workings: {
-      category: settings.compositionCategory,
-      ...liability,
-      reverseChargeInward: reverseCharge?.taxableAmount ?? 0,
-    },
-    totals: { totalTaxable: liability.turnover, totalTax: liability.totalPayable },
+    // `itcEngine` marks a return whose credit came from the ITC engine: filing it writes the
+    // movements in `itc`. Returns filed before the engine have no flag (see legacyClaimedThrough).
+    workings: { ...toStoredWorkings({ ...w, issues }), itcEngine: 'v1' },
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
+  };
+}
+
+// The app reads `gstin` and `summary` on every stored workings object.
+const stored = (period: GstReturnPeriodRow, w: CompositionWorkings): Workings => ({
+  workings: { ...w, gstin: period.gstin, summary: [] } as unknown as Record<string, unknown>,
+  totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
+});
+
+/** GSTR-1A: what changed since the filed GSTR-1 of the same period (see gstr1a.service). */
+async function buildGstr1aPeriod(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
+  const filed = await tx.one<{ workings: { model?: unknown } }>(
+    `SELECT workings FROM gst_return_periods WHERE gstin = $1 AND return_type = 'gstr1'
+       AND status = 'filed' AND period_year = $2 AND period_month = $3`,
+    [period.gstin, period.periodYear, period.periodMonth],
+  );
+  if (!filed?.workings?.model) {
+    throw new UnprocessableError('The GSTR-1 for this period is not filed.', ErrorCode.UNPROCESSABLE);
+  }
+  const w = await computeGstr1a(tx, boundsOf(period), filed.workings.model as Gstr1Return);
+  return {
+    workings: { ...w, gstin: period.gstin, summary: [] } as unknown as Record<string, unknown>,
+    totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
   };
 }
 

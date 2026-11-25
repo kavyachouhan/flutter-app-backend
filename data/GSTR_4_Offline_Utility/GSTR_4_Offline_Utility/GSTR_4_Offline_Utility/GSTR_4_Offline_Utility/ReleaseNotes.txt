@@ -1,0 +1,41 @@
+﻿####################################################################################################
+# PLEASE KEEP THE WIDTH OF THE LINES BELOW WITHIN 100 CHARACTERS.                                  #
+# MOST RECENT CHANGE AT THE TOP.                                                                   #                                                                                 #                                                          #
+####################################################################################################
+Release 3.3
+-Removing FY2019-2020
+Release 3.2
+-Adding validation for invoice dates for FY2019-2020
+Release 3.1
+-Adding Data Validation for rows upto 10K.
+
+
+Release 3.0
+-Adding feature for incremental upload of details on GST Portal
+-Adding action of Add/delete at a record level 
+-Error file handling simplified; only records with error need to re-uploded post rectification
+
+Release 2.3
+- Return period for Q1 i.e. (Apr-Jun, 2018-19) is enabled for return preparation.
+
+Release 2.2
+-Defect Fix for "run time error 457:The key is already associated with an element of this collection" when the user is generating json.
+
+Release 2.1
+- Return period for Q4 i.e. (Jan-Mar) is enabled for return preparation.
+- Return period change in the json generated – it will be 092017, 122017 and 032018 instead of
+  142017, 152017 and 162017.
+- Section 4A added in the utility. Renamed sheet 4B to 4-A&B(B2B) and provided a “Yes” option in
+  reverse charge dropdown.
+- Reason for issuing credit and debit note is removed from CDNR/CDNUR and their Amendments.
+- Oct-Dec added in ATA, TXPDA and TXOSA in omon dropdown.
+
+Release 2.0
+- Adding new sheets for Amendment Sections
+
+Release 1.1
+- Return period for Q3 i.e. (Oct-Dec) is enabled for return preparation
+
+Release 1.0
+- Preparation GSTR-4 return data and Generation of JSON file for upload of data on GST Portal
+- Correction of downloaded GSTR-4 error file and regeneration of JSON file in offline tool

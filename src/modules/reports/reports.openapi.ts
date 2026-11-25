@@ -38,6 +38,7 @@ export const reportCatalogueEntrySchema = registry.register(
     description: z.string(),
     group: z.enum(['sales', 'inventory', 'money', 'customers', 'compliance']),
     filters: z.array(z.string()),
+    screen: z.string().nullable(),
     locked: z.boolean().openapi({
       description: 'The plan does not include it. Render an upsell rather than running it.',
     }),

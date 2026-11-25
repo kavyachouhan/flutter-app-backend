@@ -9,7 +9,7 @@ export interface TenantRow {
   isGstRegistered: boolean;
   gstin: string | null;
   isComposition: boolean;
-  /** Decides the CMP-08 rate. Null until a composition shop is asked. */
+  /** Decides the composition rate. Null until a composition shop is asked. */
   compositionCategory: 'trader' | 'manufacturer' | 'restaurant' | 'service' | null;
   /** NUMERIC: a string from pg. Stored, not derived, so an old return keeps its rate. */
   compositionRatePercent: string | null;

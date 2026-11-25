@@ -39,12 +39,30 @@ export type Gstr1Table =
  * Invoice value above which an inter-state sale to an unregistered buyer is
  * reported individually (B2CL, table 5) rather than inside a rate-wise total.
  *
- * ₹2.5 lakh, in paise. A constant rather than configuration because it is a
- * statutory figure, and a shop that could change it would file a wrong return
- * without knowing. It moves by notification, which is a code change with a
- * test, as it should be.
+ * ₹2.5 lakh up to 31.07.2024 and ₹1 lakh from 01.08.2024 (Rule 59(4) as amended
+ * by Notification 12/2024-Central Tax). It is in code rather than configuration
+ * because it is a statutory figure, and a shop that could change it would file a
+ * wrong return without knowing. Changes come by notification, so each one is a
+ * code change with a test.
  */
-export const B2CL_THRESHOLD_PAISE = 25_000_000;
+export const B2CL_THRESHOLD_PAISE = 10_000_000;
+
+/** The threshold before 01.08.2024. */
+export const B2CL_THRESHOLD_BEFORE_AUG_2024_PAISE = 25_000_000;
+
+/** First day the ₹1 lakh threshold applies. */
+export const B2CL_THRESHOLD_REDUCED_FROM = '2024-08-01';
+
+/**
+ * The B2CL threshold for a document dated `date` (ISO `YYYY-MM-DD`). The Offline
+ * Tool applies the limit by return period. A document is reported in the period
+ * of its own date, so the document date picks the same threshold.
+ */
+export function b2clThresholdPaise(date: string): number {
+  return date.slice(0, 10) < B2CL_THRESHOLD_REDUCED_FROM
+    ? B2CL_THRESHOLD_BEFORE_AUG_2024_PAISE
+    : B2CL_THRESHOLD_PAISE;
+}
 
 export type SupplyCategory = 'taxable' | 'exempt' | 'nil_rated' | 'non_gst';
 
@@ -62,6 +80,8 @@ export interface ClassifiableDocument {
   readonly supplyType: SupplyType;
   /** The whole document's value including tax, which the B2CL test is on. */
   readonly grandTotal: number;
+  /** Document date (ISO). Picks the B2CL threshold; absent means the current one. */
+  readonly date?: string;
   /** A credit note or debit note goes to the CDN tables, not the sales ones. */
   readonly isCreditOrDebitNote?: boolean;
   /**
@@ -109,7 +129,8 @@ export function classifyOutward(document: ClassifiableDocument): Gstr1Table {
 
   if (registered) return 'b2b';
 
-  if (document.supplyType === 'inter_state' && document.grandTotal > B2CL_THRESHOLD_PAISE) {
+  const threshold = document.date ? b2clThresholdPaise(document.date) : B2CL_THRESHOLD_PAISE;
+  if (document.supplyType === 'inter_state' && document.grandTotal > threshold) {
     return 'b2cl';
   }
   return 'b2cs';

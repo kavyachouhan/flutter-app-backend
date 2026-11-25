@@ -1,0 +1,14 @@
+GSTIN/UIN of Recipient,Receiver Name,Original Invoice Number,Original Invoice date,Revised Invoice Number,Revised Invoice date,Invoice Value,Place Of Supply,Reverse Charge,Applicable % of Tax Rate,Invoice Type,E-Commerce GSTIN,Rate,Taxable Value,Cess Amount
+12GEOPS0823BBZH,xyz,1000,14-Jul-17,S1000,14-Aug-17,50000,37-Andhra Pradesh,Y,65,Intra-State supplies attracting IGST,,12,45000,756
+12GEOPS0823BBZH,xyz,A1001,14-Jul-17,S1001,14-Aug-17,43000,37-Andhra Pradesh,N,,Regular B2B,,5,40000,234
+12GEOPS0823BBZH,xyz,1000A,14-Jul-17,S1002,14-Aug-17,42000,36-Telangana,N,65,Regular B2B,,12,40000,
+12GEOPS0823BBZH,xyz,A/1001,14-Jul-17,S1003,14-Aug-17,5000,05-Uttarakhand,Y,,Regular B2B,,28,50000,6700
+12GEOPS0823BBZH,xyz,A/1002,14-Jul-17,S1004,14-Aug-17,2000,05-Uttarakhand,Y,,Intra-State supplies attracting IGST,,0.25,40000,
+12GEOPS0823BBZH,xyz,A/1003,14-Jul-17,S1005,14-Aug-17,50000,37-Andhra Pradesh,N,,Regular B2B,,12,234,
+12GEOPS0823BBZH,xyz,A/1003,14-Jul-17,S1006,14-Aug-17,50000,37-Andhra Pradesh,N,65,Intra-State supplies attracting IGST,,5,35000,
+12GEOPS0823BBZH,xyz,1/1005,14-Jul-17,S1007,14-Aug-17,44000,37-Andhra Pradesh,N,,Regular B2B,,12,40000,500
+12GEOPS0823BBZH,xyz,A-10010,14-Jul-17,S1008,14-Aug-17,26000,37-Andhra Pradesh,N,,Regular B2B,,18,25000,
+12GEOPS0823BBZH,xyz,1-10010,14-Jul-17,S1009,14-Aug-17,48000,36-Telangana,N,,Regular B2B,,0,40000,
+12GEOPS0823BBZH,xyz,A-KNP/1000/06-17,14-Jul-17,S1010,14-Aug-17,45000,37-Andhra Pradesh,N,,Regular B2B,,3,40000,
+12GEOPS0823BBZH,xyz,06-17/LKO/1052,14-Jul-17,S1011,14-Aug-17,43000,37-Andhra Pradesh,N,65,Regular B2B,,12,40000,
+12GEOPS0823BBZH,xyz,06-17/LKO/1053,14-Jul-17,S1012,14-Aug-17,43000,37-Andhra Pradesh,Y,,Regular B2B,,28,40000,5000

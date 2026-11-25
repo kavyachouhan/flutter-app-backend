@@ -19,7 +19,8 @@ import {
   createProformaInvoiceBody,
   updateProformaInvoiceBody,
 } from '../proforma-invoices/proforma-invoices.schemas.js';
-import { createCustomerBody, updateCustomerBody } from '../customers/customers.schemas.js';
+import { createFinancialCreditNoteBody, createSalesDebitNoteBody } from '../adjustment-notes/adjustment-notes.schemas.js';
+import { createCustomerBody, updateCustomerBody, upsertCustomerAddressBody } from '../customers/customers.schemas.js';
 import { createInvoiceBody, voidInvoiceBody } from '../invoices/invoices.schemas.js';
 import { createReceiptBody, voidPaymentBody } from '../payments/payments.schemas.js';
 import {
@@ -85,12 +86,18 @@ export const OPERATION_PAYLOADS = {
   'invoice.printed': withId({}),
   'credit_note.create': createCreditNoteBody,
   'credit_note.void': withId({ reason: nonEmpty }),
+  'sales_debit_note.create': createSalesDebitNoteBody,
+  'sales_debit_note.void': withId({ reason: nonEmpty }),
+  'financial_credit_note.create': createFinancialCreditNoteBody,
+  'financial_credit_note.void': withId({ reason: nonEmpty }),
   'credit_note.printed': withId({}),
   'payment.create': createReceiptBody,
   'payment.void': withId(voidPaymentBody.shape),
   'customer.create': createCustomerBody,
   'customer.update': update(updateCustomerBody),
   'customer.delete': withId({}),
+  'customer_address.upsert': upsertCustomerAddressBody,
+  'customer_address.delete': withId({ customerId: z.string().uuid() }),
   'item.create': createItemBody,
   'item.update': update(updateItemBody),
   'item.delete': withId({}),

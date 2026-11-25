@@ -1,0 +1,5 @@
+﻿Recipient GSTIN/UIN,Recipient Name,Original Document Number,Original Document Date,Revised Document Number,Revised Document Date,Value of supplies made,Place Of Supply,Document type,Rate,Taxable Value,Cess Amount
+12GEOPS0823BBZH,abcdef,1002,02-Feb-2024,1008,02-Mar-2024,50000,33-Tamil Nadu,Regular,1,45000,756
+12GEOPS0823BBZH,abcdef,1002,02-Feb-2024,1008,02-Mar-2024,50000,33-Tamil Nadu,Regular,6,45000,756
+24GFJIP2194A1C7,abcdef,1003,02-Feb-2024,1007,02-Mar-2024,50000,33-Tamil Nadu,Regular,12,45000,756
+24GFJIP2194A1C7,abcdef,1003,02-Feb-2024,1007,02-Mar-2024,50000,33-Tamil Nadu,Regular,18,45000,756

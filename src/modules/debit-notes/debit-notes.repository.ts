@@ -1,8 +1,12 @@
 import type { Tx } from '../../db/tx.js';
+import { jsonParam } from '../../db/sql.js';
 import type { SupplyCategory, TaxInvoiceResult } from '../../domain/tax/types.js';
 import type { Cursor } from '../../lib/pagination.js';
 
 export interface DebitNoteHeaderInsert {
+  /** Copied from the bill: a return reverses it as it was. */
+  sellerSnapshot: unknown;
+  buyerSnapshot: unknown;
   id: string;
   outletId: string;
   supplierId: string;
@@ -151,7 +155,7 @@ export const debitNotesRepository = {
          gross_amount, line_discount_total, bill_discount_amount, taxable_amount,
          total_cgst, total_sgst, total_igst, total_cess, total_tax, sub_total, round_off,
          grand_total, tax_summary, hsn_summary, reason_code, restock, notes, status, issued_at, issued_by,
-         is_reverse_charge)
+         is_reverse_charge, seller_snapshot, buyer_snapshot)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5,
          $6, $7, $8, $9, $10,
@@ -159,7 +163,7 @@ export const debitNotesRepository = {
          $14, $15, $16, $17,
          $18, $19, $20, $21,
          $22, $23, $24, $25, $26, $27, $28,
-         $29, $30, $31, $32, $33, $34, 'issued', $35, $36, $37)`,
+         $29, $30, $31, $32, $33, $34, 'issued', $35, $36, $37, $38, $39)`,
       [
         h.id,
         h.outletId,
@@ -198,6 +202,8 @@ export const debitNotesRepository = {
         h.issuedAt,
         h.issuedBy,
         t.isReverseCharge,
+        jsonParam(h.sellerSnapshot),
+        jsonParam(h.buyerSnapshot),
       ],
     );
   },

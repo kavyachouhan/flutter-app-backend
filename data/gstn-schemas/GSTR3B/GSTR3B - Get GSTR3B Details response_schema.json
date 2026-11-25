@@ -1,0 +1,875 @@
+{
+  "properties": {
+    "gstin": {
+      "description": "Supplier GSTIN",
+      "type": "string",
+      "maxLength": 15,
+      "minLength": 15,
+      "pattern": "^[a-zA-Z0-9]+$"
+    },
+    "ret_period": {
+      "description": "Return period",
+      "type": "string",
+      "pattern": "^[0-9]{6}$"
+    },
+    "sup_details": {
+      "properties": {
+        "osup_det": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            },
+            "iamt": {
+              "description": "integrated Taxamount available in the current month",
+              "type": "number"
+            },
+            "camt": {
+              "description": "central tax amount available in the current month",
+              "type": "number"
+            },
+            "samt": {
+              "description": "State Tax amount available in the current month",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "Cess Tax amount available in the current month",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval",
+            "iamt",
+            "camt",
+            "samt",
+            "csamt"
+          ]
+        },
+        "osup_zero": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            },
+            "iamt": {
+              "description": "integrated Taxamount available in the current month",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "Cess Tax amount available in the current month",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval",
+            "iamt",
+            "csamt"
+          ]
+        },
+        "osup_nil_exmp": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval"
+          ]
+        },
+        "isup_rev": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            },
+            "iamt": {
+              "description": "integrated Taxamount available in the current month",
+              "type": "number"
+            },
+            "camt": {
+              "description": "central tax amount available in the current month",
+              "type": "number"
+            },
+            "samt": {
+              "description": "State Tax amount available in the current month",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "Cess Tax amount available in the current month",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval",
+            "iamt",
+            "camt",
+            "samt",
+            "csamt"
+          ]
+        },
+        "osup_nongst": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval"
+          ]
+        }
+      }
+    },
+    "inter_sup": {
+      "properties": {
+        "unreg_details": {
+          "items": {
+            "properties": {
+              "pos": {
+                "description": "Place of supply",
+                "type": "string"
+              },
+              "txval": {
+                "description": "Taxable Value",
+                "type": "number"
+              },
+              "iamt": {
+                "description": "IGST Amount as per invoice",
+                "type": "number"
+              }
+            },
+            "optional": [
+              "pos",
+              "txval",
+              "iamt"
+            ]
+          }
+        },
+        "comp_details": {
+          "items": {
+            "properties": {
+              "pos": {
+                "description": "Place of supply",
+                "type": "string"
+              },
+              "txval": {
+                "description": "Taxable Value",
+                "type": "number"
+              },
+              "iamt": {
+                "description": "IGST Amount as per invoice",
+                "type": "number"
+              }
+            },
+            "optional": [
+              "pos",
+              "txval",
+              "iamt"
+            ]
+          }
+        },
+        "uin_details": {
+          "items": {
+            "properties": {
+              "pos": {
+                "description": "Place of supply",
+                "type": "string"
+              },
+              "txval": {
+                "description": "Taxable Value",
+                "type": "number"
+              },
+              "iamt": {
+                "description": "IGST Amount as per invoice",
+                "type": "number"
+              }
+            },
+            "optional": [
+              "pos",
+              "txval",
+              "iamt"
+            ]	
+          }
+        }
+      }
+    },
+    "eco_dtls": {
+      "properties": {
+        "eco_sup": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            },
+            "iamt": {
+              "description": "integrated Taxamount available in the current month",
+              "type": "number"
+            },
+            "camt": {
+              "description": "central tax amount available in the current month",
+              "type": "number"
+            },
+            "samt": {
+              "description": "State Tax amount available in the current month",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "Cess Tax amount available in the current month",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval",
+            "iamt",
+            "camt",
+            "samt",
+            "csamt"
+          ]
+        },
+        "eco_reg_sup": {
+          "properties": {
+            "txval": {
+              "description": "Taxable Value",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "txval"
+          ]
+        }
+	  }
+	},
+	"itc_elg": {
+      "properties": {
+        "itc_avl": {
+          "items": {
+            "properties": {
+              "iamt": {
+                "description": "integrated Taxamount available in the current month",
+                "type": "number"
+              },
+              "camt": {
+                "description": "CGST Amount as per invoice",
+                "type": "number"
+              },
+              "samt": {
+                "description": "SGST Amount as per invoice",
+                "type": "number"
+              },
+              "csamt": {
+                "description": "Cess Tax amount available in the current month",
+                "type": "number"
+              },
+              "ty": {
+                "description": "Identifer if Goods or Services",
+                "type": "string",
+                "pattern": "(^IMPG$)|(^IMPS$)|(^ISRC$)|(^ISD$)|(^OTH$)"
+              }
+            },
+            "optional": [
+              "iamt",
+              "camt",
+              "samt",
+              "csamt",
+              "ty"
+            ]
+          }
+        },
+        "itc_rev": {
+          "items": {
+            "properties": {
+              "iamt": {
+                "description": "Amount of ITC reversal of IGST ",
+                "type": "number"
+              },
+              "camt": {
+                "description": "Amount of ITC reversal of CGST ",
+                "type": "number"
+              },
+              "csamt": {
+                "description": "Amount of ITC reversal of CESS ",
+                "type": "number"
+              },
+              "samt": {
+                "description": "Amount of ITC reversal of SGST ",
+                "type": "number"
+              },
+              "ty": {
+                "description": "Identifer if Goods or Services",
+                "type": "string",
+                "pattern": "(^RUL$)|(^OTH$)"
+              }
+            },
+            "optional": [
+              "iamt",
+              "camt",
+              "samt",
+              "csamt",
+              "ty"
+            ]
+          }
+        },
+        "itc_net": {
+          "properties": {
+            "iamt": {
+              "description": "Amount of ITC reversal of IGST ",
+              "type": "number"
+            },
+            "camt": {
+              "description": "Amount of ITC reversal of CGST ",
+              "type": "number"
+            },
+            "samt": {
+              "description": "Amount of ITC reversal of SGST ",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "Amount of ITC reversal of CESS ",
+              "type": "number"
+            }
+          },
+          "optional": [
+            "iamt",
+            "camt",
+            "samt",
+            "csamt"
+          ]
+        },
+        "itc_inelg": {
+          "items": {
+            "properties": {
+              "iamt": {
+                "description": "Amount of ITC reversal of IGST ",
+                "type": "number"
+              },
+              "camt": {
+                "description": "Amount of ITC reversal of CGST ",
+                "type": "number"
+              },
+              "samt": {
+                "description": "Amount of ITC reversal of SGST ",
+                "type": "number"
+              },
+              "csamt": {
+                "description": "Amount of ITC reversal of CESS ",
+                "type": "number"
+              },
+              "ty": {
+                "description": "Identifer if Goods or Services",
+                "type": "string",
+                "pattern": "(^RUL$)|(^OTH$)"
+              }
+            },
+            "optional": [
+              "camt",
+              "samt",
+              "csamt",
+              "iamt"
+            ]
+          }
+        }
+      }
+    },
+    "inward_sup": {
+      "properties": {
+        "isup_details": {
+          "items": {
+            "properties": {
+              "inter": {
+                "description": "Inter State supplies",
+                "type": "number"
+              },
+              "intra": {
+                "description": "Intra State supplies",
+                "type": "number"
+              },
+              "ty": {
+                "description": "Identifer if Goods or Services",
+                "type": "string",
+                "pattern": "(^GST$)|(^NONGST$)"
+              }
+            },
+            "optional": [
+              "inter",
+              "intra",
+              "ty"
+            ]
+          }
+        }
+      }
+    },
+    "tx_pmt": {
+      "id": "/properties/tx_pmt",
+      "properties": {
+        "tx_py": {
+          "items": {
+            "properties": {
+              "trans_typ": {
+                "description": "Transaction Type",
+                "type": "number"
+              },
+              "tran_desc": {
+                "description": "Transaction description",
+                "type": "string",
+                "pattern": "(^Other than Reverse Charge)|(^Reverse Charge)|(^Reverse charge and supplies made)"
+              },
+              "liab_ldg_id": {
+                "description": "Liability ledger Id",
+                "type": "number"
+              },
+              "cgst": {
+                "properties": {
+                  "intr": {
+                    "description": "CGST INTEREST Payable",
+                    "type": "number"
+                  },
+                  "tx": {
+                    "description": "CGST Tax Payable",
+                    "type": "number"
+                  },
+                  "fee": {
+                    "description": "CGST LateFee Payable",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "sgst": {
+                "properties": {
+                  "intr": {
+                    "description": "SGST INTEREST Payable",
+                    "type": "number"
+                  },
+                  "tx": {
+                    "description": "SGST Tax Payable",
+                    "type": "number"
+                  },
+                  "fee": {
+                    "description": "SGST LateFee Payable",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "cess": {
+                "properties": {
+                  "intr": {
+                    "description": "CESS INTEREST Payable",
+                    "type": "number"
+                  },
+                  "tx": {
+                    "description": "CESS Tax Payable",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "igst": {
+                "properties": {
+                  "intr": {
+                    "description": "IGST INTEREST Payable",
+                    "type": "number"
+                  },
+                  "tx": {
+                    "description": "IGST Tax Payable",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "adjnegliab":{		
+               "description":"Adjusted tax payable amount",
+			    "items":{
+               "properties":{
+                  "trans_typ":{
+                     "description":"Transaction Id",
+                     "type":"number"
+                  },
+				  "tran_desc":{
+                        "description":"Transaction description",
+                        "type":"string",
+                        "pattern":"(^Other than Reverse Charge)|(^Reverse Charge)|(^Reverse charge and supplies made)"
+                  },
+                   "liab_ldg_id":{
+                     "description":"Liability Id",
+                     "type":"number"
+                  },
+                  "sgst":{
+                        "properties":{
+                           "intr":{
+                              "description":"SGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"SGST Tax Payable",
+                              "type":"number"
+                           },
+                           "fee":{
+                              "description":"SGST LateFee Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "cgst":{
+                        "properties":{
+                           "intr":{
+                              "description":"CGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"CGST Tax Payable",
+                              "type":"number"
+                           },
+                           "fee":{
+                              "description":"CGST LateFee Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "cess":{
+                        "properties":{
+                           "intr":{
+                              "description":"CESS INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"CESS Tax Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "igst":{
+                        "properties":{
+                           "intr":{
+                              "description":"IGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"IGST Tax Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     }
+               },
+               "type":"object"
+			   },
+               "type":"array"
+            },
+	    "net_tax_pay":{		
+               "description":"Net tax payable amount",
+			    "items":{
+               "properties":{
+                  "trans_typ":{
+                     "description":"Transaction Id",
+                     "type":"number"
+                  },
+				  "tran_desc":{
+                        "description":"Transaction description",
+                        "type":"string",
+                        "pattern":"(^Other than Reverse Charge)|(^Reverse Charge)|(^Reverse charge and supplies made)"
+                  },
+                   "liab_ldg_id":{
+                     "description":"Liability Id",
+                     "type":"number"
+                  },
+                  "sgst":{
+                        "properties":{
+                           "intr":{
+                              "description":"SGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"SGST Tax Payable",
+                              "type":"number"
+                           },
+                           "fee":{
+                              "description":"SGST LateFee Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "cgst":{
+                        "properties":{
+                           "intr":{
+                              "description":"CGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"CGST Tax Payable",
+                              "type":"number"
+                           },
+                           "fee":{
+                              "description":"CGST LateFee Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "cess":{
+                        "properties":{
+                           "intr":{
+                              "description":"CESS INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"CESS Tax Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     },
+                  "igst":{
+                        "properties":{
+                           "intr":{
+                              "description":"IGST INTEREST Payable",
+                              "type":"number"
+                           },
+                           "tx":{
+                              "description":"IGST Tax Payable",
+                              "type":"number"
+                           }
+                        },
+                        "type":"object"
+                     }
+               },
+               "type":"object"
+			   },
+               "type":"array"
+            },
+	"pdcash": {
+          "description": "Paid Cash",
+          "items": {
+            "properties": {
+              "liab_ldg_id": {
+                "description": "Liability Id",
+                "type": "number"
+              },
+              "trans_typ": {
+                "description": "Transaction Type",
+                "type": "number"
+              },
+              "ipd": {
+                "description": "IGST Paid",
+                "type": "number"
+              },
+              "cpd": {
+                "description": "CGST Paid",
+                "type": "number"
+              },
+              "spd": {
+                "description": "SGST Paid",
+                "type": "number"
+              },
+              "cspd": {
+                "description": "CESS Paid",
+                "type": "number"
+              },
+              "i_intrpd": {
+                "description": "IGST INTEREST Paid",
+                "type": "number"
+              },
+              "c_intrpd": {
+                "description": "CGST INTEREST Paid",
+                "type": "number"
+              },
+              "s_intrpd": {
+                "description": "SGST INTEREST Paid",
+                "type": "number"
+              },
+              "cs_intrpd": {
+                "description": "CESS INTEREST Paid",
+                "type": "number"
+              },
+              "c_lfeepd": {
+                "description": "CGST LateFee Paid",
+                "type": "number"
+              },
+              "s_lfeepd": {
+                "description": "SGST LateFee Paid",
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "pditc": {
+          "description": "Paid ITC",
+          "properties": {
+            "liab_ldg_id": {
+              "description": "Liability Id",
+              "type": "number"
+            },
+            "trans_typ": {
+              "description": "Transaction Id",
+              "type": "number"
+            },
+            "i_pdi": {
+              "description": "IGST Paid as IGST",
+              "type": "number"
+            },
+            "i_pdc": {
+              "description": "IGST Paid as CGST",
+              "type": "number"
+            },
+            "i_pds": {
+              "description": "IGST Paid as SGST",
+              "type": "number"
+            },
+            "c_pdi": {
+              "description": "CGST Paid as IGST",
+              "type": "number"
+            },
+            "c_pdc": {
+              "description": "CGST Paid as CGST",
+              "type": "number"
+            },
+            "s_pdi": {
+              "description": "SGST Paid as IGST",
+              "type": "number"
+            },
+            "s_pds": {
+              "description": "SGST Paid as SGST",
+              "type": "number"
+            },
+            "cs_pdcs": {
+              "description": "CESS Paid as CESS",
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+		 "pdnls": {
+          "description": "Paid NLS",
+          "properties": {
+            "liab_ldg_id": {
+              "description": "Liability Id",
+              "type": "number"
+            },
+            "trans_typ": {
+              "description": "Transaction Id",
+              "type": "number"
+            },
+            "tran_desc": {
+              "description": "Transaction description",
+              "type": "string",
+              "pattern": "(^Other than Reverse Charge)|(^Reverse Charge)|(^Reverse charge and supplies made)"
+            },
+            "ipd": {
+              "description": "IGST Paid",
+              "type": "number"
+            },
+            "cpd": {
+              "description": "CGST Paid",
+              "type": "number"
+            },
+            "spd": {
+              "description": "SGST Paid",
+              "type": "number"
+            },
+            "cspd": {
+              "description": "CESS Paid",
+              "type": "number"
+            }
+          },
+          "type": "array"
+        }
+      }
+    },
+    "intr_ltfee": {
+      "description": "Interest and LateFee",
+      "properties": {
+        "intr_details": {
+          "description": "Interest",
+          "properties": {
+            "camt": {
+              "description": "CGST amount",
+              "type": "number"
+            },
+            "csamt": {
+              "description": "CESS amount",
+              "type": "number"
+            },
+            "iamt": {
+              "description": "IGST Paid",
+              "type": "number"
+            },
+            "samt": {
+              "description": "SGST amount",
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "ltfee_details": {
+          "description": "Latefee",
+          "properties": {
+            "camt": {
+              "description": "CGST amount",
+              "type": "number"
+            },
+            "samt": {
+              "description": "SGST amount",
+              "type": "number"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "liab_breakup": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ret_period": {
+            "description": "Return period of breakup ",
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          },
+          "liability": {
+            "type": "object",
+            "properties": {
+              "iamt": {
+                "description": "Declared IGST liability",
+                "type": "number"
+              },
+              "camt": {
+                "description": "Declared CGST liability",
+                "type": "number"
+              },
+              "samt": {
+                "description": "Declared SGST liability",
+                "type": "number"
+              },
+              "csamt": {
+                "description": "Declared Cess liability ",
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "ret_period",
+          "liability"
+        ]
+      }
+    }
+  },
+  "required": [
+    "gstin",
+    "ret_period"
+  ]
+}

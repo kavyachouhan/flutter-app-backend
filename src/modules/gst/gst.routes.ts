@@ -6,8 +6,18 @@ import { idParams } from '../../lib/validators.js';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import * as exportService from './export.service.js';
+import { importLedgerBody, listLedgerImportsQuery } from './ledgers/ledger.schemas.js';
+import * as ledgers from './ledgers/ledger.service.js';
+import { hsnSalesQuery, sacQuery, transactionReportQuery } from './reports/gst-reports.schemas.js';
+import { exportTransactionReport, hsnSalesReport, sacReport } from './reports/gst-reports.service.js';
 import * as reconciliation from './reconciliation.service.js';
 import * as service from './gst.service.js';
+import * as registrations from './registrations.service.js';
+import * as ruleSets from './rule-sets.service.js';
+import { itcRouter } from './itc/itc.routes.js';
+import { amendmentsRouter } from './amendments/amendments.routes.js';
+import { advancesRouter } from './advances/advances.routes.js';
+import { closingStockStatement } from './closing-stock/closing-stock.service.js';
 import {
   acceptMatchBody,
   createGstr2bImportBody,
@@ -16,17 +26,75 @@ import {
   itcRegisterQuery,
   listMatchesQuery,
   listPeriodsQuery,
+  preparePeriodBody,
 } from './gst.schemas.js';
 
 export const gstRouter: Router = Router();
 
+// Input tax credit: RCM self-invoices, IMS decisions, statement balances, credit history.
+gstRouter.use('/itc', itcRouter);
+// Amendments of filed GSTR-1 details (GSTR-1A or tables 9A / 9C / 10 of a later GSTR-1).
+gstRouter.use('/amendments', amendmentsRouter);
+// Advances: receipt and refund vouchers, adjustment against invoices (GSTR-1 table 11).
+gstRouter.use('/advances', advancesRouter);
+
+// Closing-stock ITC (Rule 44) for GSTR-10 Table 8, REG-16 Table 10 or ITC-03.
+const closingStock = {
+  query: z.object({ gstin: z.string().min(15).max(15), asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+};
+gstRouter.get('/closing-stock-itc', requirePermission('gst:read'), validate(closingStock), async (req, res) => {
+  const { query } = validated<typeof closingStock>(req);
+  res.json({ data: await closingStockStatement(query.gstin, query.asOf) });
+});
+
+// --- Rule sets and the HSN/SAC master ----------------------------------------
+
+// Every device bills with these, so any signed-in member may read them.
+export const updateRegistrationBody = z.object({ roundOffEnabled: z.boolean() });
+
+const ruleSetsQuery = {
+  query: z.object({ since: z.string().datetime({ offset: true }).optional() }),
+};
+gstRouter.get('/rule-sets', validate(ruleSetsQuery), async (req, res) => {
+  const { query } = validated<typeof ruleSetsQuery>(req);
+  res.json({ data: await ruleSets.listRuleSets(query.since) });
+});
+
+const hsnQuery = { query: z.object({ version: z.string().max(64).optional() }) };
+gstRouter.get('/hsn-master', validate(hsnQuery), async (req, res) => {
+  const { query } = validated<typeof hsnQuery>(req);
+  res.json({ data: await ruleSets.hsnMaster(query.version) });
+});
+
+// --- Registrations -----------------------------------------------------------
+
+gstRouter.get('/registrations', requirePermission('gst:read'), async (_req, res) => {
+  res.json({ data: await registrations.listRegistrations() });
+});
+
+const updateRegistration = { params: idParams, body: updateRegistrationBody };
+gstRouter.patch(
+  '/registrations/:id',
+  requirePermission('gst:manage'),
+  validate(updateRegistration),
+  async (req, res) => {
+    const { params, body } = validated<typeof updateRegistration>(req);
+    res.json({ data: await registrations.updateRegistration(params.id, body) });
+  },
+);
+
 // --- Return periods --------------------------------------------------------
 
 const listPeriods = { query: listPeriodsQuery };
-gstRouter.get('/periods', requirePermission('gst:read'), validate(listPeriods), async (req, res) => {
-  const { query } = validated<typeof listPeriods>(req);
-  res.json(await service.listPeriods(query));
-});
+gstRouter.get(
+  '/periods',
+  requirePermission('gst:read'),
+  validate(listPeriods),
+  async (req, res) => {
+    const { query } = validated<typeof listPeriods>(req);
+    res.json(await service.listPeriods(query));
+  },
+);
 
 const createPeriod = { body: createPeriodBody };
 gstRouter.post(
@@ -45,13 +113,14 @@ gstRouter.get('/periods/:id', requirePermission('gst:read'), validate(byId), asy
   res.json({ data: await service.getPeriod(params.id) });
 });
 
+const prepare = { params: idParams, body: preparePeriodBody };
 gstRouter.post(
   '/periods/:id/prepare',
   requirePermission('gst:manage'),
-  validate(byId),
+  validate(prepare),
   async (req, res) => {
-    const { params } = validated<typeof byId>(req);
-    res.json({ data: await service.preparePeriod(params.id) });
+    const { params, body } = validated<typeof prepare>(req);
+    res.json({ data: await service.preparePeriod(params.id, body) });
   },
 );
 
@@ -68,7 +137,11 @@ gstRouter.post(
 
 const exportPeriod = {
   params: idParams,
-  query: z.object({ format: z.enum(['xlsx', 'json']).default('xlsx') }),
+  query: z.object({
+    format: z.enum(['xlsx', 'json', 'ca']).default('xlsx'),
+    // JSON only: accept a file that leaves out sections no official schema covers yet.
+    acceptUnsupported: z.enum(['true', 'false']).default('false'),
+  }),
 };
 gstRouter.get(
   '/periods/:id/export',
@@ -76,11 +149,91 @@ gstRouter.get(
   validate(exportPeriod),
   async (req, res) => {
     const { params, query } = validated<typeof exportPeriod>(req);
-    const result = await exportService.exportPeriod(params.id, query.format);
+    const result = await exportService.exportPeriod(params.id, query.format, {
+      acceptUnsupported: query.acceptUnsupported === 'true',
+    });
     // Signed here rather than in the service, so the service stays testable
     // without a storage round trip — as with the spreadsheet exporter.
     const link = await signDownload(result.objectKey, result.filename);
     res.json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
+  },
+);
+
+// --- Reports ---------------------------------------------------------------
+
+const transactionReport = { query: transactionReportQuery };
+gstRouter.get(
+  '/reports/transactions',
+  requirePermission('gst:read'),
+  validate(transactionReport),
+  async (req, res) => {
+    const { query } = validated<typeof transactionReport>(req);
+    const result = await exportTransactionReport(query);
+    const link = await signDownload(result.objectKey, result.filename);
+    res.json({ data: { ...result, downloadUrl: link.url, expiresAt: link.expiresAt } });
+  },
+);
+
+/** A table report is either shown (json) or handed over as a signed workbook link. */
+async function sendTableReport(
+  res: import('express').Response,
+  out: Awaited<ReturnType<typeof hsnSalesReport>>,
+): Promise<void> {
+  if (out.kind === 'json') {
+    res.json({ data: out.report });
+    return;
+  }
+  const link = await signDownload(out.objectKey, out.filename);
+  res.json({
+    data: {
+      objectKey: out.objectKey,
+      filename: out.filename,
+      contentType: out.contentType,
+      downloadUrl: link.url,
+      expiresAt: link.expiresAt,
+      issues: out.report.issues,
+    },
+  });
+}
+
+const hsnSales = { query: hsnSalesQuery };
+gstRouter.get(
+  '/reports/hsn-sales',
+  requirePermission('gst:read'),
+  validate(hsnSales),
+  async (req, res) => {
+    const { query } = validated<typeof hsnSales>(req);
+    await sendTableReport(res, await hsnSalesReport(query));
+  },
+);
+
+const sac = { query: sacQuery };
+gstRouter.get('/reports/sac', requirePermission('gst:read'), validate(sac), async (req, res) => {
+  const { query } = validated<typeof sac>(req);
+  await sendTableReport(res, await sacReport(query));
+});
+
+// --- Electronic ledgers ------------------------------------------------------
+
+const importLedger = { body: importLedgerBody };
+gstRouter.post(
+  '/ledger-imports',
+  requirePermission('gst:manage'),
+  validate(importLedger),
+  async (req, res) => {
+    const { body } = validated<typeof importLedger>(req);
+    res.status(201).json({ data: await ledgers.importLedger(body) });
+  },
+);
+
+const listLedgers = { query: listLedgerImportsQuery };
+gstRouter.get(
+  '/ledger-imports',
+  requirePermission('gst:read'),
+  validate(listLedgers),
+  async (req, res) => {
+    const { query } = validated<typeof listLedgers>(req);
+    res.json({ data: await ledgers.listLedgerImports(query) });
   },
 );
 

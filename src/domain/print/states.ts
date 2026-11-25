@@ -50,8 +50,9 @@ export const STATE_NAMES: Readonly<Record<string, string>> = Object.freeze({
   '36': 'Telangana',
   '37': 'Andhra Pradesh',
   '38': 'Ladakh',
+  '96': 'Foreign Country',
   '97': 'Other Territory',
-  '99': 'Other Country',
+  '99': 'Centre Jurisdiction',
 });
 
 /**
@@ -63,4 +64,10 @@ export const STATE_NAMES: Readonly<Record<string, string>> = Object.freeze({
 export function stateNameFor(code: string | null | undefined): string | null {
   if (!code) return null;
   return STATE_NAMES[code] ?? null;
+}
+
+/** Rule 46 asks for the state's name and its code, as in "Maharashtra (27)". */
+export function stateLabelFor(code: string | null | undefined): string | null {
+  const name = stateNameFor(code);
+  return name === null ? null : `${name} (${code})`;
 }

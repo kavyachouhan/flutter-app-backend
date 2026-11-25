@@ -1,15 +1,10 @@
 /**
- * Composition scheme: the one piece of the scheme the system never computed.
+ * Composition scheme helpers.
  *
- * A composition dealer charges no tax to the customer — the tax engine already
- * handles that, and the print resolver already prints the declaration — but
- * still owes a flat percentage of turnover to the department, quarterly, on
- * CMP-08. Nothing computed that liability, so a composition shop using this
- * system could bill correctly all quarter and still have no idea what to pay.
- *
- * Pure, and the rates are passed in rather than hard-coded: they move by
- * notification, and a CMP-08 filed last year must keep reporting the rate it
- * was filed at.
+ * A composition dealer charges no tax to the customer: the tax engine handles that, and the print
+ * resolver prints the bill-of-supply declaration. The composition return (CMP-08) is not part of
+ * this version, so only the default rates (offered when a shop picks its category in settings)
+ * and the financial-year quarter helper (used for QRMP return periods) live here.
  */
 
 export type CompositionCategory = 'trader' | 'manufacturer' | 'restaurant' | 'service';
@@ -26,67 +21,7 @@ export const DEFAULT_COMPOSITION_RATES: Record<CompositionCategory, number> = {
   service: 6,
 };
 
-export interface CompositionTurnover {
-  /**
-   * Taxable outward supplies in the period, in paise, net of credit notes.
-   *
-   * Composition turnover is the whole value billed, not a taxable value net of
-   * tax: the dealer charged no tax, so the two are the same figure. Returns
-   * reduce it, which is why this is already net — a quarter with heavy returns
-   * otherwise overstates the liability and the shop overpays.
-   */
-  readonly outwardSupplies: number;
-  /**
-   * Inward supplies liable to reverse charge, in paise. A composition dealer
-   * still pays reverse-charge tax at the normal rate and cannot claim it as
-   * credit, so it is a separate liability rather than part of turnover.
-   */
-  readonly reverseChargeInward: number;
-  /** Tax on those inward supplies, at the normal rates. */
-  readonly reverseChargeTax: number;
-}
-
-export interface CompositionLiability {
-  readonly turnover: number;
-  readonly ratePercent: number;
-  /** The flat tax on turnover. */
-  readonly taxOnTurnover: number;
-  /** Reverse-charge tax, which is owed on top and is never creditable here. */
-  readonly reverseChargeTax: number;
-  readonly totalPayable: number;
-}
-
-/**
- * CMP-08 liability for a period.
- *
- * Rounded half away from zero to the paisa, matching the tax engine, so a
- * figure shown on screen and a figure filed cannot differ by a rounding rule.
- */
-export function compositionLiability(
-  turnover: CompositionTurnover,
-  ratePercent: number,
-): CompositionLiability {
-  if (!Number.isFinite(ratePercent) || ratePercent < 0) {
-    throw new Error('A composition rate must be a non-negative percentage.');
-  }
-  const base = Math.max(0, turnover.outwardSupplies);
-  const taxOnTurnover = Math.round((base * ratePercent) / 100);
-  return {
-    turnover: base,
-    ratePercent,
-    taxOnTurnover,
-    reverseChargeTax: turnover.reverseChargeTax,
-    totalPayable: taxOnTurnover + turnover.reverseChargeTax,
-  };
-}
-
-/**
- * The quarter a month belongs to, and its bounds.
- *
- * CMP-08 is quarterly on the financial year, not the calendar one: April-June
- * is quarter one. Taking calendar quarters would file every period against the
- * wrong window.
- */
+/** A financial-year quarter and its bounds. */
 export interface CompositionPeriod {
   readonly quarter: number;
   readonly fromYear: number;
@@ -98,9 +33,9 @@ export interface CompositionPeriod {
 /**
  * The quarter a month belongs to, and its bounds.
  *
- * CMP-08 is quarterly on the *financial* year, not the calendar one: with an
- * April year start, April-June is quarter one. Using calendar quarters would
- * file every period against the wrong window.
+ * Quarterly returns (QRMP) run on the *financial* year, not the calendar one:
+ * with an April year start, April-June is quarter one. Using calendar quarters
+ * would file every period against the wrong window.
  *
  * Done in absolute months from year zero rather than with modular arithmetic
  * on the month alone, because a quarter straddling the calendar new year

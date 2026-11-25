@@ -1,0 +1,1096 @@
+/*Created with Adobe RoboHelp 2015.*/
+body {
+	font-family: Arial;
+	background-color: #ffffff;
+	counter-reset: pbullets1 0 pnew1 0 pbasicnumber1 0;
+}
+h1 {
+	font-size: 18.0pt;
+	font-family: Verdana, "Helvetica Neue", Helvetica, Arial, sans-serif;
+	background-color: rgb(255, 219, 73);
+}
+h2 {
+	font-weight: bold;
+	font-size: 18.0pt;
+}
+h3 {
+	font-weight: bold;
+	font-family: Arial, sans-serif;
+	font-size: 1.1em;
+	color: #212121;
+	line-height: 25px;
+	background-color: #17c4bb;
+}
+h4 {
+	font-weight: bold;
+	font-size: 12.0pt;
+}
+h5 {
+	font-size: 10.0pt;
+}
+h6 {
+	font-weight: bold;
+	font-size: 8.0pt;
+	text-align-last: center;
+	font-family: "arial
+";
+}
+p {
+	margin-top: 0pt;
+	margin-bottom: 0pt;
+	mso-fareast-language: X-NONE;
+	mso-ansi-language: EN;
+	color: #222;
+	font-family: Arial, sans-serif;
+	font-weight: 300;
+	font-size: 13px;
+	line-height: 21px;
+	a.expandspot: "{" "color:" #008000;
+	cursor: hand;
+	font-style: italic;
+	text-decoration: none;
+}
+span.expandtext {
+	font-style: italic;
+	font-weight: normal;
+	color: #ff0000;
+}
+a.dropspot {
+	cursor: hand;
+	color: #008000;
+	font-style: italic;
+	text-decoration: none;
+}
+a.glossterm {
+	color: #800000;
+	cursor: hand;
+	font-style: italic;
+	text-decoration: none;
+}
+span.glosstext {
+	font-style: italic;
+	font-weight: normal;
+	color: #0000ff;
+}
+ol,ul {
+	margin-top: 0px;
+	margin-bottom: 0px;
+	list-style: square;
+	font-size: 10pt;
+}
+li {
+	color: #222;
+	font-family: Verdana, "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-weight: 300;
+	font-size: 13px;
+	line-height: 25px;
+}
+span.Bold {
+	line-height: 1.118571429;
+	font-size: 14px;
+	font-weight: 300;
+	font-family: Verdana, "Helvetica Neue", Helvetica, Arial, sans-serif;
+	color: ##ff00ff;
+}
+table.AlternateBlueWithHeader {
+	x-border-spacing: 0px;
+	x-row-pat-count: 2;
+	border-left-style: Solid;
+	border-left-width: 1px;
+	border-left-color: #4F81BD;
+	border-right-style: Solid;
+	border-right-width: 1px;
+	border-right-color: #4F81BD;
+	x-1st-row: 1;
+}
+span.rls-9-Bullets {
+	font-size: 8pt;
+}
+span.rls-1-Bullets {
+	font-size: 12pt;
+}
+span.rls-2-Bullets {
+	font-size: 12pt;
+}
+span.rls-3-Bullets {
+	font-size: 12pt;
+}
+span.rls-4-Bullets {
+	font-size: 12pt;
+}
+span.rls-5-Bullets {
+	font-size: 10pt;
+}
+span.rls-6-Bullets {
+	font-size: 10pt;
+}
+span.rls-7-Bullets {
+	font-size: 10pt;
+}
+span.rls-8-Bullets {
+	font-size: 10pt;
+}
+p.Bullets {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	position: relative;
+}
+p.Bullets:before {
+	counter-increment: pbullets1;
+	content: counter(pbullets1, disc);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.Bullets[data-list-level="2"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 20px;
+	position: relative;
+}
+p.Bullets[data-list-level="2"]:before {
+	counter-increment: item2;
+	content: counter(item2, square);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.Bullets[data-list-level="3"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 40px;
+	position: relative;
+}
+p.Bullets[data-list-level="3"]:before {
+	counter-increment: item3;
+	content: counter(item3, circle);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.Bullets[data-list-level="4"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 60px;
+	position: relative;
+}
+p.Bullets[data-list-level="4"]:before {
+	counter-increment: item4;
+	content: counter(item4, square);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.Bullets[data-list-level="5"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 80px;
+	position: relative;
+}
+p.Bullets[data-list-level="5"]:before {
+	counter-increment: item5;
+	content: counter(item5, disc);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.Bullets[data-list-level="6"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 100px;
+	position: relative;
+}
+p.Bullets[data-list-level="6"]:before {
+	counter-increment: item6;
+	content: counter(item6, square);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.Bullets[data-list-level="7"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 120px;
+	position: relative;
+}
+p.Bullets[data-list-level="7"]:before {
+	counter-increment: item7;
+	content: counter(item7, circle);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.Bullets[data-list-level="8"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 140px;
+	position: relative;
+}
+p.Bullets[data-list-level="8"]:before {
+	counter-increment: item8;
+	content: counter(item8, square);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.Bullets[data-list-level="9"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 160px;
+	position: relative;
+}
+p.Bullets[data-list-level="9"]:before {
+	counter-increment: item9;
+	content: counter(item9, disc);
+	font-size: 8pt;
+	text-align: left;
+	left: -42.7px;
+	margin-right: 18.7px;
+	width: 24px;
+}
+p.new {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	position: relative;
+}
+p.new:before {
+	counter-increment: pnew1;
+	content: counter(pnew1, disc);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.new[data-list-level="2"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 20px;
+	position: relative;
+}
+p.new[data-list-level="2"]:before {
+	counter-increment: item2;
+	content: counter(item2, square);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.new[data-list-level="3"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 40px;
+	position: relative;
+}
+p.new[data-list-level="3"]:before {
+	counter-increment: item3;
+	content: counter(item3, circle);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.new[data-list-level="4"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 60px;
+	position: relative;
+}
+p.new[data-list-level="4"]:before {
+	counter-increment: item4;
+	content: counter(item4, square);
+	font-size: 12pt;
+	text-align: left;
+	left: -40px;
+	margin-right: 16px;
+	width: 24px;
+}
+p.new[data-list-level="5"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 80px;
+	position: relative;
+}
+p.new[data-list-level="5"]:before {
+	counter-increment: item5;
+	content: counter(item5, disc);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.new[data-list-level="6"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 100px;
+	position: relative;
+}
+p.new[data-list-level="6"]:before {
+	counter-increment: item6;
+	content: counter(item6, square);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.new[data-list-level="7"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 120px;
+	position: relative;
+}
+p.new[data-list-level="7"]:before {
+	counter-increment: item7;
+	content: counter(item7, circle);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.new[data-list-level="8"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 140px;
+	position: relative;
+}
+p.new[data-list-level="8"]:before {
+	counter-increment: item8;
+	content: counter(item8, square);
+	font-size: 10pt;
+	text-align: left;
+	left: -41.3px;
+	margin-right: 17.3px;
+	width: 24px;
+}
+p.new[data-list-level="9"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 160px;
+	position: relative;
+}
+p.new[data-list-level="9"]:before {
+	counter-increment: item9;
+	content: counter(item9, disc);
+	font-size: 8pt;
+	text-align: left;
+	left: -42.7px;
+	margin-right: 18.7px;
+	width: 24px;
+}
+p.BasicNumber {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	position: relative;
+}
+p.BasicNumber:before {
+	counter-increment: pbasicnumber1;
+	content: counter(pbasicnumber1, decimal)")";
+	text-align: left;
+	left: -34.7px;
+	margin-right: 10.7px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="2"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 20px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="2"]:before {
+	counter-increment: item2;
+	content: counter(item2, lower-alpha)")";
+	text-align: left;
+	left: -34.7px;
+	margin-right: 10.7px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="3"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 40px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="3"]:before {
+	counter-increment: item3;
+	content: counter(item3, lower-roman)")";
+	text-align: left;
+	left: -34.7px;
+	margin-right: 10.7px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="4"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 60px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="4"]:before {
+	counter-increment: item4;
+	content: "("counter(item4, decimal)")";
+	text-align: left;
+	left: -32px;
+	margin-right: 8px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="5"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 80px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="5"]:before {
+	counter-increment: item5;
+	content: "("counter(item5, lower-roman)")";
+	text-align: left;
+	left: -32px;
+	margin-right: 8px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="6"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 100px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="6"]:before {
+	counter-increment: item6;
+	content: "("counter(item6, lower-roman)")";
+	text-align: left;
+	left: -32px;
+	margin-right: 8px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="7"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 120px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="7"]:before {
+	counter-increment: item7;
+	content: counter(item7, decimal)".";
+	text-align: left;
+	left: -36px;
+	margin-right: 12px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="8"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 140px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="8"]:before {
+	counter-increment: item8;
+	content: counter(item8, lower-alpha)".";
+	text-align: left;
+	left: -36px;
+	margin-right: 12px;
+	width: 24px;
+}
+p.BasicNumber[data-list-level="9"] {
+	text-decoration: none;
+	font-style: italic;
+	cursor: hand;
+	a.expandspot: "{" "color:" #008000;
+	line-height: 21px;
+	font-size: 13px;
+	font-weight: 300;
+	font-family: Arial, sans-serif;
+	color: #222;
+	mso-ansi-language: EN;
+	mso-fareast-language: X-NONE;
+	margin-bottom: 0pt;
+	margin-top: 0pt;
+	margin-left: 160px;
+	position: relative;
+}
+p.BasicNumber[data-list-level="9"]:before {
+	counter-increment: item9;
+	content: counter(item9, lower-roman)".";
+	text-align: left;
+	left: -36px;
+	margin-right: 12px;
+	width: 24px;
+}
+:not([data-list-level])+[data-list-level="2"] {
+	counter-reset: item2 0;
+}
+[data-list-level="2"]+[data-list-level="3"] {
+	counter-reset: item3 0;
+}
+[data-list-level="3"]+[data-list-level="4"] {
+	counter-reset: item4 0;
+}
+[data-list-level="4"]+[data-list-level="5"] {
+	counter-reset: item5 0;
+}
+[data-list-level="5"]+[data-list-level="6"] {
+	counter-reset: item6 0;
+}
+[data-list-level="6"]+[data-list-level="7"] {
+	counter-reset: item7 0;
+}
+[data-list-level="7"]+[data-list-level="8"] {
+	counter-reset: item8 0;
+}
+[data-list-level="8"]+[data-list-level="9"] {
+	counter-reset: item9 0;
+}
+table.AlternateBlueWithHeader td {padding-left: 10px;padding-right: 10px;padding-top: 0px;padding-bottom: 0px;
+}
+table.AlternateBlueWithHeader tr:nth-child(odd) td {border-bottom-style: Solid;border-bottom-width: 1px;border-bottom-color: 4f81bd;
+}
+table.AlternateBlueWithHeader tr:nth-child(even) td {background-color: #D3DFEE;border-bottom-style: Solid;border-bottom-width: 1px;border-bottom-color: 4f81bd;
+}
+table.AlternateBlueWithHeader tr:first-child td {background-color: #4F81BD;
+}
+ol.Decimal {
+	list-style-type: decimal;
+}
+ul.Square {
+	list-style-type: square;
+}
+ul.Disc {
+	list-style-type: disc;
+}
+ol.LowerRoman {
+	list-style-type: lower-roman;
+}
+ol.RoundSquare {
+	list-style: disc;
+}
+ol.RoundSquare>li>ol {
+	list-style: square;
+}
+ol.RoundSquare>li>ol>li>ol {
+	list-style: circle;
+}
+ol.RoundSquare>li>ol>li>ol>li>ol {
+	list-style: disc;
+}
+ol.RoundSquare>li>ol>li>ol>li>ol>li>ol {
+	list-style: square;
+}
+ol.RoundSquare>li>ol>li>ol>li>ol>li>ol>li>ol {
+	list-style: circle;
+}
+ol.RoundNumbers {
+	counter-reset: item1;
+	list-style: none;
+	padding-left: 25px;
+	margin-left: 15px;
+}
+ol.RoundNumbers>li {
+	position: relative;
+	line-height: 25px;
+	margin-bottom: 2px;
+}
+ol.RoundNumbers>li:before {
+	counter-increment: item1;
+	content: counter(item1, decimal);
+	text-align: center;
+	position: absolute;
+	left: -29px;
+	margin-right: 4px;
+	width: 25px;
+	overflow: hidden;
+	border-top-left-radius: 50%;
+	border-top-right-radius: 50%;
+	border-bottom-right-radius: 50%;
+	border-bottom-left-radius: 50%;
+	background-color: #000000;
+	color: #FFFFFF;
+	height: 25px;
+	line-height: 25px;
+}
+ul.Circle {
+	list-style-type: circle;
+}
+ol.AlphaNumeric {
+	list-style: decimal;
+}
+ol.AlphaNumeric>li>ol {
+	list-style: lower-alpha;
+}
+ol.AlphaNumeric>li>ol>li>ol {
+	list-style: lower-roman;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol {
+	counter-reset: item4;
+	list-style: none;
+	padding-left: 40px;
+	margin-left: 0px;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item4;
+	content: "("counter(item4, decimal)")";
+	text-align: right;
+	position: absolute;
+	left: -44px;
+	margin-right: 4px;
+	width: 40px;
+	overflow: hidden;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol {
+	list-style: none;
+	counter-reset: item5;
+	padding-left: 40px;
+	margin-left: 0px;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item5;
+	content: "("counter(item5, lower-alpha)")";
+	text-align: right;
+	position: absolute;
+	left: -44px;
+	margin-right: 4px;
+	width: 40px;
+	overflow: hidden;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol>li>ol {
+	list-style: none;
+	counter-reset: item6;
+	padding-left: 40px;
+	margin-left: 0px;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item6;
+	content: "("counter(item6, lower-roman)")";
+	text-align: right;
+	position: absolute;
+	left: -44px;
+	margin-right: 4px;
+	width: 40px;
+	overflow: hidden;
+}
+ol.AlphaNumeric>li>ol>li>ol>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering {
+	counter-reset: item1;
+	list-style: none;
+	padding-left: 40px;
+	margin-left: 0px;
+}
+ol.NestedNumbering>li {
+	position: relative;
+}
+ol.NestedNumbering>li:before {
+	counter-increment: item1;
+	content: counter(item1, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -44px;
+	margin-right: 4px;
+	width: 40px;
+	overflow: hidden;
+}
+ol.NestedNumbering>li>ol {
+	list-style: none;
+	counter-reset: item2;
+	padding-left: 60.1px;
+	margin-left: -20.1px;
+}
+ol.NestedNumbering>li>ol>li:before {
+	counter-increment: item2;
+	content: counter(item1, decimal)"."counter(item2, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -64.1px;
+	margin-right: 4px;
+	width: 60.1px;
+	overflow: hidden;
+}
+ol.NestedNumbering>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering>li>ol>li>ol {
+	list-style: none;
+	counter-reset: item3;
+	padding-left: 90.1px;
+	margin-left: -50.1px;
+}
+ol.NestedNumbering>li>ol>li>ol>li:before {
+	counter-increment: item3;
+	content: counter(item1, decimal)"."counter(item2, decimal)"."counter(item3, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -94.1px;
+	margin-right: 4px;
+	width: 90.1px;
+	overflow: hidden;
+}
+ol.NestedNumbering>li>ol>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol {
+	counter-reset: item4;
+	list-style: none;
+	padding-left: 120.2px;
+	margin-left: -80.2px;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item4;
+	content: counter(item1, decimal)"."counter(item2, decimal)"."counter(item3, decimal)"."counter(item4, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -124.2px;
+	margin-right: 4px;
+	width: 120.2px;
+	overflow: hidden;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol {
+	counter-reset: item5;
+	list-style: none;
+	padding-left: 150.2px;
+	margin-left: -110.2px;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item5;
+	content: counter(item1, decimal)"."counter(item2, decimal)"."counter(item3, decimal)"."counter(item4, decimal)"."counter(item5, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -154.2px;
+	margin-right: 4px;
+	width: 150.2px;
+	overflow: hidden;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol>li>ol {
+	counter-reset: item6;
+	list-style: none;
+	padding-left: 180.3px;
+	margin-left: -140.3px;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol>li>ol>li {
+	position: relative;
+}
+ol.NestedNumbering>li>ol>li>ol>li>ol>li>ol>li>ol>li:before {
+	counter-increment: item6;
+	content: counter(item1, decimal)"."counter(item2, decimal)"."counter(item3, decimal)"."counter(item4, decimal)"."counter(item5, decimal)"."counter(item6, decimal)".";
+	text-align: right;
+	position: absolute;
+	left: -184.3px;
+	margin-right: 4px;
+	width: 180.3px;
+	overflow: hidden;
+}

@@ -15,7 +15,7 @@ import { env } from '../config/env.js';
 import { pool } from './pool.js';
 import { getContext, requireTenantId } from '../lib/context.js';
 import { createLogger } from '../lib/logger.js';
-import { ConflictError, ErrorCode, InternalError } from '../lib/errors.js';
+import { ConflictError, ErrorCode, InternalError, ValidationError } from '../lib/errors.js';
 
 const log = createLogger('db:tx');
 
@@ -71,6 +71,27 @@ function isPostgresError(error: unknown): error is PostgresError {
 
 const RETRYABLE = new Set(['40001', '40P01']);
 
+/**
+ * GST rules only the database can check against the final row (partial edits and sync merges
+ * reach it without the whole record passing through a schema), so these are bad input, not bugs.
+ */
+const GST_CONSTRAINT_MESSAGES: Readonly<Record<string, string>> = {
+  gstin_state_prefix: 'The GSTIN does not belong to the selected state.',
+  customers_gstin_valid: 'The customer GSTIN is invalid or does not belong to the selected state.',
+  suppliers_gstin_valid: 'The supplier GSTIN is invalid or does not belong to the selected state.',
+  customers_treatment_gstin: 'The customer GST treatment does not match its GSTIN.',
+  suppliers_treatment_gstin: 'The supplier GST treatment does not match its GSTIN.',
+  customers_treatment_uin: 'A UIN holder needs a UIN and a state, and no GSTIN.',
+  suppliers_treatment_uin: 'A UIN holder needs a UIN and a state, and no GSTIN.',
+  customers_overseas: 'An overseas customer has a foreign country and no state, GSTIN or UIN.',
+  suppliers_overseas: 'An overseas supplier has a foreign country and no state, GSTIN or UIN.',
+  customer_addresses_domestic: 'A delivery address in India needs a state and a 6-digit pincode.',
+  customer_addresses_overseas: 'A delivery address abroad needs a postal code and no state or GSTIN.',
+  customer_addresses_ship_to_gstin: 'The ship-to GSTIN is invalid or does not belong to the delivery state.',
+  gst_document_registration: 'This outlet has no GST registration in force on the document date.',
+  gst_document_seller_gstin: 'The seller GSTIN on the document does not match the outlet registration.',
+};
+
 /** Maps the SQLSTATEs our schema deliberately raises onto domain errors. */
 export function translatePostgresError(error: unknown): unknown {
   if (!isPostgresError(error)) return error;
@@ -99,9 +120,15 @@ export function translatePostgresError(error: unknown): unknown {
           retryAfterSeconds: 1,
         },
       );
+    case '23514': {
+      const gstMessage = error.constraint ? GST_CONSTRAINT_MESSAGES[error.constraint] : undefined;
+      if (gstMessage) {
+        return new ValidationError(gstMessage, { cause: error, details: { constraint: error.constraint } });
+      }
+      return new InternalError('A database constraint was violated.', { cause: error });
+    }
     // Validation happens before SQL, so these indicate a bug, not bad input.
     case '23503':
-    case '23514':
     case '23502':
       return new InternalError('A database constraint was violated.', { cause: error });
     default:

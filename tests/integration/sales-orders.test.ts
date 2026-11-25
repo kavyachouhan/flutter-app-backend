@@ -492,7 +492,7 @@ describe('sales orders', () => {
   describe('purchase orders: edit and delete', () => {
     async function supplier() {
       const id = randomUUID();
-      await t.post('/v1/suppliers').send({ id, name: `Supplier ${id.slice(0, 6)}` }).expect(201);
+      await t.post('/v1/suppliers').send({ id, name: `Supplier ${id.slice(0, 6)}`, stateCode: '27' }).expect(201);
       return id;
     }
 

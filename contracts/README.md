@@ -13,6 +13,14 @@ files are how both sides prove they agree before a device ever goes offline.
 | `costing-vectors.json`   | `src/domain/costing/*.ts`, `src/domain/purchases/due-date.ts` | `packages/khata_domain` (Dart) parity test |
 | `returns-vectors.json`   | `src/domain/tax/returns.ts`                     | `packages/khata_domain` (Dart) parity test |
 | `access-vectors.json`    | `permissions.ts`, `plans.ts`, `numbering.schemas.ts` | `packages/khata_domain` (Dart) access test |
+| `gstin-vectors.json`     | `src/domain/gst/gstin.ts`                       | `packages/khata_domain` (Dart) GST test; `app.gstin_valid()` integration test |
+| `ruleset-vectors.json`   | `src/domain/gst/rule-set.ts`                    | `packages/khata_domain` (Dart) GST test    |
+| `registration-vectors.json` | `src/domain/gst/registration.ts`             | `packages/khata_domain` (Dart) GST test    |
+| `entity-vectors.json`    | `src/domain/gst/entity.ts`                      | `packages/khata_domain` (Dart) GST test    |
+| `corrections-vectors.json` | `src/domain/gst/corrections.ts`               | `packages/khata_domain` (Dart) GST test  |
+| `pos-vectors.json`       | `src/domain/gst/place-of-supply.ts`             | `packages/khata_domain` (Dart) GST test  |
+| `invoice-rules-vectors.json` | `src/domain/gst/invoice-rules.ts`           | `packages/khata_domain` (Dart) GST test  |
+| `tos-vectors.json`       | `src/domain/gst/time-of-supply.ts`              | `packages/khata_domain` (Dart) GST test    |
 
 ## Rules
 

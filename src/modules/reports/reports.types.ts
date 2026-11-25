@@ -78,7 +78,20 @@ export interface ReportDefinition {
   readonly feature?: Feature;
   readonly filters: readonly FilterName[];
   readonly columns: readonly ReportColumn[];
-  run(tx: Tx, params: ReportParams): Promise<ReportRow[]>;
+  /**
+   * Set for reports that have their own screen in the app (workbook downloads, return-style
+   * tables). The catalogue lists them so plan and role gating stay in one place, but they are
+   * not run through the generic table kernel: they have no `run`.
+   */
+  readonly screen?:
+    | 'gstr1'
+    | 'gstr2b'
+    | 'gstr3b'
+    | 'gst-transactions'
+    | 'gstr9'
+    | 'hsn-sales'
+    | 'sac';
+  run?(tx: Tx, params: ReportParams): Promise<ReportRow[]>;
 }
 
 export interface ReportResult {
