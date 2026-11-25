@@ -174,6 +174,10 @@ const envSchema = z.object({
   TWOFACTOR_API_KEY: optional(z.string().min(1)),
   TWOFACTOR_OTP_TEMPLATE: optional(z.string().regex(/^[A-Za-z0-9_-]+$/)),
 
+  // Demo switch (modules/auth/demo-otp.ts): true = no SMS, the code is 000000;
+  // false = a real code by SMS. Refused in production.
+  DEMO_OTP_ENABLED: optional(bool),
+
   // Development-only; refused under APP_ENV=production.
   AUTH_DEV_BYPASS: required(bool),
   AUTH_DEV_FIXED_OTP: optional(z.string().regex(/^\d+$/)),
@@ -359,6 +363,9 @@ function assertProductionSafety(parsed: RawEnv): void {
   }
   if (parsed.AUTH_DEV_FIXED_OTP !== undefined) {
     violations.push('AUTH_DEV_FIXED_OTP is an OTP accepted for every phone; it must be unset.');
+  }
+  if (parsed.DEMO_OTP_ENABLED) {
+    violations.push('DEMO_OTP_ENABLED makes 000000 sign in to every number; it must be false.');
   }
   if (NON_DELIVERING_OTP_PROVIDERS.includes(parsed.OTP_DELIVERY_PROVIDER)) {
     violations.push(

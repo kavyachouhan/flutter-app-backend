@@ -51,6 +51,7 @@ build/Release
 .env.development
 .env.test
 .env.production
+.env.render
 
 # TypeScript cache
 *.tsbuildinfo
