@@ -57,7 +57,7 @@ export function annualReturnObligation(
     : { status: 'required', basis: `Aggregate turnover is above ₹2 crore (Notification ${notification}).` };
 }
 
-export type ReturnKind = 'gstr1' | 'gstr3b' | 'gstr9';
+export type ReturnKind = 'gstr1' | 'gstr3b' | 'gstr9' | 'gstr1a' | 'cmp08' | 'gstr4';
 export type FilingFrequency = 'monthly' | 'qrmp';
 
 const iso = (y: number, m: number, d: number): string =>
@@ -75,6 +75,14 @@ export function standardDueDate(
   frequency: FilingFrequency,
 ): string {
   if (kind === 'gstr9') return iso(periodYear + 1, 12, 31);
+  // GSTR-4 by 30 June after the year (Rule 62 proviso, 12/2024-CT); CMP-08 by the 18th after the
+  // quarter (Rule 62(1)(i)).
+  if (kind === 'gstr4') return iso(periodYear + 1, 6, 30);
+  if (kind === 'cmp08') {
+    const y = periodMonth === 12 ? periodYear + 1 : periodYear;
+    const m = periodMonth === 12 ? 1 : periodMonth + 1;
+    return iso(y, m, 18);
+  }
   const nextYear = periodMonth === 12 ? periodYear + 1 : periodYear;
   const nextMonth = periodMonth === 12 ? 1 : periodMonth + 1;
   if (kind === 'gstr1') return iso(nextYear, nextMonth, frequency === 'qrmp' ? 13 : 11);

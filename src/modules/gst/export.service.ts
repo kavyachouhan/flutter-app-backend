@@ -38,7 +38,7 @@ const periodSheetSpec = (sheet: Sheet, used: Set<string>) =>
   toSheetSpec(sheet, used, sheet.id === 'b2b' ? 'b2b,sez,de' : sheet.id);
 
 interface StoredWorkings {
-  form: 'gstr1' | 'gstr3b' | 'gstr9';
+  form: 'gstr1' | 'gstr3b' | 'gstr9' | 'gstr1a' | 'cmp08' | 'gstr4';
   sheets: Sheet[];
   issues: WorkingIssue[];
   summary: {
@@ -121,8 +121,14 @@ export async function exportPeriod(
 
   const stored = requireStored(period);
 
+  if (format === 'json' && ['gstr1a', 'cmp08', 'gstr4'].includes(period.returnType)) {
+    throw new UnprocessableError(
+      `${period.returnType.toUpperCase()} has no file format here: it is entered on the portal. Export the Excel workbook or the CA package instead.`,
+      ErrorCode.UNPROCESSABLE,
+    );
+  }
   if (format === 'json') {
-    const exported = exportPayload(period.returnType, stored.model, {
+    const exported = exportPayload(period.returnType as 'gstr1' | 'gstr3b' | 'gstr9', stored.model, {
       year: period.periodYear,
       month: period.periodMonth,
     });

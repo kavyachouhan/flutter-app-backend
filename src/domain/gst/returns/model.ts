@@ -175,6 +175,58 @@ export interface Gstr1DocRow {
 }
 
 /**
+ * Amendments of details reported in an earlier, filed GSTR-1 (tables 9A, 9C, 10). Each carries the
+ * full revised record and the original document's number and date (or, for B2CS, its month).
+ */
+export interface Gstr1Amendments {
+  readonly b2b: readonly {
+    readonly recipientGstin: string;
+    readonly originalNumber: string;
+    readonly originalDate: string;
+    readonly invoice: Gstr1Invoice;
+  }[];
+  readonly b2cl: readonly {
+    readonly placeOfSupply: string;
+    readonly originalNumber: string;
+    readonly originalDate: string;
+    readonly invoice: Gstr1B2clGroup['invoices'][number];
+  }[];
+  readonly b2cs: readonly { readonly originalMonth: string; readonly row: Gstr1B2csRow }[];
+  readonly exports: readonly {
+    readonly originalNumber: string;
+    readonly originalDate: string;
+    readonly export: Gstr1Export;
+  }[];
+  readonly cdnr: readonly {
+    readonly recipientGstin: string;
+    readonly originalNumber: string;
+    readonly originalDate: string;
+    readonly note: Gstr1Note;
+  }[];
+  readonly cdnur: readonly {
+    readonly originalNumber: string;
+    readonly originalDate: string;
+    readonly note: Gstr1UnregisteredNote;
+  }[];
+}
+
+export interface Gstr1AdvanceRow {
+  readonly placeOfSupply: string;
+  readonly supplyType: 'intra_state' | 'inter_state';
+  readonly ratePercent: number;
+  readonly value: TaxedValue;
+}
+
+export const NO_AMENDMENTS: Gstr1Amendments = {
+  b2b: [],
+  b2cl: [],
+  b2cs: [],
+  exports: [],
+  cdnr: [],
+  cdnur: [],
+};
+
+/**
  * Everything the engine knows about a GSTR-1. Sections the active mapper cannot express are
  * counted in `otherSections`, so a return is never presented as complete when it is not.
  */
@@ -196,6 +248,23 @@ export interface Gstr1Return {
    * name -> number of records. A non-empty entry becomes an export issue.
    */
   readonly otherSections: Readonly<Record<string, number>>;
+  /** Amendments of earlier filed GSTR-1s reported in this one (absent: none). */
+  readonly amendments?: Gstr1Amendments;
+  /** Table 11: advances received (11A) and adjusted (11B), by place of supply and rate. */
+  readonly advances?: {
+    readonly received: readonly Gstr1AdvanceRow[];
+    readonly adjusted: readonly Gstr1AdvanceRow[];
+  };
+  /** Table 14: supplies through e-commerce operators (absent: none). */
+  readonly ecommerce?: {
+    readonly tcs: readonly {
+      readonly operatorGstin: string;
+      readonly placeOfSupply: string;
+      readonly recipientRegistered: boolean;
+      readonly value: TaxedValue;
+    }[];
+    readonly s9_5: readonly { readonly operatorGstin: string; readonly value: TaxedValue }[];
+  };
 }
 
 // --- GSTR-3B ----------------------------------------------------------------

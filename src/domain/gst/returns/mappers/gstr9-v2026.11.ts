@@ -100,6 +100,8 @@ function map(model: Gstr9Return): MapResult<Record<string, unknown>> {
     sez: { txval: rupees(t4.sez.taxable), iamt: rupees(t4.sez.igst), csamt: rupees(t4.sez.cess) },
     deemed: five(t4.deemed),
     rchrg: five(t4.inwardReverseCharge),
+    // 4F advances (from GSTR-1 table 11), written only when there are any.
+    ...(t4.advances.taxable !== 0 ? { at: five(t4.advances) } : {}),
     cr_nt: five(t4.creditNotes),
     dr_nt: five(t4.debitNotes),
   };
@@ -111,6 +113,8 @@ function map(model: Gstr9Return): MapResult<Record<string, unknown>> {
     zero_rtd: v(t5.zeroRated),
     sez: v(t5.sez),
     rchrg: v(t5.reverseCharge),
+    // 5C1 supplies through an operator liable under s.9(5) (from GSTR-1 table 14(b)).
+    ...(t5.ecommerce !== 0 ? { ecom_14: v(t5.ecommerce) } : {}),
     exmt: v(t5.exempt),
     nil: v(t5.nilRated),
     non_gst: v(t5.nonGst),

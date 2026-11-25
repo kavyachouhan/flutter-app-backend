@@ -438,3 +438,95 @@ describe('engine output through the mapper', () => {
     expect(out.status).toBe('portal_ready');
   });
 });
+
+describe('GSTR-1 amendments (tables 9A, 9C, 10)', () => {
+  it('writes b2ba, b2cla, b2csa, cdnra, cdnura and expa that pass the official Save schema', () => {
+    const withAmendments: Gstr1Return = {
+      ...gstr1,
+      amendments: {
+        b2b: [
+          {
+            recipientGstin: '29AABCU9603R1ZX',
+            originalNumber: 'INV/26-27/0001',
+            originalDate: '2026-10-05',
+            invoice: { ...gstr1.b2b[0]!.invoices[0]!, number: 'INV/26-27/0001' },
+          },
+        ],
+        b2cl: [
+          {
+            placeOfSupply: '29',
+            originalNumber: 'INV/26-27/0002',
+            originalDate: '2026-10-06',
+            invoice: gstr1.b2cl[0]!.invoices[0]!,
+          },
+        ],
+        b2cs: [{ originalMonth: '2026-10', row: gstr1.b2cs[0]! }],
+        exports: [
+          { originalNumber: 'EXP/26-27/1', originalDate: '2026-10-08', export: gstr1.exports[0]! },
+        ],
+        cdnr: [
+          {
+            recipientGstin: '29AABCU9603R1ZX',
+            originalNumber: 'CN/26-27/0001',
+            originalDate: '2026-10-20',
+            note: gstr1.creditDebitNotesRegistered[0]!.notes[0]!,
+          },
+        ],
+        cdnur: [
+          {
+            originalNumber: 'CN/26-27/0009',
+            originalDate: '2026-10-21',
+            note: {
+              kind: 'credit',
+              type: 'b2cl',
+              number: 'CN/26-27/0009',
+              date: '2026-11-21',
+              value: 118_000,
+              placeOfSupply: '29',
+              lines: [line(18, 100_000, 18_000, 0, 0)],
+            },
+          },
+        ],
+      },
+    };
+    const result = exportPayload('gstr1', withAmendments, period);
+    expect(result.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const p = result.payload as any;
+    expect(p.b2ba[0].inv[0]).toMatchObject({ oinum: 'INV/26-27/0001', oidt: '05-10-2026' });
+    expect(p.b2cla[0]).toMatchObject({ pos: '29' });
+    expect(p.b2csa[0]).toMatchObject({ omon: '102026', sply_ty: 'INTRA', pos: '27' });
+    expect(p.cdnra[0].nt[0]).toMatchObject({ ont_num: 'CN/26-27/0001' });
+    expect(p.cdnura[0]).toMatchObject({ typ: 'B2CL', ont_num: 'CN/26-27/0009' });
+    expect(p.expa[0].inv[0]).toMatchObject({ oinum: 'EXP/26-27/1' });
+  });
+});
+
+describe('GSTR-1 table 14 (supeco)', () => {
+  it('writes 14(a) and 14(b) rows that pass the official Save schema', () => {
+    const withEco: Gstr1Return = {
+      ...gstr1,
+      ecommerce: {
+        tcs: [
+          {
+            operatorGstin: '29AABCU9603R1ZX',
+            placeOfSupply: '27',
+            recipientRegistered: false,
+            value: { taxable: 100_000, igst: 0, cgst: 9_000, sgst: 9_000, cess: 0 },
+          },
+        ],
+        s9_5: [
+          {
+            operatorGstin: '29AABCU9603R1ZX',
+            value: { taxable: 50_000, igst: 0, cgst: 2_500, sgst: 2_500, cess: 0 },
+          },
+        ],
+      },
+    };
+    const result = exportPayload('gstr1', withEco, period);
+    expect(result.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const p = result.payload as any;
+    expect(p.supeco.clttx[0]).toMatchObject({ etin: '29AABCU9603R1ZX', suppval: 1_000, typeOfRecipient: 'UNREG', taxPeriod: '112026', pos: '27' });
+    expect(p.supeco.paytx[0]).toMatchObject({ suppval: 500, cgst: 25 });
+    expect(result.issues.map((i) => i.code)).toContain('supeco_layout_unverified');
+  });
+});

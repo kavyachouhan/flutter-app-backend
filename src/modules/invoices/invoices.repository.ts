@@ -59,6 +59,7 @@ export interface InvoiceHeaderInsert {
   /** 'direct' or 'marketplace'; marketplace carries the e-commerce operator's GSTIN. */
   salesChannel: 'direct' | 'marketplace';
   ecoGstin: string | null;
+  ecoLiability: 'tcs_s52' | 's9_5' | null;
   supply: InvoiceSupplyColumns;
 }
 
@@ -166,7 +167,7 @@ const HEADER_COLUMNS = `
   i.issued_at AS "issuedAt", i.issued_by AS "issuedBy", i.void_reason AS "voidReason", i.voided_at AS "voidedAt",
   i.voided_by AS "voidedBy", i.print_count AS "printCount", i.printed_at AS "printedAt", i.created_at AS "createdAt",
   i.custom_fields AS "customFields", i.attachments, i.is_reverse_charge AS "isReverseCharge",
-  i.sales_channel AS "salesChannel", i.eco_gstin AS "ecoGstin",
+  i.sales_channel AS "salesChannel", i.eco_gstin AS "ecoGstin", i.eco_liability AS "ecoLiability",
   i.terms_id AS "termsId", i.terms_snapshot AS "termsSnapshot", i.sales_order_id AS "salesOrderId", i.estimate_id AS "estimateId", i.proforma_invoice_id AS "proformaInvoiceId",
   i.amends_invoice_id AS "amendsInvoiceId", i.bill_discount_reason AS "billDiscountReason",
   i.document_type AS "documentType", i.irn_state AS "irnState",
@@ -231,7 +232,7 @@ export const invoicesRepository = {
          amends_invoice_id, bill_discount_reason, estimate_id, attachments, proforma_invoice_id,
          supply_scenario, pos_provision, pos_override, sez_authorised_operations, lut_reference,
          buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
-         dispatch_from_snapshot, document_type, sales_channel, eco_gstin)
+         dispatch_from_snapshot, document_type, sales_channel, eco_gstin, eco_liability)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -240,7 +241,7 @@ export const invoicesRepository = {
          $25, $26, $27, $28, $29, $30, $31,
          $32, $33, $34, $35, $36, $37, $38, 'issued',
          $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49::jsonb, $50,
-         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64)`,
+         $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65)`,
       [
         h.id,
         h.outletId,
@@ -306,6 +307,7 @@ export const invoicesRepository = {
         h.documentType,
         h.salesChannel,
         h.ecoGstin,
+        h.ecoLiability,
       ],
     );
   },

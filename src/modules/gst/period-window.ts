@@ -46,6 +46,16 @@ export function windowFromSettings(
 ): { from: string; to: string } {
   // For GSTR-9 the "year" is the year the financial year starts in; the month is ignored.
   if (returnType === 'gstr9') return fyWindow(year, settings.fyStartMonth);
+  // Composition returns follow the statutory year (April-March): GSTR-4 for the year, CMP-08 for
+  // the quarter.
+  if (returnType === 'gstr4') return fyWindow(year, 4);
+  if (returnType === 'cmp08') {
+    const q = compositionQuarter(year, month, 4);
+    return {
+      from: `${q.fromYear}-${String(q.fromMonth).padStart(2, '0')}-01`,
+      to: lastDayOf(q.toYear, q.toMonth),
+    };
+  }
   const quarterly = settings.filingFrequency === 'qrmp';
   if (!quarterly) {
     return { from: `${year}-${String(month).padStart(2, '0')}-01`, to: lastDayOf(year, month) };

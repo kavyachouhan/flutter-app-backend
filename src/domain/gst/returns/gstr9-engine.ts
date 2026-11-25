@@ -240,14 +240,24 @@ export function buildGstr9(input: Gstr9Input): Gstr9Workings {
 
   // --- Tables 4 and 5 ---
   const rchrg4 = sumTv(g3.map((m) => m.outward.inwardReverseCharge));
-  const t4Subtotal = sumTv([o.b2c, o.b2b, o.exp, o.sez, o.deemed, rchrg4]);
+  // 4F: advances on which tax was paid and no invoice issued yet in the year, from GSTR-1 table 11
+  // (11A received less 11B adjusted). 5C1: supplies through an operator liable under s.9(5), from
+  // table 14(b) (12/2024-CT inserted 4G1 for operators and 5C1 for suppliers).
+  const sumRows = (rows: readonly { value: TaxedValue }[]) => sumTv(rows.map((r) => r.value));
+  const advances4f = tv(
+    sumTv(g1.map((m) => sumRows(m.advances?.received ?? []))),
+    sumTv(g1.map((m) => sumRows(m.advances?.adjusted ?? []))),
+    -1,
+  );
+  const eco5c1 = g1.reduce((s, m) => s + (m.ecommerce?.s9_5 ?? []).reduce((x, r) => x + r.value.taxable, 0), 0);
+  const t4Subtotal = sumTv([o.b2c, o.b2b, o.exp, o.sez, o.deemed, advances4f, rchrg4]);
   // 4M = -4I + 4J (+4K - 4L, which are not computed).
   const t4Adjust = tv(o.debitNotes, o.creditNotes, -1);
   const t4Net = tv(t4Subtotal, t4Adjust);
 
   const exempt5 = o.exempt + (input.considerNonTaxAsExempt ? o.nonGst : 0);
   const nonGst5 = input.considerNonTaxAsExempt ? 0 : o.nonGst;
-  const t5Subtotal = o.zeroRated + o.sez5 + o.rcm5 + exempt5 + o.nil + nonGst5;
+  const t5Subtotal = o.zeroRated + o.sez5 + o.rcm5 + eco5c1 + exempt5 + o.nil + nonGst5;
   const t5Adjust = o.debitNotes5 - o.creditNotes5;
   const t5Net = t5Subtotal + t5Adjust;
   const turnover = t4Net.taxable + t5Net;
@@ -328,8 +338,7 @@ export function buildGstr9(input: Gstr9Input): Gstr9Workings {
     rows.map((r) => ({ hsn: r.hsn, uqc: r.uqc, quantity: r.quantity, ratePercent: r.ratePercent, value: r.value }));
 
   const notComputed = [
-    '4F advances', '4G1 supplies by e-commerce operators', '4K 4L 5J 5K amendments',
-    '5C1 supplies by suppliers through e-commerce operators', '6A1 6A2',
+    '4G1 supplies by e-commerce operators (operators only)', '4K 4L 5J 5K amendments', '6A1 6A2',
     '6K 6L 6M 7F 7G transitional and ITC-01/02 credit', '7A 7A1 7A2 7B 7C 7D rule-wise reversals',
     '8C 8E 8F 8H1', 'Tables 10 to 16',
   ];
@@ -339,12 +348,12 @@ export function buildGstr9(input: Gstr9Input): Gstr9Workings {
     fy: input.fy,
     t4: {
       b2c: o.b2c, b2b: o.b2b, exp: o.exp, sez: o.sez, deemed: o.deemed,
-      advances: ZERO_TAXED, inwardReverseCharge: rchrg4, ecommerce: ZERO_TAXED,
+      advances: advances4f, inwardReverseCharge: rchrg4, ecommerce: ZERO_TAXED,
       creditNotes: o.creditNotes, debitNotes: o.debitNotes,
       amendmentsAdded: ZERO_TAXED, amendmentsReduced: ZERO_TAXED,
     },
     t5: {
-      zeroRated: o.zeroRated, sez: o.sez5, reverseCharge: o.rcm5, ecommerce: 0,
+      zeroRated: o.zeroRated, sez: o.sez5, reverseCharge: o.rcm5, ecommerce: eco5c1,
       exempt: exempt5, nilRated: o.nil, nonGst: nonGst5,
       creditNotes: o.creditNotes5, debitNotes: o.debitNotes5,
       amendmentsAdded: 0, amendmentsReduced: 0,
@@ -437,7 +446,7 @@ export function buildGstr9(input: Gstr9Input): Gstr9Workings {
 
   // --- Sheets ---
   const sheets = buildSheets({
-    input, o, rchrg4, t4Subtotal, t4Adjust, t4Net, exempt5, nonGst5, t5Subtotal, t5Adjust, t5Net, turnover,
+    input, o, rchrg4, advances4f, eco5c1, t4Subtotal, t4Adjust, t4Net, exempt5, nonGst5, t5Subtotal, t5Adjust, t5Net, turnover,
     total3b, sub6, a2, diff6, reclaimed, sec17, otherRev, rev7, net6o, per2b, itc6b, diff8,
     igstPaidOnImport, igstAvailedOnImport, lapsedImport, t9, interest, g1Outward, g1OutwardTax, g3Outward,
     outwardHsn: sortedHsn(outwardHsn), inwardHsn: sortedHsn(inwardHsn),
@@ -495,6 +504,8 @@ type Ctx = {
   input: Gstr9Input;
   o: Outward;
   rchrg4: TaxedValue;
+  advances4f: TaxedValue;
+  eco5c1: Paise;
   t4Subtotal: TaxedValue;
   t4Adjust: TaxedValue;
   t4Net: TaxedValue;
@@ -543,7 +554,7 @@ function buildSheets(c: Ctx): Sheet[] {
     taxedRow('4C', 'Zero rated supply (export) on payment of tax (except supplies to SEZs)', c.o.exp),
     taxedRow('4D', 'Supply to SEZs on payment of tax', c.o.sez),
     taxedRow('4E', 'Deemed exports', c.o.deemed),
-    taxedRow('4F', 'Advances on which tax has been paid but invoice has not been issued', ZERO_TAXED),
+    taxedRow('4F', 'Advances on which tax has been paid but invoice has not been issued', c.advances4f),
     taxedRow('4G', 'Inward supplies on which tax is to be paid on reverse charge basis', c.rchrg4),
     taxedRow('4G1', 'Supplies on which e-commerce operator is required to pay tax u/s 9(5)', ZERO_TAXED),
     taxedRow('4H', 'Sub-total (A to G1 above)', c.t4Subtotal),
@@ -556,7 +567,7 @@ function buildSheets(c: Ctx): Sheet[] {
     valueRow('5A', 'Zero rated supply (export) without payment of tax', c.o.zeroRated),
     valueRow('5B', 'Supply to SEZs without payment of tax', c.o.sez5),
     valueRow('5C', 'Supplies on which tax is to be paid by the recipient on reverse charge basis', c.o.rcm5),
-    valueRow('5C1', 'Supplies on which tax is to be paid by e-commerce operators u/s 9(5)', 0),
+    valueRow('5C1', 'Supplies on which tax is to be paid by e-commerce operators u/s 9(5)', c.eco5c1),
     valueRow('5D', 'Exempted', c.exempt5),
     valueRow('5E', 'Nil Rated', c.o.nil),
     valueRow('5F', 'Non-GST supply (includes "no supply")', c.nonGst5),

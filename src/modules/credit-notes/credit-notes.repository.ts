@@ -231,7 +231,7 @@ export const creditNotesRepository = {
          reason_code, refund_mode, refund_amount, restock, custom_fields, notes, status, issued_at, issued_by,
          is_reverse_charge, correction_reason, recipient_itc_reversal_status, supply_scenario, pos_provision, pos_override, sez_authorised_operations,
          lut_reference, buyer_gst_treatment, customer_uin, seller_snapshot, buyer_snapshot, ship_to_snapshot,
-         dispatch_from_snapshot, sales_channel, eco_gstin)
+         dispatch_from_snapshot, sales_channel, eco_gstin, eco_liability)
        VALUES (
          $1, app.current_tenant_id(), $2, $3, $4, $5, $6, $7, $8,
          $9, $10, $11, $12, $13, $14,
@@ -243,7 +243,8 @@ export const creditNotesRepository = {
          -- A credit note follows its invoice's sales channel, so GSTR-1 table 14 nets it
          -- against the same e-commerce operator.
          COALESCE((SELECT o.sales_channel FROM invoices o WHERE o.id = $10), 'direct'),
-         (SELECT o.eco_gstin FROM invoices o WHERE o.id = $10))`,
+         (SELECT o.eco_gstin FROM invoices o WHERE o.id = $10),
+         (SELECT o.eco_liability FROM invoices o WHERE o.id = $10))`,
       [
         h.id,
         h.outletId,

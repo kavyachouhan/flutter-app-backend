@@ -72,6 +72,7 @@ import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js
 function salesChannelOf(body: CreateInvoiceBody): {
   salesChannel: 'direct' | 'marketplace';
   ecoGstin: string | null;
+  ecoLiability: 'tcs_s52' | 's9_5' | null;
 } {
   const channel = body.salesChannel ?? (body.ecoGstin ? 'marketplace' : 'direct');
   if (channel === 'marketplace' && !body.ecoGstin) {
@@ -88,7 +89,18 @@ function salesChannelOf(body: CreateInvoiceBody): {
       { details: { field: 'ecoGstin' } },
     );
   }
-  return { salesChannel: channel, ecoGstin: channel === 'marketplace' ? (body.ecoGstin ?? null) : null };
+  if (channel === 'direct' && body.ecoLiability) {
+    throw new UnprocessableError(
+      'The e-commerce section applies only to a marketplace sale.',
+      ErrorCode.UNPROCESSABLE,
+      { details: { field: 'ecoLiability' } },
+    );
+  }
+  return {
+    salesChannel: channel,
+    ecoGstin: channel === 'marketplace' ? (body.ecoGstin ?? null) : null,
+    ecoLiability: channel === 'marketplace' ? (body.ecoLiability ?? 'tcs_s52') : null,
+  };
 }
 
 export interface Warning {
@@ -246,6 +258,14 @@ export async function createInvoice(body: CreateInvoiceBody) {
       lines: body.lines,
     });
     assertTotalsMatch(totals, body.expectedTotals, 'Invoice');
+    // Under s.9(5) the operator pays the tax, so the supplier's invoice carries none.
+    if (body.ecoLiability === 's9_5' && totals.totalTax > 0) {
+      throw new UnprocessableError(
+        'A supply on which the e-commerce operator pays the tax (s.9(5)) must not charge GST on this invoice.',
+        ErrorCode.UNPROCESSABLE,
+        { details: { field: 'ecoLiability', totalTax: totals.totalTax } },
+      );
+    }
     const documentType = documentTypeFor(
       mode,
       supply.buyer?.gstTreatment ?? null,

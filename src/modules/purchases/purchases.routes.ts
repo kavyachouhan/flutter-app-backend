@@ -13,6 +13,7 @@ import {
   listPurchaseBillsQuery,
   listPurchaseOrdersQuery,
   listSupplierPaymentsQuery,
+  updatePurchaseItcBody,
   updatePurchaseOrderBody,
   voidPurchaseBillBody,
   voidSupplierPaymentBody,
@@ -69,6 +70,19 @@ purchaseBillsRouter.get(
   async (req, res) => {
     const { params } = validated<typeof byId>(req);
     res.json({ data: await listReturnable(params.id) });
+  },
+);
+
+// Corrects the credit facts (use, s.17(5) clause, received dates) until the credit is claimed in
+// a filed GSTR-3B; after that a correction is a debit note or a reversal in a later return.
+const updateItc = { params: idParams, body: updatePurchaseItcBody };
+purchaseBillsRouter.patch(
+  '/:id/itc',
+  requirePermission('gst:manage'),
+  validate(updateItc),
+  async (req, res) => {
+    const { params, body } = validated<typeof updateItc>(req);
+    res.json({ data: await purchases.updatePurchaseItc(params.id, body) });
   },
 );
 

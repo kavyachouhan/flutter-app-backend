@@ -87,6 +87,8 @@ export interface EngineDoc {
   readonly reverseCharge: boolean;
   readonly salesChannel: string | null;
   readonly ecoGstin: string | null;
+  /** 'tcs_s52' or 's9_5' for a marketplace sale (0053); absent or null otherwise. */
+  readonly ecoLiability?: string | null;
   /** The invoice a credit/debit note corrects. */
   readonly original: {
     readonly number: string;

@@ -14,6 +14,10 @@ import * as reconciliation from './reconciliation.service.js';
 import * as service from './gst.service.js';
 import * as registrations from './registrations.service.js';
 import * as ruleSets from './rule-sets.service.js';
+import { itcRouter } from './itc/itc.routes.js';
+import { amendmentsRouter } from './amendments/amendments.routes.js';
+import { advancesRouter } from './advances/advances.routes.js';
+import { closingStockStatement } from './closing-stock/closing-stock.service.js';
 import {
   acceptMatchBody,
   createGstr2bImportBody,
@@ -26,6 +30,22 @@ import {
 } from './gst.schemas.js';
 
 export const gstRouter: Router = Router();
+
+// Input tax credit: RCM self-invoices, IMS decisions, statement balances, credit history.
+gstRouter.use('/itc', itcRouter);
+// Amendments of filed GSTR-1 details (GSTR-1A or tables 9A / 9C / 10 of a later GSTR-1).
+gstRouter.use('/amendments', amendmentsRouter);
+// Advances: receipt and refund vouchers, adjustment against invoices (GSTR-1 table 11).
+gstRouter.use('/advances', advancesRouter);
+
+// Closing-stock ITC (Rule 44) for GSTR-10 Table 8, REG-16 Table 10 or ITC-03.
+const closingStock = {
+  query: z.object({ gstin: z.string().min(15).max(15), asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+};
+gstRouter.get('/closing-stock-itc', requirePermission('gst:read'), validate(closingStock), async (req, res) => {
+  const { query } = validated<typeof closingStock>(req);
+  res.json({ data: await closingStockStatement(query.gstin, query.asOf) });
+});
 
 // --- Rule sets and the HSN/SAC master ----------------------------------------
 

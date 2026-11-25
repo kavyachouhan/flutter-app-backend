@@ -28,6 +28,7 @@ interface HeaderRow {
   reverseCharge: boolean;
   salesChannel: string | null;
   ecoGstin: string | null;
+  ecoLiability: string | null;
   origNumber: string | null;
   origDate: string | null;
   origTotal: number | null;
@@ -62,20 +63,20 @@ export const returnsRepository = {
   async outwardDocuments(tx: Tx, gstin: string, from: string, to: string): Promise<EngineDoc[]> {
     const headers = await tx.many<HeaderRow>(
       `SELECT 'invoice' AS kind, ${HEADER_COLUMNS('i')}, i.irn_state AS "irnState",
-              i.sales_channel AS "salesChannel", i.eco_gstin AS "ecoGstin",
+              i.sales_channel AS "salesChannel", i.eco_gstin AS "ecoGstin", i.eco_liability AS "ecoLiability",
               NULL::text AS "origNumber", NULL::text AS "origDate",
               NULL::bigint AS "origTotal", NULL::text AS "origSupplyType"
        FROM invoices i
        WHERE i.supplier_gstin = $1 AND i.document_date >= $2::date AND i.document_date <= $3::date
        UNION ALL
        SELECT 'credit_note', ${HEADER_COLUMNS('c')}, c.irn_state,
-              c.sales_channel, c.eco_gstin,
+              c.sales_channel, c.eco_gstin, c.eco_liability,
               o.document_number, o.document_date::text, o.grand_total::bigint, o.supply_type
        FROM credit_notes c LEFT JOIN invoices o ON o.id = c.original_invoice_id
        WHERE c.supplier_gstin = $1 AND c.document_date >= $2::date AND c.document_date <= $3::date
        UNION ALL
        SELECT 'debit_note', ${HEADER_COLUMNS('d')}, d.irn_state,
-              'direct', NULL,
+              'direct', NULL, NULL,
               o.document_number, o.document_date::text, o.grand_total::bigint, o.supply_type
        FROM sales_debit_notes d LEFT JOIN invoices o ON o.id = d.original_invoice_id
        WHERE d.supplier_gstin = $1 AND d.document_date >= $2::date AND d.document_date <= $3::date`,
@@ -133,6 +134,7 @@ export const returnsRepository = {
       reverseCharge: h.reverseCharge,
       salesChannel: h.salesChannel,
       ecoGstin: h.ecoGstin,
+      ecoLiability: h.ecoLiability,
       original:
         h.origNumber && h.origDate && h.origTotal !== null && h.origSupplyType
           ? {
@@ -381,7 +383,7 @@ export const returnsRepository = {
       state: IssuedNumberRow['state'];
       sequenceNo: number | string;
     }>(
-      `SELECT n.series_family AS family, d.series_id AS "seriesId", n.document_number AS number,
+      `SELECT n.series_family AS family, d.series_id::text AS "seriesId", n.document_number AS number,
               n.number_state AS state, d.sequence_no AS "sequenceNo"
        FROM gst_document_numbers n
        JOIN gst_registrations r ON r.id = n.registration_id AND r.gstin = $1
@@ -390,7 +392,23 @@ export const returnsRepository = {
          UNION ALL SELECT 'credit_notes', id, series_id, sequence_no, document_date FROM credit_notes
          UNION ALL SELECT 'sales_debit_notes', id, series_id, sequence_no, document_date FROM sales_debit_notes
        ) d ON d.t = n.document_table AND d.id = n.document_id
-       WHERE d.document_date >= $2::date AND d.document_date <= $3::date`,
+       WHERE d.document_date >= $2::date AND d.document_date <= $3::date
+       UNION ALL
+       -- Self-invoices for reverse-charge purchases (Table 13, nature 2), numbered per FY.
+       SELECT 'rcm_self_invoice', 'rcm-si-' || si.fy_start_year, si.document_number,
+              CASE WHEN si.status = 'void' THEN 'cancelled' ELSE 'issued' END, si.sequence_no
+       FROM rcm_self_invoices si
+       WHERE si.gstin = $1 AND si.document_date >= $2::date AND si.document_date <= $3::date
+       UNION ALL
+       -- Receipt vouchers (nature 6) and refund vouchers (nature 8), numbered per FY.
+       SELECT 'receipt_voucher', 'rv-' || rv.fy_start_year, rv.document_number,
+              CASE WHEN rv.status = 'void' THEN 'cancelled' ELSE 'issued' END, rv.sequence_no
+       FROM receipt_vouchers rv
+       WHERE rv.gstin = $1 AND rv.document_date >= $2::date AND rv.document_date <= $3::date
+       UNION ALL
+       SELECT 'refund_voucher', 'rf-' || rf.fy_start_year, rf.document_number, 'issued', rf.sequence_no
+       FROM refund_vouchers rf
+       WHERE rf.gstin = $1 AND rf.document_date >= $2::date AND rf.document_date <= $3::date`,
       [gstin, from, to],
     );
     return rows.map((r) => ({ ...r, sequenceNo: n(r.sequenceNo) }));
@@ -436,9 +454,13 @@ export const returnsRepository = {
        JOIN purchase_bills b ON b.id = l.purchase_bill_id
        JOIN suppliers s ON s.id = b.supplier_id
        LEFT JOIN gst_registrations reg ON reg.id = b.registration_id
+       -- From 01.11.2024 the time of supply is the date of the self-invoice (s.13(3)(c)), when one
+       -- has been issued; until then the bill date stands.
+       LEFT JOIN rcm_self_invoices si ON si.purchase_bill_id = b.id AND si.status = 'issued'
        WHERE b.is_reverse_charge AND b.status <> 'void'
          AND (reg.gstin IS NULL OR reg.gstin = $1)
-         AND b.document_date >= $2::date AND b.document_date <= $3::date
+         AND COALESCE(si.document_date, b.document_date) >= $2::date
+         AND COALESCE(si.document_date, b.document_date) <= $3::date
        GROUP BY 1, 2`,
       [gstin, from, to],
     );

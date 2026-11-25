@@ -61,7 +61,7 @@ import { numberForDocument } from './numbering.js';
 import { ordersRepository } from './orders.repository.js';
 import { assertReceiptFits } from './orders.service.js';
 import { purchasesRepository, type PurchaseBillLineInsert } from './purchases.repository.js';
-import type {
+import type { UpdatePurchaseItcBody,
   CreatePurchaseBillBody,
   CreateSupplierPaymentBody,
   ListPurchaseBillsQuery,
@@ -256,6 +256,16 @@ export async function createPurchaseBill(body: CreatePurchaseBillBody) {
       createdBy: auth.userId,
       itcCategory,
       itcIneligibleReason,
+      itc: {
+        use: body.itcUse ?? 'business_taxable',
+        blockedCreditCode: itcEligible ? (body.blockedCreditCode ?? null) : null,
+        goodsReceivedDate: body.goodsReceivedDate ?? null,
+        servicesReceivedDate: body.servicesReceivedDate ?? null,
+        receiptComplete: body.receiptComplete ?? true,
+        boeNumber: body.boeNumber ?? null,
+        boeDate: body.boeDate ?? null,
+        boePortCode: body.boePortCode ?? null,
+      },
     });
 
     const lineRows: PurchaseBillLineInsert[] = body.lines.map((line, index) => {
@@ -771,5 +781,40 @@ export function voidSupplierPayment(id: string, reason: string) {
     });
 
     return purchasesRepository.findPayment(tx, id);
+  });
+}
+
+/**
+ * Corrects a bill's credit facts. Refused once the bill's credit has been through a filed GSTR-3B
+ * (a movement recorded, or the period filed before the ITC engine): the filed return is the record.
+ */
+export function updatePurchaseItc(id: string, body: UpdatePurchaseItcBody) {
+  return withTransaction(async (tx) => {
+    const header = await purchasesRepository.findBill(tx, id, true);
+    if (!header) throw new NotFoundError('Purchase bill');
+    assertOutletAccess(header.outletId);
+    if (header.status === 'void') {
+      throw new UnprocessableError('This bill is void.', ErrorCode.UNPROCESSABLE);
+    }
+    const claimed = await tx.one<{ found: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM itc_movements m JOIN itc_register r ON r.id = m.register_id
+          WHERE r.source_type = 'purchase_bill' AND r.source_id = $1) AS found`,
+      [id],
+    );
+    if (claimed?.found || (await gstr3bFiledForItc(tx, 'purchase_bill', id))) {
+      throw new UnprocessableError(
+        'The credit on this bill is already in a filed GSTR-3B. Correct it with a debit note or in a later return.',
+        ErrorCode.CORRECTION_NOT_ALLOWED,
+      );
+    }
+    await purchasesRepository.updateItcFacts(tx, id, body);
+    await recordAudit(tx, {
+      action: 'purchase_bill.itc_updated',
+      entityType: 'purchase_bill',
+      entityId: id,
+      metadata: { ...body },
+    });
+    return loadBill(tx, id);
   });
 }

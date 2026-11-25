@@ -156,6 +156,11 @@ export const createInvoiceBody = z.object({
    */
   salesChannel: z.enum(['direct', 'marketplace']).optional(),
   ecoGstin: gstin.optional(),
+  /**
+   * For a marketplace sale: 'tcs_s52' (the operator collects TCS; default) or 's9_5' (the operator
+   * pays the tax under s.9(5), so this invoice carries none and goes to GSTR-1 table 14(b)).
+   */
+  ecoLiability: z.enum(['tcs_s52', 's9_5']).optional(),
   pricesIncludeTax: z.boolean(),
   roundOff: z.boolean(),
   lines: z.array(line).nonempty(),

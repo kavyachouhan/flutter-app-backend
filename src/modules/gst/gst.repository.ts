@@ -4,7 +4,7 @@ import type { Cursor } from '../../lib/pagination.js';
 export interface GstReturnPeriodRow {
   id: string;
   gstin: string;
-  returnType: 'gstr1' | 'gstr3b' | 'gstr9';
+  returnType: 'gstr1' | 'gstr3b' | 'gstr9' | 'gstr1a' | 'cmp08' | 'gstr4';
   periodYear: number;
   periodMonth: number;
   periodFrom: string;

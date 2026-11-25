@@ -3,7 +3,7 @@ import { clientId } from '../../lib/ids.js';
 import { pageQuery } from '../../lib/pagination.js';
 import { gstin, isoDate, nonEmpty } from '../../lib/validators.js';
 
-export const RETURN_TYPES = ['gstr1', 'gstr3b', 'gstr9'] as const;
+export const RETURN_TYPES = ['gstr1', 'gstr3b', 'gstr9', 'gstr1a', 'cmp08', 'gstr4'] as const;
 export const RETURN_STATUSES = ['open', 'prepared', 'filed'] as const;
 export const ITC_CATEGORIES = ['inputs', 'input_services', 'capital_goods', 'ineligible'] as const;
 export const ITC_STATES = ['available', 'claimed', 'reversed', 'ineligible'] as const;

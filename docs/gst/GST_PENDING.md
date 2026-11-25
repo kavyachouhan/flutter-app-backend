@@ -79,19 +79,45 @@ These items are no longer missing; what each settled is in `GST_PHASE2_GAP_ANALY
 - **GSTR-9:** not computed and left out of the file, so the portal keeps whatever is entered there: 4F advances, 4G1 / 5C1 e-commerce, 4K / 4L / 5J / 5K and Tables 10-13 amendments, Tables 14-16 (differential tax, refunds and demands, composition and job-work supplies), 6A1 / 6A2, 6K-6M and 7F / 7G (transitional and ITC-01/02), the rule-wise reversals 7A-7D (known only as blocked credit and "other"), and 8C / 8E / 8F / 8H1. Table 8 is shown and exported to Excel but **not written to the JSON**: the Save schema's descriptions of its keys are copied from other rows. Late fee (9F) and interest (9E) are summed from GSTR-3B 5.1, which is itself not computed (above).
 - **GSTR-9 for a composition dealer (GSTR-9A)** and for an ISD or e-commerce operator: refused or not covered. GSTR-9A is still prescribed by Rule 80(1), but every annual return is exempt up to ₹2 crore turnover (32/2023, 14/2024, 15/2025), and composition is capped at ₹1.5 crore (14/2019). It is optional in practice and will not be built.
 - **Composition dealers have no return at all (Phase 1 scope).** CMP-08 was removed on 14 Nov 2026 (code, Reports row and migration 0049); creating any return period for a composition tenant is refused with a plain message. Composition billing (bill of supply, `tenants.composition_*`, `DEFAULT_COMPOSITION_RATES`) is unchanged. **Phase 2 (25 Nov 2026) brings GSTR-4 (annual) and CMP-08 (quarterly) back as P3**, as Excel/CA working papers with the 05/2026 table layout (separate s.9(5) row). This needs a new migration; 0049 stays as it is.
-- **Phase 2 features, not started** (design and data status in `GST_PHASE2_GAP_ANALYSIS.md`):
-  - ITC engine (line-level ITC, `itc_movements`, Rules 37/37A/42/43/44/88D, IMS actions, ECRRS/RCM statement mirrors, RCM self-invoice under Rule 47A)
-  - Amendments and GSTR-1A
-  - GSTR-1 Table 14/14A, 3B 3.1.1(ii), GSTR-9 4G1/5C1, marketplace imports
-  - Advances (receipt/refund vouchers, Tables 11A/11B, allocating an advance later)
-  - GSTR-4 + CMP-08
-  - Closing-stock ITC statement (GSTR-10 / ITC-03 / REG-16 Table 10)
+- **Phase 2: built 25-26 Nov 2026, open follow-ups** (what was built is in section 5, "Phase 2"):
+  - **ITC:**
+    - Rule 37A reversal from the September GSTR-2B Table 5 is not read yet (2B `itcrev` parsing waits for a real 2B sample).
+    - Interest under s.50 on Rule 37 reversals is flagged, not computed.
+    - The Rule 42(2) / 43 annual true-up is not computed.
+    - Matching 2B credit notes, ISD and bills of entry against our documents is not built; only invoices are matched.
+    - IMS pending limits, deemed acceptance and 3B blocking are warn-only until an official IMS document is held (section 1).
+    - ITC-01 / 02 / 03 / 04 forms are not produced; the closing-stock statement gives the ITC-03 stock figures.
+  - **Amendments:** nil (`nila`), HSN (`hsna`), advance (`ata`, `txpda`) and table 14A amendments are not written. GSTR-9 4K / 4L / 5J / 5K are not filled from amendments. An amendment's 3.2 (inter-State to unregistered) effect is not moved.
+  - **E-commerce:**
+    - **s.9(5) invoices.** They carry no tax, so table 14(b) shows the operator's tax only at the line rate; billed at 0% it shows none. A "tax payable by the operator" mode in the shared tax engine (TS and Dart) and the `tax_payable_by` CHECK would fix this.
+    - **Marketplace report imports** wait for sample files (section 1).
+    - **Table 14(a) JSON** follows the Save schema layout, not confirmed by a sample.
+  - **Advances:**
+    - Table 11 is shown in the Offline Tool's at / atadj CSV layout. It is not written to the portal JSON, because the Save schema's layout conflicts with the manual (section 1).
+    - Refunds of an earlier period's advance are put with 11B, with a note.
+  - **Composition:** GSTR-4 Table 7 (TDS/TCS) and Table 8 (interest, late fee) are not computed. CMP-08 interest is not computed. Both returns are Excel/CA only.
+  - **Closing stock:** the s.29(5) "output tax on the goods" comparison is not computed. Stock without invoices is listed, not valued (Rule 44(3) needs a CA/CMA estimate).
+  - **App:**
+    - Hindi, Gujarati and Marathi texts for the Phase 2 screens were added on 26 Nov 2026 (69 strings each); like the rest of the GST wording, they need a native reader's review.
+    - The IMS upload file is shared as a `.json` file (GSTR-2B statement screen, upload icon) named like the IMS utility's output. It was built from the utility's macros and has not been tried on the portal.
+    - The amendment form edits one rate line; a multi-rate invoice is amended with one revised rate. It sends the tax as CGST/SGST, and the server moves it to IGST when the reported original was inter-State (`matchHeads`, fixed 26 Nov 2026).
+- **Planned in the Phase 2 report, not built yet** (found by the completion check on 26 Nov 2026):
+  - **Filed-return snapshot chain** (`gst_return_snapshots` with `supersedes_id`): filed rows are locked (0050), but GSTR-1A and amendments are not stored as new snapshots linked to the original return.
+  - **Reopening a filed return:** no owner-only, audited path. The 0050 trigger allows it only under the setting `app.gst_reopen_period`, which nothing sets.
+  - **Line-level ITC.** ITC facts (`itc_use`, `blocked_credit_code`, category) are per purchase bill, so one bill cannot mix blocked and eligible items. Split such a purchase into two bills until then.
+  - **Credit notes and s.34(2) (from 01.10.2025).** `credit_notes.recipient_itc_reversal_status` exists, but no return holds back a credit note's reduction until the buyer has reversed the ITC. The IMS "ITC reduction" decision is only exported.
+  - **E-commerce operator list and s.9(5) by rule.** The operator GSTIN is typed per bill and the s.9(5) choice is the shop's tick. There is no operator master, and nothing decides s.9(5) from the service category (needs the 17/2017-CT(Rate) amendments, section 1).
+  - **Rule 88D reason codes:** 3B credit above 2B is a warning only. The DRC-01C reasons (Rule 37/37A reclaim, imports, earlier instalments) are not recorded against the difference.
+- **API built, no app screen yet:**
+  - `PATCH /v1/purchase-bills/:id/itc`: correct a bill's ITC facts after saving, until the credit is filed.
+  - `POST /v1/gst/itc/statement-balances`: declare opening balances of the ECRRS and RCM statements, which the advisory #389 check needs.
+  - `POST /v1/payments/:id/allocations`: settle an invoice from a khata advance.
+- **Held bills lose reverse charge** (from before Phase 2): `HeldCart` does not carry `reverseCharge`, so a held reverse-charge bill comes back as a normal one. The same gap for the marketplace fields was fixed on 26 Nov 2026.
+- **Phase 2 screens** (Amendments, Advances, Closing-stock credit, ITC history sheet, IMS decision, marketplace chip, purchase ITC fields) have not been run on a device and have no widget tests yet.
 - **Phase 1 defects found by the Phase 2 audit: still open** (the fixed ones are in section 5, "P0 fixes"):
-  - **3B Table 4 ignores claim state and period** (`returns.service.ts` `computeGstr3b`): rows flagged `missing_in_2b` are still counted, and 4(A)(4), 4(B)(2), 4(D) are always zero. Part fixed on 25 Nov 2026: credit per books above GSTR-2B is now a warning (`itc_exceeds_2b`) that cites s.16(2)(aa) and Rule 88D and gives the excess per head. The full fix (claim by period from `itc_movements`) is the ITC engine.
-  - **Reverse-charge tax point**: bills are still placed by bill date; from 01.11.2024 it is the self-invoice date (s.13(3)(c), Rule 47A). Comes with the RCM self-invoice in the ITC engine. The return now says so.
   - **2B notes, ISD and imports are not matched**: since 25 Nov 2026 only invoice rows (b2b, b2ba, ecom, ecoma) are matched against purchase bills (they were wrongly paired before). Credit notes against purchase debit notes, ISD and bills of entry still need their own matching (ITC engine).
   - **Undated thresholds**: the e-invoice threshold (₹5 crore from 01.08.2023, 10/2023) and RCM e-invoicing (from 01.01.2027, 04/2026) are not yet in the rule set (A2 is paused); needed for B3.
-  - **App side not built yet**: the bill screen has no sales channel / operator GSTIN fields, and there is no "settle from advance" action on a receipt. Both API endpoints exist (section 5).
+  - **App side:** there is still no "settle from advance" action on a khata receipt in the app (the API `POST /v1/payments/:id/allocations` exists). GST receipt vouchers are adjusted from the Advances screen.
 - **Purchase register (GSTR-2 format):** no portal JSON exists (GSTR-2 has been suspended since 2017). It is a register for reconciliation, not a filing. Debit-note reasons are mapped to the nearest GSTR-2 reason; the mapping is listed in the file's issues.
 
 ## 3. Rules assumed, not verified
@@ -101,8 +127,8 @@ These items are no longer missing; what each settled is in `GST_PHASE2_GAP_ANALY
 | B2CL threshold is a flat 2.5 lakh | `classify.ts` `B2CL_THRESHOLD_PAISE` | **Now known to be wrong** from the August 2024 period: Rule 59(4) has said ₹1 lakh from 01.08.2024 (12/2024). Fix in P0 by making the threshold period-aware |
 | 3B 4(D) pairing: `RUL` = reclaimed after reversal, `OTH` = ineligible under s.16(4)/PoS | `mappers/gstr3b-v2026.11.ts` | The schema only says "RUL / OTH"; the older form read RUL as s.17(5) |
 | 3B Table 4: 4(A) holds all credit per books, ineligible credit comes out through 4(B)(1) | `gstr3b-engine.ts` | Matches how the portal pre-fills, but is a design choice |
-| Reverse-charge purchases fall in the month of the bill date | `returns.repository.ts` | **Now known to be wrong** from 01.11.2024: the RCM tax point is the date of the recipient's self-invoice (s.13(3)(c), FA (No.2) 2024, 17/2024), issued within 30 days of receipt (Rule 47A). Fixed by the RCM self-invoice in the ITC engine |
-| Rule 43(1)(g) common credit for exempt supplies uses `Tm` (planned) | ITC engine (Phase 2) | The official formula reads `Te = (E/F) x Tr`, but 16/2020-CT omitted clause (f), which defined `Tr`, and left (g) unchanged. `Tm` (clause (e)) is the only per-period common-credit amount left. Confirm with a CBIC clarification if one exists |
+| Reverse-charge purchases without a self-invoice fall in the month of the bill date | `returns.repository.ts`, `itc-engine.repository.ts` | From 01.11.2024 the RCM tax point is the self-invoice date (s.13(3)(c), Rule 47A). When a self-invoice exists its date is used (since 26 Nov 2026). Bills from a **registered** supplier under reverse charge, and unregistered ones before the self-invoice is issued, still use the bill date |
+| Rule 43(1)(g) common credit for exempt supplies uses `Tm` | `domain/gst/itc-engine.ts` | The official formula reads `Te = (E/F) x Tr`, but 16/2020-CT omitted clause (f), which defined `Tr`, and left (g) unchanged. `Tm` (clause (e)) is the only per-period common-credit amount left. Confirm with a CBIC clarification if one exists |
 | IMS rules (pending limits, deemed acceptance, 3B blocking) | ITC engine (Phase 2) | No official IMS manual or advisory in the repo; these checks ship as warnings only |
 | s.9(5) services: only passenger transport and accommodation | rule set (Phase 2) | The original 17/2017-CT(Rate) only; later additions are missing (section 1) |
 | Outward reverse-charge sales: placement in 3.1 not decided | `gstr3b-engine.ts` (warning) | Wrong figure in 3.1 if used |
@@ -127,13 +153,14 @@ These items are no longer missing; what each settled is in `GST_PHASE2_GAP_ANALY
 
 | Environment | Migrations | State |
 |---|---|---|
-| TEST | 0001-0045, 0047, 0048, 0049, 0050 applied (0047-0049 on 14 Nov 2026, 0050 on 25 Nov 2026). There is no 0046 on TEST. 0049 narrows `gst_return_periods.return_type` to gstr1/gstr3b/gstr9 and stops (raises) if any cmp08 period exists; TEST and DEV had none on 14 Nov | Proper. 0047 widens `gst_return_periods.return_type` for GSTR-9; 0048 adds `gst_ledger_imports` and `gst_ledger_entries`. They were first numbered 0046 and 0047 and renamed because DEV already held a different `0046_import_mappings.sql` from other work; the TEST ledger rows were renumbered to match |
-| DEV | 0001-0045 applied (13 Nov 2026). **0047, 0048, 0049 and 0050 are pending on DEV and were not applied.** DEV also holds `0046_import_mappings.sql` (applied 14 Nov, from other work, not in this branch): when that branch merges, TEST will show it pending, and it applies out of order after 0047 and 0048 there | Proper. The preflight had 93 blocking rows (checksum-invalid GSTINs on 93 of 99 tenants, all created 26-28 Oct, names like "Catalogue Shop", holding 119 invoices). With approval, those 93 fixture tenants were backed up and removed, the preflight re-ran with 0 blocking rows, and 0037-0045 applied. 6 tenants remain |
+| TEST | 0001-0045, 0047-0055 applied (0047-0049 on 14 Nov 2026, 0050 on 25 Nov 2026, 0051-0055 on 25-26 Nov 2026). There is no 0046 on TEST. 0049 narrows `gst_return_periods.return_type` to gstr1/gstr3b/gstr9 and stops (raises) if any cmp08 period exists; TEST and DEV had none on 14 Nov | Proper. 0047 widens `gst_return_periods.return_type` for GSTR-9; 0048 adds `gst_ledger_imports` and `gst_ledger_entries`. They were first numbered 0046 and 0047 and renamed because DEV already held a different `0046_import_mappings.sql` from other work; the TEST ledger rows were renumbered to match |
+| DEV | 0001-0045 applied (13 Nov 2026). **0047 to 0055 are pending on DEV and were not applied.** DEV also holds `0046_import_mappings.sql` (applied 14 Nov, from other work, not in this branch): when that branch merges, TEST will show it pending, and it applies out of order after 0047 and 0048 there | Proper. The preflight had 93 blocking rows (checksum-invalid GSTINs on 93 of 99 tenants, all created 26-28 Oct, names like "Catalogue Shop", holding 119 invoices). With approval, those 93 fixture tenants were backed up and removed, the preflight re-ran with 0 blocking rows, and 0037-0045 applied. 6 tenants remain |
 
 DEV backup of the removed tenants: `D:/Projects/Khataapp/backups/dev_fixture_tenants_2026-11-13/` (one JSONL file per table plus `MANIFEST.json` with row counts and hashes). It holds customer data from those fixtures; keep it out of both git repos.
 
 Other follow-ups:
 
+- Integration suites against the remote TEST database are slow and sometimes time out (`gst-amendments` failed once at 225 s on 26 Nov 2026 and passed on re-run); re-run before treating a failure as real.
 - Run the app on a device or emulator and walk the GST screens (not done; only analyze and unit/widget tests).
 - Have the Hindi, Gujarati and Marathi GST wording reviewed by a native reader.
 - `estimate_detail_test.dart` has 5 failures that look date-dependent and are unrelated to GST.
@@ -153,6 +180,44 @@ Other follow-ups:
 - Not yet run on a device after the 14 Nov navigation fix: open GSTR-1, GSTR-3B and GSTR-2B from the GST reports list and press "New return" / upload / open a row.
 
 ## 5. Done (for reference)
+
+- **Phase 2 (25-26 Nov 2026).** Backend and app, not committed. Design and law: `GST_PHASE2_GAP_ANALYSIS.md`.
+  - **ITC engine (A7)**, migration 0051.
+    - `domain/gst/itc-engine.ts` (pure). Credit only to the extent it is in GSTR-2B (s.16(2)(aa)). Months without an imported 2B follow the books, with the warning `itc_without_2b`.
+    - Goods received and the last lot (s.16(2)(b)); the s.16(4) limit to 4(D)(2); 2B "not available" to 4(D)(2).
+    - s.17(5) and exclusive exempt / non-business use: claimed and reversed in 4(B)(1).
+    - Rule 42 D1/D2 and Rule 43 Te monthly, with `Tm` assumed.
+    - Rule 37: reverse after 180 days in 4(B)(2), reclaim on payment in 4(A)(5) and 4(D)(1).
+    - Reverse charge in 4(A)(2)/(3), with tax from the line rates; imports with a bill of entry in 4(A)(1).
+    - Unfiled earlier returns are simulated so credit is never claimed twice.
+    - Filing a GSTR-3B writes append-only `itc_movements`; returns filed before the engine are left as filed.
+    - Checks against advisory #389: the ECRRS balance (declared plus movements) going negative, and RCM credit above RCM tax paid.
+    - **Purchase bills:** `itcUse`, `blockedCreditCode`, receipt dates, `receiptComplete` and bill of entry. `PATCH /v1/purchase-bills/:id/itc` corrects them until the credit is filed.
+    - **`/v1/gst/itc`:** RCM self-invoices (Rule 47A, `SI/yyyy/n`; the date sets the RCM time of supply in 3.1(d) and 4(A), Table 13 nature 2), IMS decisions with the IMS Offline Utility v2.0 upload JSON, ECRRS / RCM statement balances, and each register entry's movements.
+  - **Amendments and GSTR-1A (A6)**, migration 0052.
+    - `gst_amendments`: the original is taken from the filed GSTR-1 snapshot.
+    - Routes: `gstr1a` (same period, before 3B, no GSTIN change) and `later_gstr1` (9A/9C/10, s.37(3) limit).
+    - The mapper writes `b2ba`, `b2cla`, `b2csa`, `cdnra`, `cdnura` and `expa`, schema-validated.
+    - GSTR-3B adds each amendment's difference to 3.1.
+    - GSTR-1A return type: documents added after filing plus 1A amendments, Excel/CA only.
+  - **E-commerce**, migration 0053.
+    - `eco_liability` (`tcs_s52` or `s9_5`) on invoices and credit notes; invoices accept `ecoLiability`. A s.9(5) invoice must carry no tax.
+    - Table 14 (`supeco`) in GSTR-1, with s.9(5) supplies taken out of tables 4-8.
+    - GSTR-3B 3.1.1(ii); GSTR-9 5C1.
+  - **Advances**, migration 0054.
+    - Receipt vouchers (Rule 50: tax-inclusive, 18% when the rate is unknown, inter-State when the nature is unknown, no tax on goods) and refund vouchers (Rule 51), each numbered `RV/yyyy/n` and `RF/yyyy/n`. Adjustment against invoices.
+    - GSTR-1 table 11A/11B sheets; 3.1(a) adds 11A tax and takes off 11B tax; Table 13 natures 6 and 8; GSTR-9 4F.
+  - **Composition**, migration 0055.
+    - CMP-08 (quarterly, 05/2026 Table 3 rows including 1(b) for s.9(5)) and GSTR-4 (annual Tables 4, 5, 6), Excel/CA only.
+    - A composition dealer can open only these; a regular dealer cannot.
+  - **Closing-stock ITC** (`GET /v1/gst/closing-stock-itc`): Rule 44 inputs matched to the latest invoices, stock without invoices listed, capital goods at remaining months over 60. For GSTR-10, REG-16 Table 10 and ITC-03.
+  - **App:**
+    - GST hub: Amendments, Advances (receipt vouchers: issue, adjust, refund, cancel) and Closing-stock credit.
+    - Return types GSTR-1A, CMP-08 and GSTR-4.
+    - The ITC register row shows credit history and the RCM self-invoice action. The 2B statement row records an IMS decision.
+    - The bill screen has a marketplace chip (operator GSTIN, s.9(5)); the bill detail has "Amend a filed invoice".
+    - The purchase bill form has the ITC fields.
+  - **Tests:** unit `itc-engine`, `amendments`, `advances`, `ecommerce`, `closing-stock`, plus payload-export schema cases for the amendment sections and `supeco`. Integration `gst-itc`, `gst-amendments`, `gst-advances`, `gst-composition` against TEST.
 
 - **P0 fixes from the Phase 2 audit (25 Nov 2026).** Backend only, not committed.
   - **Filed returns are immutable and lock the period** (migration 0050). A trigger refuses any change to a filed `gst_return_periods` row's status, workings, totals, prepared/filed fields or ARN, and refuses deleting it, for every role (reopen will need `app.gst_reopen_period`, not built). Filing a GSTR-1 or GSTR-3B calls `app.record_gst_period_lock`: an append-only `gst_period_lock_events` row, `gstr1_locked_through` / `gstr3b_locked_through` raised, `lock_epoch` bumped.

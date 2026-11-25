@@ -37,21 +37,14 @@
             "at",
             "txpd",
             "ecom",
-            "supeco",
-            "b2ba",
-            "b2cla",
-            "b2csa",
-            "cdnra",
-            "cdnura",
             "nila",
-            "expa",
             "ata",
             "txpda",
             "ecoma",
             "supecoa",
             "hsna"
           ],
-          "notes": "Official Save request schema (additionalProperties is false throughout, so only schema-named keys are written). Written: b2b, b2cl, b2cs, cdnr, cdnur, exp, nil, hsn (b2b/b2c) and doc_issue. Not computed yet: advances, e-commerce and amendments. The Submit schema (gstin, ret_period) is the filing call and is not used: filing needs a GSP and a signature."
+          "notes": "Official Save request schema (additionalProperties is false throughout, so only schema-named keys are written). Written: b2b, b2cl, b2cs, cdnr, cdnur, exp, nil, hsn (b2b/b2c), doc_issue, and the amendments b2ba, b2cla, b2csa, cdnra, cdnura, expa (tables 9A/9C/10, from gst_amendments; validated against the schema, no portal sample). Table 14 (supeco) is written in the schema layout (clttx by operator, place of supply, recipient type and tax period; paytx operator-wise), not confirmed by a portal sample. Not computed yet: advances, table 15 (operators only), nil/HSN/advance and 14A amendments. The Submit schema (gstin, ret_period) is the filing call and is not used: filing needs a GSP and a signature."
         }
       ]
     },

@@ -162,6 +162,7 @@ export const invoiceSchema = registry.register(
     isReverseCharge: z.boolean(),
     salesChannel: z.enum(['direct', 'marketplace']),
     ecoGstin: z.string().nullable(),
+    ecoLiability: z.enum(['tcs_s52', 's9_5']).nullable(),
     pricesIncludeTax: z.boolean(),
     roundOffEnabled: z.boolean(),
     grossAmount: paise,

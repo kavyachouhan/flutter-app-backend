@@ -52,6 +52,13 @@ export interface Gstr1Payload {
   cdnr?: unknown[];
   cdnur?: unknown[];
   exp?: unknown[];
+  b2ba?: unknown[];
+  b2cla?: unknown[];
+  b2csa?: unknown[];
+  cdnra?: unknown[];
+  cdnura?: unknown[];
+  expa?: unknown[];
+  supeco?: { clttx?: unknown[]; paytx?: unknown[] };
   nil?: { inv: unknown[] };
   hsn?: { hsn_b2b: unknown[]; hsn_b2c: unknown[] };
   doc_issue?: { doc_det_new: unknown[] };
@@ -309,6 +316,52 @@ function map(model: Gstr1Return): MapResult<Gstr1Payload> {
     };
   }
 
+  writeAmendments(model, payload);
+
+  // Table 14. 14(a) rows follow the Save schema's layout (operator, place of supply, recipient
+  // type, tax period); 14(b) is operator-wise.
+  const eco = model.ecommerce;
+  if (eco && (eco.tcs.length > 0 || eco.s9_5.length > 0)) {
+    const taxes = (v: TaxedValue) => ({
+      igst: rupees(v.igst),
+      cgst: rupees(v.cgst),
+      sgst: rupees(v.sgst),
+      cess: rupees(v.cess),
+    });
+    payload.supeco = {
+      ...(eco.tcs.length > 0
+        ? {
+            clttx: eco.tcs.map((r) => ({
+              etin: r.operatorGstin,
+              suppval: rupees(r.value.taxable),
+              ...taxes(r.value),
+              pos: r.placeOfSupply,
+              typeOfRecipient: r.recipientRegistered ? 'REG' : 'UNREG',
+              taxPeriod: gstnPeriod(model.period),
+            })),
+          }
+        : {}),
+      ...(eco.s9_5.length > 0
+        ? {
+            paytx: eco.s9_5.map((r) => ({
+              etin: r.operatorGstin,
+              suppval: rupees(r.value.taxable),
+              ...taxes(r.value),
+            })),
+          }
+        : {}),
+    };
+    if (eco.tcs.length > 0) {
+      issues.push({
+        severity: 'warning',
+        code: 'supeco_layout_unverified',
+        message:
+          'Table 14(a) is written in the Save schema layout (by operator, place of supply and recipient type); the portal manual shows operator-wise totals. Not confirmed with a portal sample.',
+        path: 'supeco',
+      });
+    }
+  }
+
   for (const [section, count] of Object.entries(model.otherSections)) {
     if (count > 0) {
       issues.push({
@@ -321,6 +374,102 @@ function map(model: Gstr1Return): MapResult<Gstr1Payload> {
   }
 
   return { mapperId: GSTR1_MAPPER_ID, payload, issues };
+}
+
+/** Tables 9A, 9C and 10: the revised record plus the original's number and date (or month). */
+function writeAmendments(model: Gstr1Return, payload: Gstr1Payload): void {
+  const a = model.amendments;
+  if (!a) return;
+  const groupBy = <T>(list: readonly T[], key: (t: T) => string) => {
+    const m = new Map<string, T[]>();
+    for (const t of list) m.set(key(t), [...(m.get(key(t)) ?? []), t]);
+    return m;
+  };
+  if (a.b2b.length > 0) {
+    payload.b2ba = [...groupBy(a.b2b, (x) => x.recipientGstin).entries()].map(([ctin, list]) => ({
+      ctin,
+      inv: list.map((x) => ({
+        ...invoicePayload(x.invoice),
+        oinum: x.originalNumber,
+        oidt: gstnDate(x.originalDate),
+      })),
+    }));
+  }
+  if (a.b2cl.length > 0) {
+    payload.b2cla = [...groupBy(a.b2cl, (x) => x.placeOfSupply).entries()].map(([pos, list]) => ({
+      pos,
+      inv: list.map((x) => ({
+        oinum: x.originalNumber,
+        oidt: gstnDate(x.originalDate),
+        inum: x.invoice.number,
+        idt: gstnDate(x.invoice.date),
+        val: rupees(x.invoice.value),
+        itms: items(x.invoice.lines, 'igst_cess'),
+      })),
+    }));
+  }
+  if (a.b2cs.length > 0) {
+    payload.b2csa = [
+      ...groupBy(
+        a.b2cs,
+        (x) =>
+          `${x.originalMonth}|${x.row.placeOfSupply}|${x.row.intraState}|${x.row.viaEcommerce}`,
+      ).entries(),
+    ].map(([, list]) => {
+      const first = list[0]!;
+      return {
+        omon: `${first.originalMonth.slice(5, 7)}${first.originalMonth.slice(0, 4)}`,
+        sply_ty: first.row.intraState ? 'INTRA' : 'INTER',
+        typ: first.row.viaEcommerce ? 'E' : 'OE',
+        pos: first.row.placeOfSupply,
+        itms: list.map((x) => ({
+          rt: rate(x.row.ratePercent),
+          txval: rupees(x.row.value.taxable),
+          ...(x.row.intraState
+            ? { camt: rupees(x.row.value.cgst), samt: rupees(x.row.value.sgst) }
+            : { iamt: rupees(x.row.value.igst) }),
+          csamt: rupees(x.row.value.cess),
+        })),
+      };
+    });
+  }
+  if (a.exports.length > 0) {
+    const groups = exportsPayload(a.exports.map((x) => x.export)) as {
+      exp_typ: string;
+      inv: Record<string, unknown>[];
+    }[];
+    const originals = new Map(a.exports.map((x) => [x.export.number, x]));
+    payload.expa = groups.map((g) => ({
+      exp_typ: g.exp_typ,
+      inv: g.inv.map((inv) => {
+        const o = originals.get(String(inv['inum']))!;
+        return { ...inv, oinum: o.originalNumber, oidt: gstnDate(o.originalDate) };
+      }),
+    }));
+  }
+  if (a.cdnr.length > 0) {
+    payload.cdnra = [...groupBy(a.cdnr, (x) => x.recipientGstin).entries()].map(([ctin, list]) => ({
+      ctin,
+      nt: list.map((x) => ({
+        ...notePayload(x.note),
+        ont_num: x.originalNumber,
+        ont_dt: gstnDate(x.originalDate),
+      })),
+    }));
+  }
+  if (a.cdnur.length > 0) {
+    payload.cdnura = a.cdnur.map((x) => ({
+      typ: UNREGISTERED_NOTE_TYPE[x.note.type],
+      ntty: NOTE_TYPE[x.note.kind],
+      nt_num: x.note.number,
+      nt_dt: gstnDate(x.note.date),
+      ont_num: x.originalNumber,
+      ont_dt: gstnDate(x.originalDate),
+      val: rupees(x.note.value),
+      pos: x.note.placeOfSupply,
+      itms: items(x.note.lines, 'igst_cess'),
+    }));
+  }
 }
 
 export const gstr1Mapper: ReturnMapper<Gstr1Return, Gstr1Payload> = {
