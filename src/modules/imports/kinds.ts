@@ -608,6 +608,11 @@ function partyKind(kind: 'customers' | 'suppliers'): KindHandler {
           city: str(values['city']),
           pincode: str(values['pincode']),
           notes: str(values['notes']),
+          // The import file has no country or UIN columns: an imported party is in India and not
+          // a UIN holder, the same defaults as creating one in the app (0038 party columns).
+          countryCode: 'IN',
+          uin: null,
+          gstTreatment: null,
         };
         if (customers) {
           await customersRepository.insert(tx, {
