@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { customersKind, decide, itemsKind, type Judgement, type ParsedChunkRow } from './kinds.js';
+import {
+  customersKind,
+  decide,
+  itemsKind,
+  officialHsnCodes,
+  type Judgement,
+  type ParsedChunkRow,
+} from './kinds.js';
+import type { Tx } from '../../db/tx.js';
 
 const row = (
   rowNo: number,
@@ -156,5 +164,33 @@ describe('party parse', () => {
     expect(customersKind.parse(['Asha', '12345678901234'], map).errors['phone']).toBe(
       'Phone must be a valid mobile number',
     );
+  });
+});
+
+describe('officialHsnCodes', () => {
+  /** A Tx holding a fixed HSN master; records the codes it was asked about. */
+  const fakeTx = (master: string[]) => {
+    const asked: string[][] = [];
+    const tx = {
+      one: () => Promise.resolve({ any: master.length > 0 }),
+      many: (_sql: string, params: readonly unknown[]) => {
+        const codes = (params[0] as string[]) ?? [];
+        asked.push(codes);
+        return Promise.resolve(codes.filter((c) => master.includes(c)).map((code) => ({ code })));
+      },
+    } as unknown as Tx;
+    return { tx, asked };
+  };
+
+  it('returns the codes that are in the official list, asking once per code', async () => {
+    const { tx, asked } = fakeTx(['0902', '3401']);
+    const known = await officialHsnCodes(tx, ['0902', '1234', '0902']);
+    expect([...(known ?? [])]).toEqual(['0902']);
+    expect(asked).toEqual([['0902', '1234']]);
+  });
+
+  it('flags nothing while the list is not loaded on the server', async () => {
+    const { tx } = fakeTx([]);
+    expect(await officialHsnCodes(tx, ['1234'])).toBeNull();
   });
 });

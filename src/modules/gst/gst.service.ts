@@ -210,7 +210,10 @@ export function preparePeriod(id: string, options: PreparePeriodBody = {}) {
           : period.returnType === 'gstr1a'
             ? await buildGstr1aPeriod(tx, period)
             : period.returnType === 'cmp08'
-              ? stored(period, await computeCmp08(tx, period.gstin, period.periodFrom, period.periodTo))
+              ? stored(
+                  period,
+                  await computeCmp08(tx, period.gstin, period.periodFrom, period.periodTo),
+                )
               : period.returnType === 'gstr4'
                 ? stored(period, await computeGstr4(tx, period.gstin, period.periodYear))
                 : await buildGstr9Period(tx, period, options);
@@ -399,7 +402,11 @@ async function buildGstr9Period(
  */
 async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings> {
   const w = await computeGstr3b(tx, boundsOf(period));
-  const stored = await tx.one<{ totalTaxable: number | null; totalTax: number | null; status: string }>(
+  const stored = await tx.one<{
+    totalTaxable: number | null;
+    totalTax: number | null;
+    status: string;
+  }>(
     `SELECT total_taxable AS "totalTaxable", total_tax AS "totalTax", status FROM gst_return_periods
      WHERE gstin = $1 AND return_type = 'gstr1' AND period_year = $2 AND period_month = $3
        AND status IN ('prepared', 'filed')`,
@@ -420,9 +427,9 @@ async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings
               message: `Bills of this period changed after GSTR-1 was filed (filed taxable ${stored.totalTaxable}, today ${fresh.totals.taxable} paise). Report the difference in GSTR-1A before filing this GSTR-3B, or in a later GSTR-1.`,
             }
           : {
-        severity: 'error',
-        code: 'gstr1_changed_since_prepared',
-        message: `The prepared GSTR-1 shows taxable ${stored.totalTaxable} and tax ${stored.totalTax} (paise), but today's bills give ${fresh.totals.taxable} and ${fresh.totals.tax}. Prepare GSTR-1 again so both returns agree.`,
+              severity: 'error',
+              code: 'gstr1_changed_since_prepared',
+              message: `The prepared GSTR-1 shows taxable ${stored.totalTaxable} and tax ${stored.totalTax} (paise), but today's bills give ${fresh.totals.taxable} and ${fresh.totals.tax}. Prepare GSTR-1 again so both returns agree.`,
             },
       );
     }
@@ -443,7 +450,7 @@ async function buildGstr3b(tx: Tx, period: GstReturnPeriodRow): Promise<Workings
 
 // The app reads `gstin` and `summary` on every stored workings object.
 const stored = (period: GstReturnPeriodRow, w: CompositionWorkings): Workings => ({
-  workings: { ...w, gstin: period.gstin, summary: [] } as unknown as Record<string, unknown>,
+  workings: { ...w, gstin: period.gstin, summary: [] },
   totals: { totalTaxable: w.totals.taxable, totalTax: w.totals.tax },
 });
 
@@ -455,7 +462,10 @@ async function buildGstr1aPeriod(tx: Tx, period: GstReturnPeriodRow): Promise<Wo
     [period.gstin, period.periodYear, period.periodMonth],
   );
   if (!filed?.workings?.model) {
-    throw new UnprocessableError('The GSTR-1 for this period is not filed.', ErrorCode.UNPROCESSABLE);
+    throw new UnprocessableError(
+      'The GSTR-1 for this period is not filed.',
+      ErrorCode.UNPROCESSABLE,
+    );
   }
   const w = await computeGstr1a(tx, boundsOf(period), filed.workings.model as Gstr1Return);
   return {

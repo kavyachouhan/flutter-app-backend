@@ -337,10 +337,20 @@ export const itemsKind: KindHandler = {
     }
 
     const settings = await tenantsRepository.getSettings(tx);
+    const officialHsn = await officialHsnCodes(
+      tx,
+      rows.map((r) => str(r.values['hsnCode'])).filter((c): c is string => c !== null),
+    );
     const judgements: Judgement[] = rows.map((parsed) => {
       const code = str(parsed.values['code']);
       const barcode = str(parsed.values['barcode']);
       const name = str(parsed.values['name']);
+      const hsn = str(parsed.values['hsnCode']);
+      // A note, not a refusal: the row still imports, but a code that is not in the
+      // official list is almost always a typo that would end up on GST invoices.
+      if (hsn && officialHsn && !officialHsn.has(hsn)) {
+        parsed.notes.push(`HSN ${hsn} is not in the official HSN/SAC list; check it for a typo`);
+      }
       let match: Judgement['match'] = null;
       const hit = (candidate: MatchCandidate | undefined, rule: MatchRule) => {
         if (!match && candidate) match = { id: candidate.id, rule, existing: { ...candidate } };
@@ -479,6 +489,26 @@ export const itemsKind: KindHandler = {
     }
   },
 };
+
+/**
+ * Which of [codes] are in the official HSN/SAC master. Null when the master is
+ * not loaded on this server, so an empty list never flags every code as wrong.
+ */
+export async function officialHsnCodes(
+  tx: Tx,
+  codes: readonly string[],
+): Promise<Set<string> | null> {
+  const loaded = await tx.one<{ any: boolean }>(
+    'SELECT EXISTS (SELECT 1 FROM hsn_master) AS "any"',
+  );
+  if (!loaded?.any) return null;
+  if (codes.length === 0) return new Set();
+  const rows = await tx.many<{ code: string }>(
+    'SELECT code FROM hsn_master WHERE code = ANY($1::text[])',
+    [[...new Set(codes)]],
+  );
+  return new Set(rows.map((r) => r.code));
+}
 
 /** Categories named in the file are created on demand; a price list rarely lists them separately. */
 async function resolveCategory(

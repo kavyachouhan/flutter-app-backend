@@ -14,9 +14,12 @@
  * stock entry type, no new CHECK constraint.
  */
 import { stampDocumentParties } from '../sales-docs/document-parties.js';
-import { randomUUID } from 'node:crypto';
 import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
-import { assertAttachments, checkAttachments, removeDroppedAttachments } from '../../lib/attachments.js';
+import {
+  assertAttachments,
+  checkAttachments,
+  removeDroppedAttachments,
+} from '../../lib/attachments.js';
 import { requireAuthContext } from '../../lib/context.js';
 import {
   NotFoundError,
@@ -311,10 +314,12 @@ export async function assertChallanLinesFit(
   if (requests.length === 0) return [];
 
   const locked = new Map(
-    (await deliveryChallansRepository.lockLinesByIds(
-      tx,
-      requests.map((r) => r.lineId),
-    )).map((l) => [l.id, l]),
+    (
+      await deliveryChallansRepository.lockLinesByIds(
+        tx,
+        requests.map((r) => r.lineId),
+      )
+    ).map((l) => [l.id, l]),
   );
 
   const challanIds = [...new Set([...locked.values()].map((l) => l.deliveryChallanId))];
@@ -330,11 +335,9 @@ export async function assertChallanLinesFit(
   for (const request of requests) {
     const line = locked.get(request.lineId);
     if (!line) {
-      throw new UnprocessableError(
-        'That delivery-challan line does not exist.',
-        undefined,
-        { details: { lineId: request.lineId } },
-      );
+      throw new UnprocessableError('That delivery-challan line does not exist.', undefined, {
+        details: { lineId: request.lineId },
+      });
     }
     const challan = challans.get(line.deliveryChallanId);
     if (!challan || challan.status === 'cancelled') {

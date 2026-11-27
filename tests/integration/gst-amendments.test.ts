@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- the exported JSON is walked untyped */
 /**
  * Amendments and GSTR-1A through the real API (milestone A6): a filed GSTR-1, an amendment in
  * GSTR-1A of the same period, a GSTIN change refused there and accepted for a later GSTR-1, whose
@@ -22,11 +21,18 @@ vi.mock('../../src/lib/storage.js', async (importOriginal) => ({
     return Promise.resolve(key);
   },
   signDownload: (key: string) =>
-    Promise.resolve({ url: `https://files.test/${key}`, expiresAt: new Date(Date.now() + 60_000).toISOString() }),
+    Promise.resolve({
+      url: `https://files.test/${key}`,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }),
 }));
 
 function validGstin(state: string): string {
-  const letters = randomUUID().replace(/[^a-f]/g, '').toUpperCase().padEnd(5, 'A').slice(0, 5);
+  const letters = randomUUID()
+    .replace(/[^a-f]/g, '')
+    .toUpperCase()
+    .padEnd(5, 'A')
+    .slice(0, 5);
   const digits = String(Math.floor(Math.random() * 10_000)).padStart(4, '0');
   const first14 = `${state}${letters}${digits}B1Z`;
   return first14 + gstinCheckCharacter(first14);
@@ -34,7 +40,10 @@ function validGstin(state: string): string {
 
 interface Period {
   id: string;
-  workings: { sheets: { id: string; rows: Record<string, unknown>[] }[]; issues: { code: string }[] } | null;
+  workings: {
+    sheets: { id: string; rows: Record<string, unknown>[] }[];
+    issues: { code: string }[];
+  } | null;
 }
 
 describe('amendments and GSTR-1A', () => {
@@ -49,10 +58,14 @@ describe('amendments and GSTR-1A', () => {
 
   const open = async (returnType: string, y: number, m: number): Promise<string> => {
     const id = randomUUID();
-    await shop.post('/v1/gst/periods').send({ id, gstin, returnType, periodYear: y, periodMonth: m }).expect(201);
+    await shop
+      .post('/v1/gst/periods')
+      .send({ id, gstin, returnType, periodYear: y, periodMonth: m })
+      .expect(201);
     return id;
   };
-  const prepare = async (id: string) => data<Period>(await shop.post(`/v1/gst/periods/${id}/prepare`).expect(200));
+  const prepare = async (id: string) =>
+    data<Period>(await shop.post(`/v1/gst/periods/${id}/prepare`).expect(200));
 
   beforeAll(async () => {
     gstin = validGstin('27');
@@ -77,7 +90,13 @@ describe('amendments and GSTR-1A', () => {
     const buyer = randomUUID();
     await shop
       .post('/v1/customers')
-      .send({ id: buyer, name: 'Registered Buyer', addressLine1: '1 Main Rd', stateCode: '27', gstin: validGstin('27') })
+      .send({
+        id: buyer,
+        name: 'Registered Buyer',
+        addressLine1: '1 Main Rd',
+        stateCode: '27',
+        gstin: validGstin('27'),
+      })
       .expect(201);
     const res = await shop
       .post('/v1/invoices')
@@ -94,7 +113,10 @@ describe('amendments and GSTR-1A', () => {
 
     const g1 = await open('gstr1', year, month);
     await prepare(g1);
-    await shop.post(`/v1/gst/periods/${g1}/file`).send({ confirm: true, arn: 'AA2700000001' }).expect(200);
+    await shop
+      .post(`/v1/gst/periods/${g1}/file`)
+      .send({ confirm: true, arn: 'AA2700000001' })
+      .expect(200);
   }, 240_000);
 
   afterAll(async () => {
@@ -166,7 +188,9 @@ describe('amendments and GSTR-1A', () => {
     const p = await prepare(id);
     expect(p.workings!.sheets.map((s) => s.id)).toContain('amendments');
     const res = await shop.get(`/v1/gst/periods/${id}/export?format=json`).expect(200);
-    const json = JSON.parse(uploaded.get(data<{ objectKey: string }>(res).objectKey)!.toString('utf8')) as any;
-    expect(json.b2ba[0].inv[0].oinum).toBeDefined();
+    const json = JSON.parse(
+      uploaded.get(data<{ objectKey: string }>(res).objectKey)!.toString('utf8'),
+    ) as { b2ba: { inv: { oinum?: string }[] }[] };
+    expect(json.b2ba[0]!.inv[0]!.oinum).toBeDefined();
   }, 180_000);
 });

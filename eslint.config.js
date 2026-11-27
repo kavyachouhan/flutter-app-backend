@@ -4,7 +4,9 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
+  // data/ and docs/ hold reference material (GSTN offline tools, saved
+  // advisories, schemas, PDFs), not code of ours to lint.
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'data/**', 'docs/**'] },
 
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
