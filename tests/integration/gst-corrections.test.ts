@@ -111,7 +111,7 @@ describe('GST corrections', () => {
   beforeAll(async () => {
     gstin = validGstin('27');
     shop = await createTenant({ stateCode: '27', gstin });
-    item = await createItem(shop, { salePrice: PRICE, taxRatePercent: 18 });
+    item = await createItem(shop, { salePrice: PRICE, taxRatePercent: 18, hsnCode: '6109' });
     const setUp = async (documentType: string, prefix: string): Promise<string> => {
       const s = await createSeries(shop, { documentType, prefix });
       await leaseBlock(shop, s.id, 100);
@@ -300,7 +300,7 @@ describe('GST corrections', () => {
 
   describe('invoice-cum-bill of supply', () => {
     it('is what a mixed bill to an unregistered buyer is, and a registered buyer still gets a tax invoice', async () => {
-      const exempt = await createItem(shop, { salePrice: PRICE, taxRatePercent: 0 });
+      const exempt = await createItem(shop, { salePrice: PRICE, taxRatePercent: 0, hsnCode: '0713' });
       const lines = (itemId: string) => ({
         id: randomUUID(),
         itemId,

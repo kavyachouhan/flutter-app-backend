@@ -14,6 +14,7 @@ export interface ItemOptions {
   trackStock?: boolean;
   itemType?: 'goods' | 'service';
   barcodes?: string[];
+  hsnCode?: string;
 }
 
 export async function createItem(
@@ -35,6 +36,7 @@ export async function createItem(
       trackStock: options.trackStock ?? true,
       pricesIncludeTax: false,
       ...(options.barcodes ? { barcodes: options.barcodes } : {}),
+      ...(options.hsnCode ? { hsnCode: options.hsnCode } : {}),
     })
     .expect(201);
   return { id, salePrice, taxRatePercent };

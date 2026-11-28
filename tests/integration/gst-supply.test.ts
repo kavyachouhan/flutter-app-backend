@@ -74,7 +74,7 @@ describe('GST supply and printing', () => {
 
   beforeAll(async () => {
     shop = await createTenant({ stateCode: '27' });
-    item = await createItem(shop, { salePrice: PRICE, taxRatePercent: 18, trackStock: false });
+    item = await createItem(shop, { salePrice: PRICE, taxRatePercent: 18, trackStock: false, hsnCode: '6109' });
     const series = await createSeries(shop);
     seriesId = series.id;
     await leaseBlock(shop, seriesId, 200);
@@ -297,7 +297,7 @@ describe('GST supply and printing', () => {
 
   it('labels the state half UTGST in a union territory without a legislature', async () => {
     const ut = await createTenant({ stateCode: '04' });
-    const utItem = await createItem(ut, { salePrice: PRICE, taxRatePercent: 18, trackStock: false });
+    const utItem = await createItem(ut, { salePrice: PRICE, taxRatePercent: 18, trackStock: false, hsnCode: '6109' });
     const series = await createSeries(ut);
     await leaseBlock(ut, series.id, 5);
     const base = invoicePayload(ut, {

@@ -62,6 +62,7 @@ import { voidRefusal } from '../../domain/gst/corrections.js';
 import { documentTypeFor } from '../../domain/gst/invoice-rules.js';
 import { gstr1FiledFor } from '../gst/filing-state.js';
 import { assertRule46, decideInvoiceSupply, dispatchSnapshot, sellerSnapshot } from './invoice-supply.js';
+import { assertHsnOnInvoice } from './hsn-rule.js';
 import { invoicesRepository, type InvoiceLineInsert } from './invoices.repository.js';
 import type { CreateInvoiceBody, ListInvoicesQuery } from './invoices.schemas.js';
 
@@ -272,6 +273,20 @@ export async function createInvoice(body: CreateInvoiceBody) {
       totals.lines.map((l) => l.supplyCategory),
     );
     assertRule46({ documentType, supplyType: totals.supplyType, supply, taxableValue: totals.taxableAmount });
+    // HSN/SAC on every line a GST-registered seller bills: at least 4 digits to a
+    // GSTIN holder, 6 on every bill above ₹5 crore of turnover. The app checks
+    // first; this is what stops a bill sent straight to the API.
+    if (mode !== 'non_gst') {
+      await assertHsnOnInvoice(tx, {
+        documentDate: body.documentDate,
+        buyerHasGstin: Boolean(supply.buyer?.gstin),
+        lines: body.lines.map((l, index) => ({
+          id: l.id,
+          name: l.itemName ?? itemFor(l.itemId)?.name ?? '',
+          hsnCode: totals.lines[index]?.hsnCode,
+        })),
+      });
+    }
 
     const tenders = body.payments ?? [];
     const paid = tenders.reduce((acc, t) => acc + t.amount, 0);
