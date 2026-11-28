@@ -3,7 +3,12 @@ import { requirePermission } from '../../middleware/authorize.js';
 import { validate, validated } from '../../middleware/validate.js';
 import { idParams } from '../../lib/validators.js';
 import * as numberingService from './numbering.service.js';
-import { createSeriesBody, leaseBody, listSeriesQuery } from './numbering.schemas.js';
+import {
+  cancelUnusedBody,
+  createSeriesBody,
+  leaseBody,
+  listSeriesQuery,
+} from './numbering.schemas.js';
 
 export const numberingRouter: Router = Router();
 
@@ -48,6 +53,17 @@ numberingRouter.get(
   async (req, res) => {
     const { params } = validated<typeof byId>(req);
     res.json({ data: await numberingService.listGaps(params.id) });
+  },
+);
+
+const cancelUnused = { body: cancelUnusedBody };
+numberingRouter.post(
+  '/unused-numbers/cancel',
+  requirePermission('numbering:manage'),
+  validate(cancelUnused),
+  async (req, res) => {
+    const { body } = validated<typeof cancelUnused>(req);
+    res.json({ data: await numberingService.cancelUnusedNumbers(body) });
   },
 );
 

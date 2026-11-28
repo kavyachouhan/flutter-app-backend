@@ -10,7 +10,12 @@ import {
   timestamp,
   uuid,
 } from '../../openapi/registry.js';
-import { createSeriesBody, leaseBody, listSeriesQuery } from './numbering.schemas.js';
+import {
+  cancelUnusedBody,
+  createSeriesBody,
+  leaseBody,
+  listSeriesQuery,
+} from './numbering.schemas.js';
 
 export const financialYearSchema = registry.register(
   'FinancialYear',
@@ -65,9 +70,17 @@ export const numberBlockSchema = registry.register(
   }),
 );
 
-export const sequenceRangeSchema = registry.register(
-  'SequenceRange',
-  z.object({ from: z.number().int(), to: z.number().int() }),
+export const unusedRangeSchema = registry.register(
+  'UnusedNumberRange',
+  z.object({
+    from: z.number().int(),
+    to: z.number().int(),
+    count: z.number().int(),
+    status: z.enum(['cancellable', 'in_use', 'device_offline']).openapi({
+      description:
+        'cancellable: nothing can still be issued under these numbers. in_use: a live block is still being billed from. device_offline: the block expired, but its device has not been online since and may hold bills not yet sent.',
+    }),
+  }),
 );
 
 registry.registerPath({
@@ -118,7 +131,7 @@ registry.registerPath({
   security: accessTokenSecurity,
   request: { params: idParams },
   responses: {
-    200: jsonResponse('Ranges.', dataEnvelope(z.array(sequenceRangeSchema))),
+    200: jsonResponse('Ranges.', dataEnvelope(z.array(unusedRangeSchema))),
     ...errorResponses(422),
   },
 });
@@ -131,5 +144,35 @@ registry.registerPath({
   responses: {
     200: jsonResponse('Blocks.', dataEnvelope(z.array(numberBlockSchema))),
     ...errorResponses(),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: '/v1/numbering/unused-numbers/cancel',
+  tags: ['Numbering'],
+  summary: 'Declare unused reserved numbers cancelled (GSTR-1 Table 13)',
+  description:
+    'Declares cancelled every unused number nothing can still be issued under, in one series or in every series the caller can see, so Table 13 accounts for it instead of reporting a gap. A number declared cancelled is refused to any later upload. Numbers that must wait are returned with why.',
+  security: accessTokenSecurity,
+  request: { body: { content: { 'application/json': { schema: cancelUnusedBody } } } },
+  responses: {
+    200: jsonResponse(
+      'Declared.',
+      dataEnvelope(
+        z.object({
+          cancelled: z.number().int(),
+          waiting: z.number().int(),
+          series: z.array(
+            z.object({
+              seriesId: uuid,
+              cancelled: z.array(unusedRangeSchema),
+              waiting: z.array(unusedRangeSchema),
+            }),
+          ),
+        }),
+      ),
+    ),
+    ...errorResponses(404),
   },
 });

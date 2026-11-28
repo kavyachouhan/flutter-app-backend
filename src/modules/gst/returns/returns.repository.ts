@@ -408,7 +408,15 @@ export const returnsRepository = {
        UNION ALL
        SELECT 'refund_voucher', 'rf-' || rf.fy_start_year, rf.document_number, 'issued', rf.sequence_no
        FROM refund_vouchers rf
-       WHERE rf.gstin = $1 AND rf.document_date >= $2::date AND rf.document_date <= $3::date`,
+       WHERE rf.gstin = $1 AND rf.document_date >= $2::date AND rf.document_date <= $3::date
+       UNION ALL
+       -- Reserved numbers no document used, declared cancelled (0058), in the period they stopped
+       -- being usable: so a series with an unused block reads as issued plus cancelled, no gap.
+       SELECT c.series_family, c.series_id::text, c.document_number, 'cancelled', c.sequence_no
+       FROM cancelled_document_numbers c
+       JOIN gst_registrations r ON r.id = c.registration_id AND r.gstin = $1
+       WHERE c.series_family IN ('outward_invoice', 'bill_of_supply', 'credit_note', 'debit_note_outward')
+         AND c.cancelled_on >= $2::date AND c.cancelled_on <= $3::date`,
       [gstin, from, to],
     );
     return rows.map((r) => ({ ...r, sequenceNo: n(r.sequenceNo) }));

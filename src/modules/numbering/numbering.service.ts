@@ -3,6 +3,7 @@ import { withReadTransaction, withTransaction, type Tx } from '../../db/tx.js';
 import {
   financialYearOf,
   financialYearStarting,
+  formatDocumentNumber,
   pickFittingFormat,
   maxSequenceFor,
   remainingInBlock,
@@ -10,6 +11,12 @@ import {
   type FinancialYear,
   type SeriesFormat,
 } from '../../domain/numbering/series.js';
+import {
+  cancellationDate,
+  groupUnused,
+  type UnusedNumber,
+  type UnusedRange,
+} from '../../domain/numbering/unused.js';
 import { requireAuthContext } from '../../lib/context.js';
 import { ErrorCode, NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
 import { newId } from '../../lib/ids.js';
@@ -19,6 +26,7 @@ import { recordAudit } from '../audit/audit.js';
 import { hasPermission, type Permission } from '../auth/permissions.js';
 import { devicesRepository } from '../devices/devices.repository.js';
 import { isFeatureEnabled, type Feature } from '../entitlements/entitlements.js';
+import { gstr1FiledFor } from '../gst/filing-state.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { tenantsRepository } from '../tenants/tenants.repository.js';
 import { numberingRepository, type BlockRow, type SeriesRow } from './numbering.repository.js';
@@ -179,14 +187,170 @@ export function listMyLeases() {
   return withReadTransaction((tx) => numberingRepository.listLiveBlocks(tx, auth.deviceId));
 }
 
-/** Declared in GSTR-1 Table 13 as cancelled or unused numbers. */
-export function listGaps(seriesId: string) {
+/**
+ * Reserved numbers of a series that no document used and that are not yet
+ * declared cancelled, as ranges, each saying whether it can be declared now:
+ * `cancellable`, `in_use` (a live block still being billed from) or
+ * `device_offline` (the block expired but its device has not been online since,
+ * so it may hold bills not yet sent).
+ */
+export function listGaps(seriesId: string): Promise<UnusedRange[]> {
   return withReadTransaction(async (tx) => {
     const series = await numberingRepository.findSeries(tx, seriesId);
     if (!series) throw new NotFoundError('Series');
     assertOutletAccess(series.outletId);
-    return numberingRepository.findGaps(tx, seriesId);
+    return groupUnused(await numberingRepository.unusedNumbers(tx, seriesId));
   });
+}
+
+export interface SeriesCancellation {
+  seriesId: string;
+  /** Ranges declared cancelled by this call. */
+  cancelled: UnusedRange[];
+  /** Ranges that must wait (in use, or the device has not been online since). */
+  waiting: UnusedRange[];
+}
+
+/**
+ * Declares a series' cancellable unused numbers cancelled, in the caller's
+ * transaction. Locks the series (one declaration at a time per series), then
+ * the blocks involved (the lock an upload takes before using a number), then
+ * reads which numbers are unused, so a document that committed first is seen
+ * and its number is left alone; one that comes after is refused.
+ *
+ * `onlyDeviceId` limits it to one device's blocks (a device being removed).
+ */
+async function cancelInSeries(
+  tx: Tx,
+  seriesId: string,
+  reason: 'device_removed' | 'unused_block',
+  onlyDeviceId?: string,
+): Promise<SeriesCancellation | undefined> {
+  const series = await numberingRepository.findSeries(tx, seriesId, true);
+  if (!series) return undefined;
+
+  const candidates = await numberingRepository.unusedNumbers(tx, seriesId, onlyDeviceId);
+  const blockIds = [
+    ...new Set(candidates.filter((n) => n.status === 'cancellable').map((n) => n.blockId)),
+  ];
+  await numberingRepository.lockBlocks(tx, blockIds);
+
+  // Re-read under the locks: what is unused now is what may be declared.
+  const unused = blockIds.length
+    ? await numberingRepository.unusedNumbers(tx, seriesId, onlyDeviceId)
+    : candidates;
+  const cancellable = unused.filter((n) => n.status === 'cancellable');
+  const waiting = groupUnused(unused.filter((n) => n.status !== 'cancellable'));
+  if (cancellable.length === 0) return { seriesId, cancelled: [], waiting };
+
+  const settings = await tenantsRepository.getSettings(tx);
+  const fy = financialYearStarting(series.fyStartYear, settings.fyStartMonth);
+  const format = toSeriesFormat(series);
+  const facts = await numberingRepository.seriesGstFacts(tx, seriesId);
+  const gstin = await numberingRepository.gstinOf(tx, facts?.registrationId ?? null);
+  const today = await numberingRepository.businessToday(tx);
+
+  const dayOfBlock = new Map<string, string>();
+  for (const b of await numberingRepository.blockDates(
+    tx,
+    seriesId,
+    cancellable.map((n) => n.blockId).filter((id, i, all) => all.indexOf(id) === i),
+  )) {
+    const base = b.lastDocumentDate ?? b.leasedOn;
+    dayOfBlock.set(
+      b.blockId,
+      cancellationDate({
+        lastDocumentDate: b.lastDocumentDate,
+        leasedOn: b.leasedOn,
+        today,
+        periodFiled: await gstr1FiledFor(tx, gstin, base),
+      }),
+    );
+  }
+
+  let createdBy: string | null = null;
+  try {
+    createdBy = requireAuthContext().userId;
+  } catch {
+    createdBy = null;
+  }
+
+  await numberingRepository.insertCancelledNumbers(
+    tx,
+    cancellable.map((n: UnusedNumber) => ({
+      id: newId(),
+      seriesId,
+      blockId: n.blockId,
+      sequenceNo: n.seq,
+      documentNumber: formatDocumentNumber(format, fy, n.seq, env.DOCUMENT_NUMBER_MAX_LENGTH),
+      seriesFamily: facts?.seriesFamily ?? 'non_gst',
+      registrationId: facts?.registrationId ?? null,
+      cancelledOn: dayOfBlock.get(n.blockId) ?? today,
+      reason,
+      createdBy,
+    })),
+  );
+
+  const cancelled = groupUnused(cancellable);
+  await recordAudit(tx, {
+    action: 'series.numbers_cancelled',
+    entityType: 'document_series',
+    entityId: seriesId,
+    metadata: {
+      reason,
+      ...(onlyDeviceId ? { deviceId: onlyDeviceId } : {}),
+      count: cancellable.length,
+      ranges: cancelled.map((r) => ({ from: r.from, to: r.to })),
+    },
+  });
+  log.info({ seriesId, reason, count: cancellable.length }, 'Declared unused numbers cancelled');
+  return { seriesId, cancelled, waiting };
+}
+
+/**
+ * Declares cancelled every unused number that nothing can still be issued
+ * under, in one series or in every series the caller can see, so GSTR-1
+ * Table 13 accounts for them instead of reporting a gap. Numbers that must
+ * still wait are returned, with why. Each series is its own transaction, so a
+ * large business does not hold every block lock at once.
+ */
+export async function cancelUnusedNumbers(input: { seriesId?: string }) {
+  const seriesIds = await withReadTransaction(async (tx) => {
+    if (input.seriesId) {
+      const series = await numberingRepository.findSeries(tx, input.seriesId);
+      if (!series) throw new NotFoundError('Series');
+      assertOutletAccess(series.outletId);
+      return [series.id];
+    }
+    return numberingRepository.seriesWithBlocks(tx, accessibleOutletIds());
+  });
+
+  const series: SeriesCancellation[] = [];
+  for (const id of seriesIds) {
+    const result = await withTransaction((tx) => cancelInSeries(tx, id, 'unused_block'));
+    if (result && (result.cancelled.length > 0 || result.waiting.length > 0)) series.push(result);
+  }
+  const count = (ranges: UnusedRange[]) => ranges.reduce((n, r) => n + r.count, 0);
+  return {
+    cancelled: series.reduce((n, s) => n + count(s.cancelled), 0),
+    waiting: series.reduce((n, s) => n + count(s.waiting), 0),
+    series,
+  };
+}
+
+/**
+ * A removed device will never sync again, so nothing more can be issued from
+ * its blocks: they stop being live, and their unused numbers are declared
+ * cancelled, in the caller's (deactivation) transaction.
+ */
+export async function cancelNumbersOfRemovedDevice(tx: Tx, deviceId: string): Promise<number> {
+  await numberingRepository.expireBlocksOfDevice(tx, deviceId);
+  let total = 0;
+  for (const seriesId of await numberingRepository.seriesOfDevice(tx, deviceId)) {
+    const result = await cancelInSeries(tx, seriesId, 'device_removed', deviceId);
+    total += result?.cancelled.reduce((n, r) => n + r.count, 0) ?? 0;
+  }
+  return total;
 }
 
 // --- Offline continuity: top-ups and financial-year rollover -----------------

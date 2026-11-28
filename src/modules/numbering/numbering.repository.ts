@@ -1,5 +1,9 @@
 import type { Tx } from '../../db/tx.js';
-import type { SequenceRange } from '../../domain/numbering/series.js';
+import {
+  ABANDONED_AFTER_DAYS,
+  CONTACT_GRACE_HOURS,
+  type UnusedNumber,
+} from '../../domain/numbering/unused.js';
 import type { DocumentType, ListSeriesQuery } from './numbering.schemas.js';
 
 export interface SeriesRow {
@@ -30,6 +34,19 @@ export interface BlockRow {
   endSeq: number;
   consumedUpTo: number | null;
   expiresAt: Date;
+}
+
+export interface CancelledNumberInsert {
+  id: string;
+  seriesId: string;
+  blockId: string;
+  sequenceNo: number;
+  documentNumber: string;
+  seriesFamily: string;
+  registrationId: string | null;
+  cancelledOn: string;
+  reason: 'device_removed' | 'unused_block';
+  createdBy: string | null;
 }
 
 export type NewSeries = Omit<
@@ -198,19 +215,35 @@ export const numberingRepository = {
     return row;
   },
 
-  /** The row lock serialises two uploads using numbers from the same block. */
-  lockBlockForSequence(
+  /**
+   * The row lock serialises two uploads using numbers from the same block, and
+   * an upload against the declaration that a number was never used
+   * (`lockBlocks` takes the same lock). A number declared cancelled is not the
+   * device's to use any more, so it is refused like one never leased.
+   *
+   * The cancellation check is its own statement, run once the lock is held: in
+   * READ COMMITTED each statement sees what was committed before it began, so
+   * it sees a cancellation that committed while this upload waited for the lock.
+   */
+  async lockBlockForSequence(
     tx: Tx,
     seriesId: string,
     deviceId: string,
     sequenceNo: number,
   ): Promise<BlockRow | undefined> {
-    return tx.one<BlockRow>(
+    const block = await tx.one<BlockRow>(
       `SELECT ${BLOCK_COLUMNS} FROM number_blocks
        WHERE series_id = $1 AND device_id = $2 AND $3 BETWEEN start_seq AND end_seq
        FOR UPDATE`,
       [seriesId, deviceId, sequenceNo],
     );
+    if (!block) return undefined;
+    const cancelled = await tx.one<{ cancelled: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM cancelled_document_numbers
+                      WHERE series_id = $1 AND sequence_no = $2) AS cancelled`,
+      [seriesId, sequenceNo],
+    );
+    return cancelled?.cancelled ? undefined : block;
   },
 
   // GREATEST ignores NULL, so the first consumption simply records the number.
@@ -231,29 +264,200 @@ export const numberingRepository = {
   },
 
   /**
-   * Reserved numbers with no invoice, grouped into ranges. A live block only
-   * counts up to what the device has consumed; an expired block counts in full.
-   * Consecutive numbers share `seq - row_number()`, which forms the ranges.
+   * Every reserved number of a series that no document used and nobody has
+   * declared cancelled, with whether it may be declared now (the rule is in
+   * domain/numbering/unused.ts).
+   *
+   * A live block of an active device only counts up to what that device has
+   * used: the rest is still ahead of it. An expired block, or any block of a
+   * removed device, counts in full. "Used" means a document of any type with
+   * this series and number, or an issue attempt refused at sync (that number
+   * is already in the registry as rejected_before_issue).
+   *
+   * `onlyDeviceId` narrows it to one device's blocks.
    */
-  findGaps(tx: Tx, seriesId: string): Promise<SequenceRange[]> {
-    return tx.many<SequenceRange>(
-      `WITH reserved AS (
-         SELECT generate_series(
-                  b.start_seq,
-                  CASE WHEN b.expires_at <= now() THEN b.end_seq ELSE COALESCE(b.consumed_up_to, b.start_seq - 1) END
-                ) AS seq
-         FROM number_blocks b WHERE b.series_id = $1
+  unusedNumbers(tx: Tx, seriesId: string, onlyDeviceId?: string): Promise<UnusedNumber[]> {
+    return tx.many<UnusedNumber>(
+      `WITH blk AS (
+         SELECT b.id, b.start_seq, b.end_seq, b.consumed_up_to, b.expires_at,
+                (d.is_active AND d.deleted_at IS NULL) AS device_active,
+                GREATEST(d.last_seen_at, s.last_pull_at, s.last_push_at) AS last_contact
+         FROM number_blocks b
+         JOIN devices d ON d.id = b.device_id
+         LEFT JOIN device_sync_state s ON s.device_id = b.device_id AND s.tenant_id = b.tenant_id
+         WHERE b.series_id = $1 AND ($2::uuid IS NULL OR b.device_id = $2)
        ),
-       missing AS (
-         SELECT r.seq FROM reserved r
-         WHERE NOT EXISTS (SELECT 1 FROM app.issued_document_numbers i
-                           WHERE i.series_id = $1 AND i.sequence_no = r.seq)
+       reserved AS (
+         SELECT blk.id AS block_id, gs.seq::bigint AS seq,
+                CASE
+                  WHEN NOT blk.device_active THEN 'cancellable'
+                  WHEN blk.expires_at > now() THEN 'in_use'
+                  WHEN blk.last_contact > blk.expires_at + make_interval(hours => $3::int)
+                    OR blk.expires_at <= now() - make_interval(days => $4::int) THEN 'cancellable'
+                  ELSE 'device_offline'
+                END AS status
+         FROM blk
+         CROSS JOIN LATERAL generate_series(
+           blk.start_seq,
+           CASE WHEN blk.expires_at <= now() OR NOT blk.device_active THEN blk.end_seq
+                ELSE COALESCE(blk.consumed_up_to, blk.start_seq - 1) END
+         ) AS gs(seq)
+       ),
+       used AS (
+         SELECT sequence_no AS seq FROM invoices WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM credit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM sales_debit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM financial_credit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM debit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM purchase_orders WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM purchase_bills WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM delivery_challans WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM sales_orders WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM estimates WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM proforma_invoices WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM document_issue_rejections WHERE series_id = $1
+         UNION ALL SELECT sequence_no FROM cancelled_document_numbers WHERE series_id = $1
        )
-       SELECT min(seq) AS "from", max(seq) AS "to"
-       FROM (SELECT seq, seq - row_number() OVER (ORDER BY seq) AS grp FROM missing) grouped
-       GROUP BY grp
-       ORDER BY 1`,
+       SELECT r.block_id AS "blockId", r.seq::int AS seq, r.status
+       FROM reserved r
+       WHERE NOT EXISTS (SELECT 1 FROM used u WHERE u.seq = r.seq)
+       ORDER BY r.seq`,
+      [seriesId, onlyDeviceId ?? null, CONTACT_GRACE_HOURS, ABANDONED_AFTER_DAYS],
+    );
+  },
+
+  /** Series with at least one block, among the outlets the caller may see (null: all). */
+  async seriesWithBlocks(tx: Tx, restrictTo: readonly string[] | null): Promise<string[]> {
+    const rows = await tx.many<{ id: string }>(
+      `SELECT s.id FROM document_series s
+       WHERE s.deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM number_blocks b WHERE b.series_id = s.id)
+         AND ($1::uuid[] IS NULL OR s.outlet_id = ANY($1::uuid[]))
+       ORDER BY s.fy_start_year, s.id`,
+      [restrictTo ? [...restrictTo] : null],
+    );
+    return rows.map((r) => r.id);
+  },
+
+  /** Series a device holds blocks on. */
+  async seriesOfDevice(tx: Tx, deviceId: string): Promise<string[]> {
+    const rows = await tx.many<{ seriesId: string }>(
+      `SELECT DISTINCT series_id AS "seriesId" FROM number_blocks WHERE device_id = $1 ORDER BY 1`,
+      [deviceId],
+    );
+    return rows.map((r) => r.seriesId);
+  },
+
+  /**
+   * Takes the row lock on blocks before declaring their numbers cancelled: the
+   * same lock an upload takes before it uses a number (`lockBlockForSequence`),
+   * so the two never interleave. Ordered, so two callers cannot deadlock.
+   */
+  async lockBlocks(tx: Tx, blockIds: readonly string[]): Promise<void> {
+    if (blockIds.length === 0) return;
+    await tx.query(
+      'SELECT id FROM number_blocks WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+      [[...blockIds]],
+    );
+  },
+
+  /** A removed device's blocks stop being live, so no top-up or lease list counts them. */
+  async expireBlocksOfDevice(tx: Tx, deviceId: string): Promise<void> {
+    await tx.query(
+      'UPDATE number_blocks SET expires_at = now() WHERE device_id = $1 AND expires_at > now()',
+      [deviceId],
+    );
+  },
+
+  /** Table 13 facts of a series: its family and the registration it numbers for. */
+  seriesGstFacts(
+    tx: Tx,
+    seriesId: string,
+  ): Promise<{ seriesFamily: string; registrationId: string | null } | undefined> {
+    return tx.one(
+      `SELECT COALESCE(
+                -- An invoice series may issue bills of supply: use the family its documents carry.
+                (SELECT n.series_family FROM gst_document_numbers n
+                   JOIN invoices i ON n.document_table = 'invoices' AND n.document_id = i.id
+                  WHERE i.series_id = s.id ORDER BY i.sequence_no DESC LIMIT 1),
+                s.series_family) AS "seriesFamily",
+              s.registration_id AS "registrationId"
+       FROM document_series s
+       WHERE s.id = $1`,
       [seriesId],
+    );
+  },
+
+  /** The GSTIN of a registration, for the filed-period check. */
+  async gstinOf(tx: Tx, registrationId: string | null): Promise<string | null> {
+    if (!registrationId) return null;
+    const row = await tx.one<{ gstin: string }>(
+      'SELECT gstin FROM gst_registrations WHERE id = $1',
+      [registrationId],
+    );
+    return row?.gstin ?? null;
+  },
+
+  /**
+   * Per block: the last day it was billed from (latest dated document numbered
+   * inside it), and the day it was leased, both in the business's calendar.
+   */
+  blockDates(
+    tx: Tx,
+    seriesId: string,
+    blockIds: readonly string[],
+  ): Promise<{ blockId: string; lastDocumentDate: string | null; leasedOn: string }[]> {
+    return tx.many(
+      `WITH docs AS (
+         SELECT sequence_no, document_date FROM invoices WHERE series_id = $1
+         UNION ALL SELECT sequence_no, document_date FROM credit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no, document_date FROM sales_debit_notes WHERE series_id = $1
+         UNION ALL SELECT sequence_no, document_date FROM financial_credit_notes WHERE series_id = $1
+       )
+       SELECT b.id AS "blockId",
+              (SELECT to_char(max(d.document_date), 'YYYY-MM-DD') FROM docs d
+                WHERE d.sequence_no BETWEEN b.start_seq AND b.end_seq) AS "lastDocumentDate",
+              to_char((b.created_at AT TIME ZONE t.timezone)::date, 'YYYY-MM-DD') AS "leasedOn"
+       FROM number_blocks b
+       JOIN tenants t ON t.id = b.tenant_id
+       WHERE b.series_id = $1 AND b.id = ANY($2::uuid[])`,
+      [seriesId, [...blockIds]],
+    );
+  },
+
+  /** Today in the business's calendar. */
+  async businessToday(tx: Tx): Promise<string> {
+    const row = await tx.one<{ today: string }>(
+      `SELECT to_char((now() AT TIME ZONE timezone)::date, 'YYYY-MM-DD') AS today
+       FROM tenants WHERE id = app.current_tenant_id()`,
+    );
+    if (!row) throw new Error('tenant not found for the business date');
+    return row.today;
+  },
+
+  async insertCancelledNumbers(tx: Tx, rows: readonly CancelledNumberInsert[]): Promise<void> {
+    if (rows.length === 0) return;
+    await tx.query(
+      `INSERT INTO cancelled_document_numbers (id, tenant_id, series_id, block_id, sequence_no, document_number,
+         series_family, registration_id, cancelled_on, reason, created_by)
+       SELECT id, app.current_tenant_id(), series_id, block_id, sequence_no, document_number,
+              series_family, registration_id, cancelled_on, reason, created_by
+       FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::bigint[], $5::text[], $6::text[], $7::uuid[],
+                   $8::date[], $9::text[], $10::uuid[])
+         AS t(id, series_id, block_id, sequence_no, document_number, series_family, registration_id,
+              cancelled_on, reason, created_by)`,
+      [
+        rows.map((r) => r.id),
+        rows.map((r) => r.seriesId),
+        rows.map((r) => r.blockId),
+        rows.map((r) => r.sequenceNo),
+        rows.map((r) => r.documentNumber),
+        rows.map((r) => r.seriesFamily),
+        rows.map((r) => r.registrationId),
+        rows.map((r) => r.cancelledOn),
+        rows.map((r) => r.reason),
+        rows.map((r) => r.createdBy),
+      ],
     );
   },
 

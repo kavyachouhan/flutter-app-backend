@@ -49,3 +49,9 @@ export type ListSeriesQuery = z.infer<typeof listSeriesQuery>;
 
 export const leaseBody = z.object({ blockSize: z.number().int().positive().optional() });
 export type LeaseBody = z.infer<typeof leaseBody>;
+
+export const cancelUnusedBody = z.object({
+  /** One series; omitted, every series the caller can see. */
+  seriesId: z.string().uuid().optional(),
+});
+export type CancelUnusedBody = z.infer<typeof cancelUnusedBody>;

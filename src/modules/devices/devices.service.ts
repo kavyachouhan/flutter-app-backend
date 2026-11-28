@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from '../../lib/errors.js';
 import { assertOutletAccess } from '../../middleware/authorize.js';
 import { diffFields, recordAudit } from '../audit/audit.js';
 import { authRepository } from '../auth/auth.repository.js';
+import { cancelNumbersOfRemovedDevice } from '../numbering/numbering.service.js';
 import { outletsRepository } from '../outlets/outlets.repository.js';
 import { devicesRepository, type DeviceRow } from './devices.repository.js';
 import type { UpdateDeviceBody } from './devices.schemas.js';
@@ -48,12 +49,18 @@ export function updateDevice(id: string, patch: UpdateDeviceBody) {
   });
 }
 
-/** Revokes refresh tokens too, so the device is locked out at its next refresh. */
+/**
+ * Revokes refresh tokens too, so the device is locked out at its next refresh.
+ * A removed device can never sync again, so the numbers it reserved and did
+ * not use are declared cancelled here: GSTR-1 Table 13 then accounts for them
+ * instead of reporting a gap.
+ */
 export function deactivateDevice(id: string) {
   return withTransaction(async (tx) => {
     await requireDevice(tx, id);
     await devicesRepository.deactivate(tx, id);
     await authRepository.revokeForDevice(tx, id, 'device_deactivated');
+    await cancelNumbersOfRemovedDevice(tx, id);
     await recordAudit(tx, { action: 'device.deactivated', entityType: 'device', entityId: id });
     return requireDevice(tx, id);
   });

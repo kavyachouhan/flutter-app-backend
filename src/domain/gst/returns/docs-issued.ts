@@ -72,7 +72,7 @@ export function buildDocsIssued(rows: readonly IssuedNumberRow[]): DocsIssuedRes
             code: 'document_number_gap',
             ref: nature,
             count: span - total,
-            message: `${span - total} number(s) between ${first.number} and ${last.number} (${nature}) are not accounted for. Every number must be issued, cancelled or explained.`,
+            message: `${span - total} number(s) between ${first.number} and ${last.number} (${nature}) are not accounted for. Every number must be issued, cancelled or explained: numbers reserved for billing and never used can be marked cancelled.`,
           });
         }
       }
